@@ -101,3 +101,19 @@
 >
 > **Dev:** "小说完本了——全部 200 章都 COMPLETED 了。Project 会自动变成 COMPLETED 吗？"
 > **Domain expert:** "不会自动变。所有章完成后 UI 顶部展示'完本提示'横幅，但 Project 保持 DRAFTING。用户需要显式点击'确认完本'才行——小说创作是有仪式感的事情，完本应该是作者的有意识决定，不是自动化脚本。用户也可以忽略横幅继续修改、继续加新章。确认完本后内容是只读的，但随时可以点'继续创作'退回 DRAFTING。"
+
+## 实施状态
+
+> 最后更新：2026-05-20
+
+| 模块 | 状态 | 已实现接口 | 备注 |
+|------|------|-----------|------|
+| ProjectModule | 部分完成 | `POST /projects`（含 title 校验，创建后返回 Project，status 初始为 IDEA） | 当前使用内存 Map 存储，待 #0.1 接入 Prisma + MongoDB |
+| 其他后端模块 | 未开始 | — | WorkflowModule / AIGatewayModule / ReviewModule / ChangeAnalysisService / ContextBudgetService / FactSheetCompensationService |
+| 前端 | 未开始 | — | 全栈模块待 #0.3 前端基础设施搭建后启动 |
+| 测试 | 已启动 | `server/test/project.e2e-spec.ts`（3 条 e2e：创建项目 / 缺 title 400 / 空白 title 400） | TDD 红→绿→重构已完成一轮 |
+
+**技术栈已落地：**
+- 后端：NestJS 11 + TypeScript 5
+- 测试：Jest 30 + supertest
+- 运行时：Node.js 22.16
