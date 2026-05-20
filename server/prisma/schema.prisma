@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────
+
+enum ProjectStatus {
+  IDEA
+  SETTING
+  OUTLINE
+  BEATS
+  DRAFTING
+  COMPLETED
+  ARCHIVED
+}
+
+enum PhaseType {
+  IDEA
+  SETTING
+  OUTLINE
+  BEATS
+  DRAFTING
+}
+
+enum StepStatus {
+  PENDING
+  IN_PROGRESS
+  AI_GENERATING
+  AWAITING_REVIEW
+  REVIEWING
+  CONFIRMED
+  REJECTED
+}
+
+enum ChapterStatus {
+  PENDING
+  DRAFT
+  REVIEWING
+  COMPLETED
+  DISPUTED
+}
+
+enum Severity {
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
+enum ImpactStatus {
+  PENDING
+  FIXED
+  SKIPPED
+  DEFERRED
+}
+
+// ─── Embedded types ───────────────────────────────────
+
+type TargetedFixEntry {
+  patchedAt         DateTime @default(now())
+  sourceChapterId   String   @db.ObjectId
+  changeFingerprint String
+  summary           String
+}
+
+// ─── Collections ──────────────────────────────────────
+
+model Project {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  title              String
+  status             ProjectStatus @default(IDEA)
+  currentPhase       PhaseType     @default(IDEA)
+  config             Json
+  pendingFactUpdates Json[]
+  statusHistory      Json[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model StepData {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  projectId   String     @db.ObjectId
+  phaseType   PhaseType
+  status      StepStatus @default(PENDING)
+  input       String?
+  output      String?
+  review      Json?
+  version     Int        @default(1)
+  confirmedAt DateTime?
+}
+
+model Beat {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  projectId       String   @db.ObjectId
+  chapterNumber   Int
+  plan            Json
+  targetWordCount Int      @default(3000)
+  hookCount       Int      @default(0)
+  isClimax        Boolean  @default(false)
+  useR1           Boolean  @default(false)
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Chapter {
+  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
+  projectId          String              @db.ObjectId
+  chapterNumber      Int
+  title              String?
+  beatPlan           Json?
+  targetWordCount    Int                 @default(3000)
+  content            String?
+  status             ChapterStatus       @default(PENDING)
+  reviewResult       Json?
+  chapterFingerprint String?
+  contextSummary     String?
+  changeAnalysis     Json?
+  targetedFixHistory TargetedFixEntry[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model FactSheet {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String   @db.ObjectId @unique
+  entries   Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+}

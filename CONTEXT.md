@@ -9,7 +9,7 @@
 | **Project（小说项目）** | 用户创建的一本小说的完整创作容器，包含所有 Phase、Chapter 和审核记录。Project 状态：IDEA → SETTING → OUTLINE → BEATS → DRAFTING → COMPLETED，可从 DRAFTING/COMPLETED 归档（ARCHIVED）。 |
 | **Phase（创作阶段）** | 用户视角的 5 个顶层进度节点，顺序固定，不可跳过。五个 Phase：IDEA（灵感提取）、SETTING（设定集）、OUTLINE（剧情大纲）、BEATS（细纲拆解）、DRAFTING（正文迭代）。 |
 | **归档（Archive）** | 将不再活跃创作的小说项目从仪表盘隐藏的操作。归档保留全部数据（Phase、Beat、Chapter、FactSheet），可随时恢复为 DRAFTING 继续创作。仅 DRAFTING 或 COMPLETED 状态的项目可归档。 |
-| **Step（阶段内步骤）** | 单个 Phase 内部的子状态流转，表示用户在特定 Phase 中所处的操作环节。Step 状态机：PENDING → IN_PROGRESS（用户开始输入/触发 AI）→ AI_GENERATING（AI 返回中）→ AWAITING_REVIEW（AI 完成，等待审核）→ REVIEWING（审核中）→ CONFIRMED（用户确认）/ REJECTED（用户驳回，回到 PENDING）。StepData 为 Project 文档中的嵌入子文档，记录每个 Phase 的输入、输出、审核结果和版本历史。 |
+| **Step（阶段内步骤）** | 单个 Phase 内部的子状态流转，表示用户在特定 Phase 中所处的操作环节。Step 状态机：PENDING → IN_PROGRESS（用户开始输入/触发 AI）→ AI_GENERATING（AI 返回中）→ AWAITING_REVIEW（AI 完成，等待审核）→ REVIEWING（审核中）→ CONFIRMED（用户确认）/ REJECTED（用户驳回，回到 PENDING）。StepData 为独立 MongoDB 文档，通过 `projectId` 关联 Project，记录每个 Phase 的输入、输出、审核结果和版本历史。 |
 | **STALE（过时状态）** | 两层语义：**Phase 级别**——用户回退到上游 Phase 修改内容后，下游已确认 Phase 整体标记 STALE，重新推进时提示"复用旧数据"或"基于新上下文重新生成"。STALE 数据不自动删除。**文档级别**（Beat/Chapter）——单条 Beat 或单章因上游变更而过时，但 status 字段保持原值（STALE 非 Chapter.status 枚举值），用户访问时提示"重新生成"或"保留现有内容"。 |
 | **确认（Confirm）** | 用户对当前 Phase 的 AI 输出和审核结果表示认可的动作。确认后 Phase 状态变为 CONFIRMED，允许推进到下一 Phase。 |
 | **Beat（细纲节拍）** | BEATS Phase 的输出单元，描述单章的冲突点、钩子预设、读者期待值和目标字数。每个 Beat 在 DRAFTING Phase 展开为一个 Chapter。Beat 决定了后续 Chapter 的结构密度。 |
@@ -108,12 +108,15 @@
 
 | 模块 | 状态 | 已实现接口 | 备注 |
 |------|------|-----------|------|
-| ProjectModule | 部分完成 | `POST /projects`（含 title 校验，创建后返回 Project，status 初始为 IDEA） | 当前使用内存 Map 存储，待 #0.1 接入 Prisma + MongoDB |
+| ProjectModule | 部分完成 | `POST /projects`（含 title 校验，创建后返回 Project，status 初始为 IDEA） | 当前使用内存 Map 存储，待后续迭代接入 PrismaService |
+| PrismaModule | 已完成 (#4) | PrismaService（含 `$connect`/`$disconnect` 生命周期钩子） | `@Global()` 全局模块，供所有业务模块注入使用 |
+| Prisma Schema | 已完成 (#4) | 5 个 Collection：`Project` / `StepData` / `Beat` / `Chapter` / `FactSheet`；7 个枚举；1 个嵌入类型 `TargetedFixEntry` | Prisma 6.19.3 + MongoDB（replica set 模式，`:27018`），Schema 文件位于 `server/prisma/schema.prisma` |
 | 其他后端模块 | 未开始 | — | WorkflowModule / AIGatewayModule / ReviewModule / ChangeAnalysisService / ContextBudgetService / FactSheetCompensationService |
 | 前端 | 未开始 | — | 全栈模块待 #0.3 前端基础设施搭建后启动 |
-| 测试 | 已启动 | `server/test/project.e2e-spec.ts`（3 条 e2e：创建项目 / 缺 title 400 / 空白 title 400） | TDD 红→绿→重构已完成一轮 |
+| 测试基础设施 | 已完成 (#4) | 单元测试（`*.spec.ts`, 10 条）+ 集成测试（`prisma.integration-spec.ts`, 5 条 MongoDB CRUD）+ e2e（`project.e2e-spec.ts`, 3 条） | TDD 红→绿→重构四轮完成，总计 18 条测试 |
 
 **技术栈已落地：**
 - 后端：NestJS 11 + TypeScript 5
+- ORM：Prisma 6.19.3 + MongoDB（replica set `rs0` on `127.0.0.1:27018`）
 - 测试：Jest 30 + supertest
 - 运行时：Node.js 22.16
