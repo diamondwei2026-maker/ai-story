@@ -113,13 +113,15 @@
 | Prisma Schema | 已完成 (#4) | 5 个 Collection：`Project` / `StepData` / `Beat` / `Chapter` / `FactSheet`；7 个枚举；1 个嵌入类型 `TargetedFixEntry` | Prisma 6.19.3 + MongoDB（replica set 模式，`:27018`），Schema 文件位于 `server/prisma/schema.prisma` |
 | AIGatewayModule | 已完成 (#5) | `GET /ai/generate`（SSE 流式逐 token 推送，TaskType→Model 路由 + 单向降级 V3↔R1，降级时响应含 modelUsed+degraded 字段）+ `GET /ai/stream/:taskId`（流式状态查询） | TDD 五轮完成 + 2 个 Blocker 修复（SSE 真流式逐 chunk 发射、TaskType 差异化降级终端——正文→Error 阻塞 / 审核→failed 标记优雅完成 / 指纹提取→跳过）。AIGatewayService（12 种 TaskType→Model 路由 + SSE Observable + 降级链防死循环守卫）+ ContextBudgetService（三层裁剪 3000/2000/3000，总预算≤8000 tokens）+ PromptTemplateLoaderService（`prompts/` 目录 5 个分类 .md 模板加载渲染，`{{variable}}` 变量替换） |
 | 其他后端模块 | 未开始 | — | WorkflowModule / ReviewModule / ChangeAnalysisService / FactSheetCompensationService |
-| 前端 | 未开始 | — | 全栈模块待 #0.3 前端基础设施搭建后启动 |
-| 测试基础设施 | 已完成 (#4, #5, #7) | 单元测试（`*.spec.ts`, 77 条）+ 集成测试（`prisma.integration-spec.ts`, 5 条 MongoDB CRUD）+ e2e（`project.e2e-spec.ts`, 14 条） | TDD 红→绿→重构完成，覆盖率 9 个测试套件，77 个测试用例（含降级链、双模型失败、SSE 逐 chunk 流式） |
+| 前端基础设施（#6） | 已完成 (#6) | `useProjectStore`（项目列表+当前项目+localStorage 持久化） `useWorkflowStore`（Phase 管理+步骤状态+Phase 访问控制+localStorage 持久化） `<AppLayout />`（书卷风布局） `<WorkflowStepper />`（5 步进度条：灵感提取→设定集→剧情大纲→细纲拆解→正文迭代，当前步金色高亮，已确认绿色勾，未来步不可点击，步骤计数器） `<CanvasBackground />`（Canvas 粒子动画，默认 50 粒子） `<ModelBadge />`（模型名称绿色 Badge，降级黄色+「已降级至 XX」） `<ErrorModal />`（双模型不可用弹窗，手动重试按钮，遮罩点击/ESC 关闭） | TDD 三轮完成：7 套件 52 条测试通过。持久化采用手动 `loadJSON`/`saveJSON`（`stores/persist.ts`）替代 PRD 规划的 pinia-plugin-persistedstate（避免测试环境额外配置）。CSS 设计 token 统一（`css-variables.css` 7 变量）。Vue Router 4 已安装待 #8 配置路由。Ant Design Vue v4 已安装，当前组件为纯 CSS 实现，后续 Issue 逐步引入 a-steps/a-modal 等 |
+| 测试基础设施 | 已完成 (#4, #5, #7, #6) | 后端：Jest 30 + supertest（单元 77 条 + 集成 5 条 + e2e 14 条）。前端：Vitest 2.1 + @vue/test-utils + happy-dom（Store 20 条 + 组件 32 条） | TDD 红→绿→重构完成。后端 96 条 + 前端 52 条 = 共 148 条 |
 
 
 **技术栈已落地：**
 - 后端：NestJS 11 + TypeScript 5
+- 前端：Vue 3.5 + Vite 6 + Ant Design Vue v4 + Pinia 3 + Vue Router 4
 - AI 网关：LangChain（`@langchain/openrouter` + `@langchain/core` + `langchain`）→ OpenRouter → DeepSeek V3 / R1
 - ORM：Prisma 6.19.3 + MongoDB（replica set `rs0` on `127.0.0.1:27018`）
-- 测试：Jest 30 + supertest + RxJS Observable
+- 后端测试：Jest 30 + supertest + RxJS Observable
+- 前端测试：Vitest 2.1 + @vue/test-utils + happy-dom
 - 运行时：Node.js 22.16
