@@ -18,6 +18,7 @@
 
 - **[W1] Vue Router 已声明但未使用**: CONTEXT.md 技术栈列出 `Vue Router 4`，但 #6 实现不包含任何路由配置。前端基础设施阶段不要求路由，但声明了未使用的依赖会给后续开发者造成困惑——不知道路由是否应该已配置。
   → 涉及：`CONTEXT.md`
+  → **状态：已于 #8 修复**（`router/index.ts` + `main.ts` 完成路由配置）
 
 - **[W2] Ant Design Vue v4 未在组件中落地**: PRD 规定 Ant Design Vue v4 作为 UI 组件库，但 #6 的 5 个组件（AppLayout / WorkflowStepper / CanvasBackground / ModelBadge / ErrorModal）均使用纯 HTML/CSS 实现，未调用任何 Ant Design 组件。WorkflowStepper 和 ErrorModal 在后续 Issue（#8 工作流容器、#13 ReviewPanel）中可能需要切换到 a-steps / a-modal 组件，存在返工风险。
   → 涉及：`docs/prd/novelcraft-pro.md`
