@@ -111,13 +111,15 @@
 | ProjectModule | 已完成 (#7) | `POST /projects`（创建项目，含 title 校验） `GET /projects`（列表，过滤 ARCHIVED） `GET /projects/:id`（详情） `PATCH /projects/:id`（更新标题/配置） `DELETE /projects/:id`（永久删除） `POST /projects/:id/archive`（归档，状态→ARCHIVED） `POST /projects/:id/restore`（恢复归档→DRAFTING，非归档拒绝 400） | 当前使用内存 Map 存储，待后续迭代接入 PrismaService。ProjectStatus 类型已对齐 Prisma Schema 全量枚举 |
 | PrismaModule | 已完成 (#4) | PrismaService（含 `$connect`/`$disconnect` 生命周期钩子） | `@Global()` 全局模块，供所有业务模块注入使用 |
 | Prisma Schema | 已完成 (#4) | 5 个 Collection：`Project` / `StepData` / `Beat` / `Chapter` / `FactSheet`；7 个枚举；1 个嵌入类型 `TargetedFixEntry` | Prisma 6.19.3 + MongoDB（replica set 模式，`:27018`），Schema 文件位于 `server/prisma/schema.prisma` |
-| 其他后端模块 | 未开始 | — | WorkflowModule / AIGatewayModule / ReviewModule / ChangeAnalysisService / ContextBudgetService / FactSheetCompensationService |
+| AIGatewayModule | 已完成 (#5) | `GET /ai/generate`（SSE 流式逐 token 推送，TaskType→Model 路由 + 单向降级 V3↔R1，降级时响应含 modelUsed+degraded 字段）+ `GET /ai/stream/:taskId`（流式状态查询） | TDD 五轮完成 + 2 个 Blocker 修复（SSE 真流式逐 chunk 发射、TaskType 差异化降级终端——正文→Error 阻塞 / 审核→failed 标记优雅完成 / 指纹提取→跳过）。AIGatewayService（12 种 TaskType→Model 路由 + SSE Observable + 降级链防死循环守卫）+ ContextBudgetService（三层裁剪 3000/2000/3000，总预算≤8000 tokens）+ PromptTemplateLoaderService（`prompts/` 目录 5 个分类 .md 模板加载渲染，`{{variable}}` 变量替换） |
+| 其他后端模块 | 未开始 | — | WorkflowModule / ReviewModule / ChangeAnalysisService / FactSheetCompensationService |
 | 前端 | 未开始 | — | 全栈模块待 #0.3 前端基础设施搭建后启动 |
-| 测试基础设施 | 已完成 (#4, #7) | 单元测试（`*.spec.ts`, 16 条）+ 集成测试（`prisma.integration-spec.ts`, 5 条 MongoDB CRUD）+ e2e（`project.e2e-spec.ts`, 14 条） | TDD 红→绿→重构五轮完成，总计 35 条测试 |
+| 测试基础设施 | 已完成 (#4, #5, #7) | 单元测试（`*.spec.ts`, 77 条）+ 集成测试（`prisma.integration-spec.ts`, 5 条 MongoDB CRUD）+ e2e（`project.e2e-spec.ts`, 14 条） | TDD 红→绿→重构完成，覆盖率 9 个测试套件，77 个测试用例（含降级链、双模型失败、SSE 逐 chunk 流式） |
 
 
 **技术栈已落地：**
 - 后端：NestJS 11 + TypeScript 5
+- AI 网关：LangChain（`@langchain/openrouter` + `@langchain/core` + `langchain`）→ OpenRouter → DeepSeek V3 / R1
 - ORM：Prisma 6.19.3 + MongoDB（replica set `rs0` on `127.0.0.1:27018`）
-- 测试：Jest 30 + supertest
+- 测试：Jest 30 + supertest + RxJS Observable
 - 运行时：Node.js 22.16

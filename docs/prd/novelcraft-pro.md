@@ -155,10 +155,9 @@ NovelCraft Pro 是一个**分步确认式 AI 长篇小说创作系统**。它将
 |------|------|------|
 | ProjectModule | `POST/GET/PATCH/DELETE /projects` | 小说项目 CRUD |
 | WorkflowModule | `GET/POST /projects/:id/steps/:step` | 5 步工作流状态机，管理阶段确认与回退。BEATS 确认时负责写入 Beat 文档 + 创建空壳 Chapter + 更新 Project.refs。新增 BEATS 轻量修改、confirmCompletion/reopenProject、BEATS 内部修改 vs 跨 Phase 回退区分 |
-| AIGatewayModule | `POST /ai/generate`, `GET /ai/stream/:taskId` | AI 调用唯一入口：通过 LangChain ChatModel 薄层调用 OpenRouter，按 TaskType→Model 映射路由，支持 SSE 流式输出、自动重试+断点续传、单向模型降级。所有模块（含 ReviewModule）通过 AIGatewayModule 调用 AI |
+| AIGatewayModule | `GET /ai/generate`（SSE 逐 token 流式）, `GET /ai/stream/:taskId`（状态查询） | AI 调用唯一入口：通过 LangChain ChatModel 薄层调用 OpenRouter，按 TaskType→Model 映射路由，支持 SSE 流式输出、单向模型降级 V3↔R1（正文→Error 阻塞 / 审核→failed 优雅完成 / 指纹→跳过）、三层上下文预算裁剪（全局静态≤3000 / 全局动态≤2000 / 局部≤3000，总≤8000 tokens）。内含 AIGatewayService（路由+降级+流式）+ ContextBudgetService（Token 估算+三层裁剪）+ PromptTemplateLoaderService（`prompts/` 目录 .md 模板加载渲染）。所有模块（含 ReviewModule）通过 AIGatewayModule 调用 AI |
 | ReviewModule | `POST /review/evaluate`, `POST /review/appeal` | "资深编辑"AI 审核：组装审核 Prompt → 调用 AIGatewayModule → 解析结构化审核结果。新增审核决策路由（getAvailableActions / appealReview）、四档结论的完整用户操作 |
 | ChangeAnalysisService | 内部 Service（无独立端点） | 变更检测编排：实质性变更判定 → 提取 ChangeFingerprint + ImpactPropagation（合并 AI 调用）→ DB 查询匹配受影响章节 → TargetedFix 编排。分析结果持久化到源 Chapter |
-| ContextBudgetService | 纯函数模块（无独立端点） | Token 计数与三层上下文裁剪：全局静态层按 5 级优先级裁剪、全局动态层按匹配度取前 N 条、局部上下文层长章摘要替代。总预算控制 |
 | FactSheetCompensationService | 内部 Service（无独立端点） | FactSheet 乐观锁补偿队列：写冲突入队、批量消费合并（去重+冲突裁决）、队列深度监控与告警、手动强制同步 |
 
 **前端模块：**
@@ -292,7 +291,7 @@ BLOCKED:
 
 ### API 契约（核心端点）
 
-**POST `/projects/:id/steps/idea/confirm`**
+**`POST /projects/:id/steps/idea/confirm`**
 
 确认灵感步骤，触发 Market & Compliance 审核：
 
@@ -314,23 +313,29 @@ BLOCKED:
 }
 ```
 
-**POST `/ai/generate`**
+**`GET /ai/generate`**（SSE 流式，NestJS `@Sse()`）
 
-通用 AI 生成端点（支持流式）：
+通用 AI 生成端点，按 TaskType 路由到对应模型并通过 SSE 逐 token 推送：
 
-```json
-// Request
-{
-  "projectId": "proj_001",
-  "step": "outline",
-  "action": "generate",
-  "params": { "structure": "three-act", "style": "快节奏爽文", "targetWordCount": 3000 },
-  "context": { "previousStepOutput": "..." }
-}
+```
+// Query params: ?taskType=CHAPTER_GENERATION&prompt=写一个章节开头&maxTokens=3000&temperature=0.7
 
 // Response: SSE stream (text/event-stream)
-// data: {"chunk": "第一幕：建置\n开场..."}
-// data: [DONE]
+// event: message
+// data: {"content":"第一幕","done":false}
+// data: {"content":"：建置\n开场...","done":false}
+// data: {"content":"","done":true,"modelUsed":"deepseek-chat-v3","degraded":false}
+```
+
+降级时 SSE 末 chunk 含 `degraded:true` 标记；双模型均不可用时按 TaskType 差异化终端行为（正文→Error 阻塞 / 审核→`failed:true` 优雅完成 / 指纹提取→`failed:true` 跳过）。
+
+**`GET /ai/stream/:taskId`**
+
+流式任务状态查询：
+
+```json
+// Response
+{ "taskId": "task-123", "status": "completed", "progress": 100 }
 ```
 
 ### 数据模型（核心实体）
