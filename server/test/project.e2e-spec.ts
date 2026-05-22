@@ -2,6 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AI_MODEL_TOKEN } from '../src/ai-gateway/ai-gateway.service';
+
+const mockChatModel = {
+  stream: async function* () {
+    yield { content: '' };
+  },
+};
 
 describe('ProjectModule (e2e)', () => {
   let app: INestApplication;
@@ -9,7 +16,10 @@ describe('ProjectModule (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(AI_MODEL_TOKEN)
+      .useValue(mockChatModel)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();

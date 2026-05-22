@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectModule } from './project/project.module';
 import { AIGatewayModule } from './ai-gateway/ai-gateway.module';
+import { StepModule } from './step/step.module';
 
 @Module({
-  imports: [PrismaModule, ProjectModule, AIGatewayModule],
+  imports: [PrismaModule, ProjectModule, AIGatewayModule, StepModule],
   controllers: [],
   providers: [],
 })

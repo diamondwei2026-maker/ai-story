@@ -32,7 +32,7 @@ export class ProjectService {
 
   update(
     id: string,
-    data: { title?: string; config?: Project['config'] },
+    data: { title?: string; config?: Project['config']; status?: Project['status'] },
   ): Project | null {
     const project = this.projects.get(id);
     if (!project) return null;
@@ -41,6 +41,9 @@ export class ProjectService {
     }
     if (data.config !== undefined) {
       project.config = data.config;
+    }
+    if (data.status !== undefined) {
+      project.status = data.status;
     }
     project.updatedAt = new Date();
     return project;

@@ -49,7 +49,7 @@ export class ProjectController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: { title?: string; config?: Project['config'] },
+    @Body() body: { title?: string; config?: Project['config']; status?: Project['status'] },
   ): Project {
     const project = this.projectService.update(id, body);
     if (!project) {

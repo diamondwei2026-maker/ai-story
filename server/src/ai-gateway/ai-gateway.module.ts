@@ -20,5 +20,6 @@ import { ContextBudgetService } from './context-budget.service';
       },
     },
   ],
+  exports: [AIGatewayService, PromptTemplateLoaderService, ContextBudgetService, AI_MODEL_TOKEN],
 })
 export class AIGatewayModule {}

@@ -1,0 +1,70 @@
+/* Shared styles for editable card components (WorldBuilder, CharacterCard, RelationGraph) */
+
+.edit-card {
+  padding: 16px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.edit-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.edit-card__title {
+  font-size: 16px;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.edit-card__edit-btn {
+  padding: 4px 16px;
+  border: 1px solid var(--color-gold);
+  background: transparent;
+  color: var(--color-gold);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.edit-card__save-btn {
+  padding: 4px 16px;
+  border: 1px solid var(--color-gold);
+  background: var(--color-gold);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.edit-card__section-label {
+  font-size: 14px;
+  color: var(--color-text-primary);
+  margin: 0 0 6px 0;
+}
+
+.edit-card__section-text {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  margin: 0;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+.edit-card__section-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.8;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+}
