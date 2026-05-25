@@ -1098,7 +1098,7 @@ describe('StepService', () => {
   });
 
   describe('updateBeatStructure', () => {
-    it('should update the beat plan and mark Beat + Chapter STALE', async () => {
+    it('should update the beat plan and keep Chapter status unchanged (STALE is conceptual)', async () => {
       const project = projectService.create({ title: '结构修改测试' });
       project.status = 'BEATS';
       projectService.update(project.id, {});
@@ -1114,18 +1114,25 @@ describe('StepService', () => {
         readerExpectation: '中',
       };
 
+      const chapters = service.getChaptersByProjectId(project.id);
+      const matchedChapter = chapters.find(
+        (c) => c.chapterNumber === target.chapterNumber,
+      );
+      const originalChapterStatus = matchedChapter!.status;
+
       const updated = await service.updateBeatStructure(target.id, newPlan);
 
       expect(updated.status).toBe('STALE');
       expect(updated.plan).toMatchObject(newPlan);
 
-      // Corresponding Chapter should also be STALE
-      const chapters = service.getChaptersByProjectId(project.id);
-      const matchedChapter = chapters.find(
+      // Chapter keeps original status — STALE is a conceptual marker, not a status value (ADR-0005)
+      const chaptersAfter = service.getChaptersByProjectId(project.id);
+      const chapterAfter = chaptersAfter.find(
         (c) => c.chapterNumber === target.chapterNumber,
       );
-      expect(matchedChapter).toBeDefined();
-      expect(matchedChapter!.status).toBe('STALE');
+      expect(chapterAfter).toBeDefined();
+      expect(chapterAfter!.status).toBe(originalChapterStatus);
+      expect(chapterAfter!.beatPlan).toMatchObject(newPlan);
     });
 
     it('should not trigger cross-Phase rollback', async () => {

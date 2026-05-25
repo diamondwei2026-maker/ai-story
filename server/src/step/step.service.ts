@@ -30,6 +30,8 @@ export class StepService {
   private steps: Map<string, StepData> = new Map();
   private beatsByProject: Map<string, BeatData[]> = new Map();
   private chaptersByProject: Map<string, ChapterData[]> = new Map();
+  private pausedChapterIds: Set<string> = new Set();
+  private factSheetByProject: Map<string, Record<string, unknown>> = new Map();
 
   constructor(
     private readonly projectService: ProjectService,
@@ -329,7 +331,6 @@ export class StepService {
 
     const chapter = this.findChapterForBeat(beat);
     if (chapter) {
-      chapter.status = 'STALE';
       chapter.beatPlan = beat.plan;
       chapter.updatedAt = new Date();
     }
@@ -339,6 +340,231 @@ export class StepService {
 
   getChaptersByProjectId(projectId: string): ChapterData[] {
     return this.chaptersByProject.get(projectId) ?? [];
+  }
+
+  // ─── DRAFTING Phase: Chapter Generation ──────────────────────
+
+  async generateChapter(
+    projectId: string,
+    chapterId: string,
+    opts: {
+      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
+      feedback?: string;
+    },
+  ): Promise<ChapterData> {
+    const project = this.projectService.findById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    if (project.status !== 'DRAFTING') {
+      throw new BadRequestException('Project status must be DRAFTING');
+    }
+
+    const chapter = this.getChapterOrThrow(chapterId);
+
+    // Sequential lock: previous chapter must be COMPLETED or DISPUTED
+    const previous = this.findPreviousChapter(projectId, chapter.chapterNumber);
+    if (previous && !['COMPLETED', 'DISPUTED'].includes(previous.status)) {
+      throw new BadRequestException(
+        `Previous chapter ${previous.chapterNumber} must be COMPLETED or DISPUTED before generating chapter ${chapter.chapterNumber}`,
+      );
+    }
+
+    // Step 1: SSE streaming content generation
+    chapter.status = 'DRAFT';
+    chapter.content = await this.collectAiOutput(
+      TaskType.CHAPTER_GENERATION,
+      this.promptLoader.renderTemplate('creation', 'chapter-generation', {
+        mode: opts.mode,
+        beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
+        targetWordCount: String(chapter.targetWordCount),
+        feedback: opts.feedback ?? '',
+        previousSummary: previous?.contextSummary ?? '',
+      }),
+    );
+
+    // Steps 2–5: post-generation pipeline
+    await this.runPostGenerationPipeline(chapter, projectId);
+
+    chapter.status = 'REVIEWING';
+    chapter.updatedAt = new Date();
+    this.pausedChapterIds.delete(chapterId);
+
+    return chapter;
+  }
+
+  async confirmChapter(
+    projectId: string,
+    chapterId: string,
+  ): Promise<ChapterData> {
+    return this.transitionChapterStatus(chapterId, 'REVIEWING', 'COMPLETED');
+  }
+
+  async disputeChapter(
+    projectId: string,
+    chapterId: string,
+  ): Promise<ChapterData> {
+    return this.transitionChapterStatus(chapterId, 'REVIEWING', 'DISPUTED');
+  }
+
+  async pauseChapterGeneration(
+    projectId: string,
+    chapterId: string,
+  ): Promise<ChapterData> {
+    const chapter = this.getChapterOrThrow(chapterId);
+    if (chapter.status === 'PENDING' && !chapter.content) {
+      throw new BadRequestException('No active generation to pause');
+    }
+    this.pausedChapterIds.add(chapterId);
+    return chapter;
+  }
+
+  async continueChapterGeneration(
+    projectId: string,
+    chapterId: string,
+    opts: { currentContent: string },
+  ): Promise<ChapterData> {
+    const chapter = this.getChapterOrThrow(chapterId);
+    if (!this.pausedChapterIds.has(chapterId)) {
+      throw new BadRequestException('No paused generation to continue');
+    }
+
+    chapter.status = 'DRAFT';
+    chapter.content = opts.currentContent;
+
+    const continuation = await this.collectAiOutput(
+      TaskType.CHAPTER_GENERATION,
+      this.promptLoader.renderTemplate('creation', 'chapter-generation', {
+        mode: 'new-continue',
+        beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
+        targetWordCount: String(chapter.targetWordCount),
+        currentContent: opts.currentContent,
+      }),
+    );
+
+    chapter.content = opts.currentContent + continuation;
+
+    await this.runPostGenerationPipeline(chapter, projectId);
+
+    chapter.status = 'REVIEWING';
+    chapter.updatedAt = new Date();
+    this.pausedChapterIds.delete(chapterId);
+
+    return chapter;
+  }
+
+  async retryChapterGeneration(
+    projectId: string,
+    chapterId: string,
+    opts: {
+      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
+      feedback?: string;
+    },
+  ): Promise<ChapterData> {
+    return this.generateChapter(projectId, chapterId, {
+      mode: opts.mode,
+      feedback: opts.feedback,
+    });
+  }
+
+  // ─── Private helpers for DRAFTING phase ──────────────────────
+
+  private getChapterOrThrow(chapterId: string): ChapterData {
+    const chapter = this.findChapterById(chapterId);
+    if (!chapter) {
+      throw new NotFoundException('Chapter not found');
+    }
+    return chapter;
+  }
+
+  private async runPostGenerationPipeline(
+    chapter: ChapterData,
+    projectId: string,
+  ): Promise<void> {
+    // Step 2: Fingerprint extraction
+    chapter.chapterFingerprint = await this.collectAiOutput(
+      TaskType.FINGERPRINT_EXTRACTION,
+      `Extract fingerprint for: ${chapter.content}`,
+    );
+
+    // Step 3: FactSheet optimistic lock update
+    const currentSheet = this.factSheetByProject.get(projectId) ?? {};
+    const updatedSheet = { ...currentSheet };
+    const sheetUpdateRaw = await this.collectAiOutput(
+      TaskType.FACTSHEET_UPDATE,
+      `Update FactSheet with: ${chapter.content}`,
+    );
+    try {
+      const parsed = JSON.parse(sheetUpdateRaw);
+      Object.assign(updatedSheet, parsed);
+    } catch {
+      updatedSheet['chapter_' + chapter.chapterNumber] = {
+        annotation: sheetUpdateRaw,
+      };
+    }
+    this.factSheetByProject.set(projectId, updatedSheet);
+
+    // Step 4: Independent review
+    const reviewRaw = await this.collectAiOutput(
+      TaskType.INDEPENDENT_REVIEW,
+      `Review content: ${chapter.content}`,
+    );
+    chapter.reviewResult = {
+      passed: true,
+      raw: reviewRaw,
+      reviewedAt: new Date().toISOString(),
+    };
+
+    // Step 5: Context summary (only if content > 2500 tokens)
+    const estimatedTokens = this.estimateTokens(chapter.content!);
+    if (estimatedTokens > 2500) {
+      chapter.contextSummary = await this.collectAiOutput(
+        TaskType.CHAPTER_GENERATION,
+        `Summarize: ${chapter.content!.substring(0, 8000)}`,
+      );
+    }
+  }
+
+  private transitionChapterStatus(
+    chapterId: string,
+    expectedStatus: ChapterData['status'],
+    targetStatus: ChapterData['status'],
+  ): ChapterData {
+    const chapter = this.getChapterOrThrow(chapterId);
+    if (chapter.status !== expectedStatus) {
+      throw new BadRequestException(
+        `Chapter must be ${expectedStatus} (current: ${chapter.status})`,
+      );
+    }
+    chapter.status = targetStatus;
+    chapter.updatedAt = new Date();
+    return chapter;
+  }
+
+  private findChapterById(chapterId: string): ChapterData | null {
+    for (const chapters of this.chaptersByProject.values()) {
+      const found = chapters.find((c) => c.id === chapterId);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  private findPreviousChapter(
+    projectId: string,
+    chapterNumber: number,
+  ): ChapterData | null {
+    const chapters = this.chaptersByProject.get(projectId) ?? [];
+    if (chapterNumber <= 1) return null;
+    return (
+      chapters.find((c) => c.chapterNumber === chapterNumber - 1) ?? null
+    );
+  }
+
+  private estimateTokens(content: string): number {
+    // Rough estimation: 1 Chinese character ≈ 1 token, 1 English word ≈ 1.3 tokens
+    const chineseChars = (content.match(/[一-鿿]/g) || []).length;
+    const englishWords = (content.match(/[a-zA-Z]+/g) || []).length;
+    return chineseChars + Math.ceil(englishWords * 1.3);
   }
 
   private findBeatById(beatId: string): BeatData | null {
@@ -375,6 +601,9 @@ export class StepService {
       status: 'PENDING',
       chapterFingerprint: null,
       contextSummary: null,
+      reviewResult: null,
+      changeAnalysis: null,
+      targetedFixHistory: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };

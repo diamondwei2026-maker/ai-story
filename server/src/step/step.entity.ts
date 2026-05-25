@@ -37,6 +37,13 @@ export interface BeatData {
   updatedAt: Date;
 }
 
+export interface TargetedFixEntry {
+  patchedAt: Date;
+  sourceChapterId: string;
+  changeFingerprint: string;
+  summary: string;
+}
+
 export interface ChapterData {
   id: string;
   projectId: string;
@@ -45,9 +52,12 @@ export interface ChapterData {
   beatPlan: Record<string, unknown> | null;
   targetWordCount: number;
   content: string | null;
-  status: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED' | 'STALE';
+  status: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
   chapterFingerprint: string | null;
   contextSummary: string | null;
+  reviewResult: Record<string, unknown> | null;
+  changeAnalysis: Record<string, unknown> | null;
+  targetedFixHistory: TargetedFixEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
