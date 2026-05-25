@@ -7,14 +7,44 @@ import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { StepData, PhaseType, StepStatus } from './step.entity';
 
 const mockChatModel = {
-  stream: async function* () {
-    yield { content: '## 时代背景\n这是一个修真世界。\n' };
-    yield { content: '## 力量体系\n炼气、筑基、金丹、元婴、化神。\n' };
+  stream: async function* (input: string) {
+    if (input.includes('beats')) {
+      yield {
+        content:
+          '## Chapter 1: 序章·觉醒\n- 冲突点: 主角发现自己的特殊能力\n- 钩子预设: 神秘组织暗中观察, 能力觉醒之谜\n- 读者期待值: 高\n- 目标字数: 3000\n',
+      };
+      yield {
+        content:
+          '\n## Chapter 2: 初入江湖\n- 冲突点: 第一次实战遭遇强敌\n- 钩子预设: 神秘老人相助\n- 读者期待值: 中\n- 目标字数: 3500\n',
+      };
+      yield {
+        content:
+          '\n## Chapter 3: 暗流涌动\n- 冲突点: 发现更大的阴谋\n- 钩子预设: 隐藏势力浮出水面, 意外的背叛, 古老的预言\n- 读者期待值: 高\n- 目标字数: 4000\n',
+      };
+      yield {
+        content:
+          '\n## Chapter 4: 绝境求生\n- 冲突点: 被困险境\n- 钩子预设: 极限突破\n- 读者期待值: 中\n- 目标字数: 3200\n',
+      };
+      yield {
+        content:
+          '\n## Chapter 5: 逆转时刻\n- 冲突点: 反击开始\n- 钩子预设: 扭转局势, 新的盟友\n- 读者期待值: 高\n- 目标字数: 3800\n',
+      };
+    } else {
+      yield { content: '## 时代背景\n这是一个修真世界。\n' };
+      yield { content: '## 力量体系\n炼气、筑基、金丹、元婴、化神。\n' };
+    }
   },
 };
 
 const mockPromptLoader = {
-  renderTemplate: jest.fn().mockReturnValue('rendered setting prompt'),
+  renderTemplate: jest.fn().mockImplementation(
+    (_domain: string, template: string, _vars: Record<string, unknown>) => {
+      if (template === 'beats-generation') {
+        return 'beats generation prompt';
+      }
+      return 'rendered setting prompt';
+    },
+  ),
 };
 
 const mockBudgetService = {
@@ -662,6 +692,514 @@ describe('StepService', () => {
       const project = projectService.create({ title: '无大纲步骤' });
 
       expect(service.getOutlineByProjectId(project.id)).toBeNull();
+    });
+  });
+
+  // ─── BEATS Phase ────────────────────────────────────────────
+
+  describe('generateBeats', () => {
+    it('should generate beats from outline via AI and return BeatData[]', async () => {
+      const project = projectService.create({ title: '细纲测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      const beats = await service.generateBeats(project.id, {
+        outline: '大纲内容...',
+      });
+
+      expect(beats).toBeDefined();
+      expect(Array.isArray(beats)).toBe(true);
+      expect(beats.length).toBeGreaterThan(0);
+      expect(beats[0]).toHaveProperty('chapterNumber');
+      expect(beats[0]).toHaveProperty('plan');
+      expect(beats[0]).toHaveProperty('hookCount');
+      expect(beats[0]).toHaveProperty('isClimax');
+      expect(beats[0]).toHaveProperty('useR1');
+      expect(beats[0]).toHaveProperty('targetWordCount');
+      expect(beats[0]).toHaveProperty('status');
+    });
+
+    it('should auto-extract hookCount from generated plan', async () => {
+      const project = projectService.create({ title: '钩子计数测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      const beats = await service.generateBeats(project.id, {
+        outline: '大纲内容...',
+      });
+
+      for (const beat of beats) {
+        expect(typeof beat.hookCount).toBe('number');
+        expect(beat.hookCount).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it('should throw when project does not exist', async () => {
+      await expect(
+        service.generateBeats('nonexistent-id', { outline: 'test' }),
+      ).rejects.toThrow(/Project not found/);
+    });
+
+    it('should throw when project status is not BEATS', async () => {
+      const project = projectService.create({ title: 'OUTLINE阶段项目' });
+      project.status = 'OUTLINE';
+      projectService.update(project.id, {});
+
+      await expect(
+        service.generateBeats(project.id, { outline: 'test' }),
+      ).rejects.toThrow(/status must be BEATS/);
+    });
+
+    it('should use regeneration prompt when currentContent is provided', async () => {
+      const project = projectService.create({ title: '刷新测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      const currentContent = '用户编辑后的细纲内容';
+      await service.generateBeats(project.id, {
+        outline: '大纲内容',
+        currentContent,
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'beats-generation',
+        expect.objectContaining({ currentContent }),
+      );
+    });
+
+    it('should reuse existing beats on regenerate (return same beat IDs)', async () => {
+      const project = projectService.create({ title: '复用细纲测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      const first = await service.generateBeats(project.id, {
+        outline: '大纲内容',
+      });
+      const firstIds = first.map((b) => b.id);
+
+      await service.rejectBeats(project.id);
+
+      const second = await service.generateBeats(project.id, {
+        outline: '大纲内容',
+      });
+
+      expect(second.map((b) => b.id)).toEqual(firstIds);
+    });
+
+    it('should call AIGatewayService with TaskType.BEATS', async () => {
+      const project = projectService.create({ title: '调用测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateBeats(project.id, {
+        outline: '大纲内容',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmBeats', () => {
+    it('should confirm beats and transition project from BEATS to DRAFTING', async () => {
+      const project = projectService.create({ title: '确认测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const result = await service.confirmBeats(project.id);
+
+      expect(result.phaseType).toBe('BEATS');
+      expect(result.status).toBe('CONFIRMED');
+      expect(result.confirmedAt).toBeInstanceOf(Date);
+
+      const updated = projectService.findById(project.id);
+      expect(updated!.status).toBe('DRAFTING');
+    });
+
+    it('should batch calculate useR1 on confirm: first 3 chapters get R1', async () => {
+      const project = projectService.create({ title: 'R1开头测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      // Chapters 1-3 (structural position) should have useR1 = true
+      const earlyBeats = beats.filter((b) => b.chapterNumber <= 3);
+      for (const beat of earlyBeats) {
+        expect(beat.useR1).toBe(true);
+      }
+    });
+
+    it('should batch calculate useR1 on confirm: last 3 chapters get R1', async () => {
+      const project = projectService.create({ title: 'R1结尾测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const totalChapters = beats.length;
+      const lateBeats = beats.filter(
+        (b) => b.chapterNumber >= totalChapters - 2,
+      );
+      for (const beat of lateBeats) {
+        expect(beat.useR1).toBe(true);
+      }
+    });
+
+    it('should set useR1 = true when hookCount >= 3 regardless of position', async () => {
+      const project = projectService.create({ title: '高钩子R1测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      // Manually set a middle chapter to have high hook count before confirm
+      const beats = service.getBeatsByProjectId(project.id);
+      const midBeat = beats.find((b) => b.chapterNumber > 3 && b.chapterNumber < beats.length - 2);
+      if (midBeat) {
+        // Simulate high hook count by updating the beat plan
+        await service.updateBeatWordCount(midBeat.id, midBeat.targetWordCount);
+      }
+
+      await service.confirmBeats(project.id);
+
+      const confirmed = service.getBeatsByProjectId(project.id);
+      const highHookBeat = confirmed.find((b) => b.hookCount >= 3);
+      if (highHookBeat) {
+        expect(highHookBeat.useR1).toBe(true);
+      }
+    });
+
+    it('should set useR1 = true when isClimax is true', async () => {
+      const project = projectService.create({ title: '高潮R1测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      // Manually mark a chapter as climax before confirm
+      const beats = service.getBeatsByProjectId(project.id);
+      const midBeat = beats.find((b) => b.chapterNumber > 3);
+      if (midBeat) {
+        await service.updateBeatStructure(midBeat.id, {
+          ...midBeat.plan,
+          isClimax: true,
+        });
+      }
+
+      await service.confirmBeats(project.id);
+
+      const confirmed = service.getBeatsByProjectId(project.id);
+      const climaxBeat = confirmed.find((b) => b.isClimax);
+      if (climaxBeat) {
+        expect(climaxBeat.useR1).toBe(true);
+      }
+    });
+
+    it('should create empty Chapter shells for each beat on confirm', async () => {
+      const project = projectService.create({ title: '空壳章节测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const chapters = service.getChaptersByProjectId(project.id);
+      const beats = service.getBeatsByProjectId(project.id);
+
+      expect(chapters.length).toBe(beats.length);
+      for (const chapter of chapters) {
+        expect(chapter.status).toBe('PENDING');
+        expect(chapter.content).toBeNull();
+        expect(chapter.targetWordCount).toBeGreaterThan(0);
+      }
+    });
+
+    it('should throw when no beats exist to confirm', async () => {
+      const project = projectService.create({ title: '无细纲确认' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await expect(service.confirmBeats(project.id)).rejects.toThrow(
+        /No generated beats/,
+      );
+    });
+
+    it('should throw when beats are already confirmed', async () => {
+      const project = projectService.create({ title: '重复确认' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      await expect(service.confirmBeats(project.id)).rejects.toThrow(
+        /already confirmed/,
+      );
+    });
+
+    it('should throw when beats are rejected (not AWAITING_REVIEW)', async () => {
+      const project = projectService.create({ title: '驳回后确认' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.rejectBeats(project.id);
+
+      await expect(service.confirmBeats(project.id)).rejects.toThrow(
+        /must be AWAITING_REVIEW/,
+      );
+    });
+  });
+
+  describe('rejectBeats', () => {
+    it('should reject generated beats', async () => {
+      const project = projectService.create({ title: '驳回细纲' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const result = await service.rejectBeats(project.id);
+
+      expect(result.phaseType).toBe('BEATS');
+      expect(result.status).toBe('REJECTED');
+    });
+
+    it('should throw when no generated beats exist to reject', async () => {
+      const project = projectService.create({ title: '无细纲驳回' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await expect(service.rejectBeats(project.id)).rejects.toThrow(
+        /No generated beats/,
+      );
+    });
+
+    it('should throw when beats are already confirmed', async () => {
+      const project = projectService.create({ title: '已确认驳回' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      await expect(service.rejectBeats(project.id)).rejects.toThrow(
+        /already confirmed/,
+      );
+    });
+  });
+
+  describe('getBeatsByProjectId', () => {
+    it('should retrieve all beats for a project', async () => {
+      const project = projectService.create({ title: '查询测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      const generated = await service.generateBeats(project.id, {
+        outline: '大纲内容',
+      });
+
+      const found = service.getBeatsByProjectId(project.id);
+      expect(found).toBeDefined();
+      expect(found.length).toBe(generated.length);
+      expect(found[0].projectId).toBe(project.id);
+    });
+
+    it('should return empty array when no beats exist', () => {
+      const project = projectService.create({ title: '无细纲步骤' });
+
+      expect(service.getBeatsByProjectId(project.id)).toEqual([]);
+    });
+  });
+
+  // ─── Lightweight Beat Modification ───────────────────────────
+
+  describe('updateBeatWordCount', () => {
+    it('should update targetWordCount on the beat without cross-Phase rollback', async () => {
+      const project = projectService.create({ title: '字数修改测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[0];
+
+      const updated = await service.updateBeatWordCount(target.id, 5000);
+
+      expect(updated.targetWordCount).toBe(5000);
+      expect(updated.status).toBe('STALE');
+
+      // Verify project is still in DRAFTING (no rollback)
+      const p = projectService.findById(project.id);
+      expect(p!.status).toBe('DRAFTING');
+    });
+
+    it('should update corresponding Chapter targetWordCount', async () => {
+      const project = projectService.create({ title: '章节同步测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[0];
+
+      await service.updateBeatWordCount(target.id, 6000);
+
+      const chapters = service.getChaptersByProjectId(project.id);
+      const matched = chapters.find(
+        (c) => c.chapterNumber === target.chapterNumber,
+      );
+      expect(matched).toBeDefined();
+      expect(matched!.targetWordCount).toBe(6000);
+    });
+
+    it('should throw when beat does not exist', async () => {
+      await expect(
+        service.updateBeatWordCount('nonexistent-id', 5000),
+      ).rejects.toThrow(/Beat not found/);
+    });
+
+    it('should only mark the single beat STALE, not others', async () => {
+      const project = projectService.create({ title: '独立STALE测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[0];
+
+      await service.updateBeatWordCount(target.id, 5000);
+
+      const after = service.getBeatsByProjectId(project.id);
+      const staleBeats = after.filter((b) => b.status === 'STALE');
+      expect(staleBeats.length).toBe(1);
+      expect(staleBeats[0].id).toBe(target.id);
+
+      const others = after.filter((b) => b.id !== target.id);
+      for (const other of others) {
+        expect(other.status).toBe('CONFIRMED');
+      }
+    });
+  });
+
+  describe('updateBeatStructure', () => {
+    it('should update the beat plan and mark Beat + Chapter STALE', async () => {
+      const project = projectService.create({ title: '结构修改测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[0];
+      const newPlan = {
+        conflictPoint: '新的冲突点',
+        hookPreset: '新的钩子预设',
+        readerExpectation: '中',
+      };
+
+      const updated = await service.updateBeatStructure(target.id, newPlan);
+
+      expect(updated.status).toBe('STALE');
+      expect(updated.plan).toMatchObject(newPlan);
+
+      // Corresponding Chapter should also be STALE
+      const chapters = service.getChaptersByProjectId(project.id);
+      const matchedChapter = chapters.find(
+        (c) => c.chapterNumber === target.chapterNumber,
+      );
+      expect(matchedChapter).toBeDefined();
+      expect(matchedChapter!.status).toBe('STALE');
+    });
+
+    it('should not trigger cross-Phase rollback', async () => {
+      const project = projectService.create({ title: '结构修改不回退' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[0];
+
+      await service.updateBeatStructure(target.id, {
+        conflictPoint: '变动',
+        hookPreset: '新钩子',
+      });
+
+      const p = projectService.findById(project.id);
+      expect(p!.status).toBe('DRAFTING');
+    });
+
+    it('should not affect upstream/downstream beats', async () => {
+      const project = projectService.create({ title: '隔离测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = service.getBeatsByProjectId(project.id);
+      const target = beats[1]; // chapter 2
+
+      await service.updateBeatStructure(target.id, {
+        conflictPoint: '变动',
+        hookPreset: '新钩子',
+      });
+
+      const after = service.getBeatsByProjectId(project.id);
+      // Beat 1 and 3 should remain CONFIRMED
+      const beat1 = after.find((b) => b.chapterNumber === 1);
+      const beat3 = after.find((b) => b.chapterNumber === 3);
+      expect(beat1!.status).toBe('CONFIRMED');
+      if (beat3) expect(beat3.status).toBe('CONFIRMED');
+    });
+
+    it('should throw when beat does not exist', async () => {
+      await expect(
+        service.updateBeatStructure('nonexistent-id', {
+          conflictPoint: 'test',
+        }),
+      ).rejects.toThrow(/Beat not found/);
+    });
+  });
+
+  describe('getChaptersByProjectId', () => {
+    it('should return empty array when no chapters exist', () => {
+      const project = projectService.create({ title: '无章节项目' });
+      expect(service.getChaptersByProjectId(project.id)).toEqual([]);
+    });
+
+    it('should return chapters created during confirmBeats', async () => {
+      const project = projectService.create({ title: '章节查询测试' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const chapters = service.getChaptersByProjectId(project.id);
+      expect(chapters.length).toBeGreaterThan(0);
+      for (const ch of chapters) {
+        expect(ch.projectId).toBe(project.id);
+      }
     });
   });
 });
