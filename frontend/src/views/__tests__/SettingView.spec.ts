@@ -5,11 +5,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 const mockGenerateSetting = vi.fn();
 const mockConfirmSetting = vi.fn();
+const mockRejectSetting = vi.fn();
 const mockGetSetting = vi.fn();
 
 vi.mock('@/api/setting', () => ({
   generateSetting: (...args: any[]) => mockGenerateSetting(...args),
   confirmSetting: (...args: any[]) => mockConfirmSetting(...args),
+  rejectSetting: (...args: any[]) => mockRejectSetting(...args),
   getSetting: (...args: any[]) => mockGetSetting(...args),
 }));
 
@@ -275,6 +277,88 @@ describe('SettingView', () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(wrapper.find('[data-testid="confirm-setting-btn"]').exists()).toBe(false);
+    });
+  });
+
+  describe('reject setting flow', () => {
+    it('shows reject button after generation', async () => {
+      mockGetSetting.mockResolvedValue(null);
+      mockGenerateSetting.mockResolvedValue({
+        id: 'step-1',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'AWAITING_REVIEW',
+        output: '设定内容。',
+        review: { powerSystemCheck: { passed: true, flags: [] } },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(wrapper.find('[data-testid="reject-setting-btn"]').exists()).toBe(true);
+    });
+
+    it('calls rejectSetting API on reject button click', async () => {
+      mockGetSetting.mockResolvedValue(null);
+      mockGenerateSetting.mockResolvedValue({
+        id: 'step-1',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'AWAITING_REVIEW',
+        output: '设定内容',
+        review: { powerSystemCheck: { passed: true, flags: [] } },
+        version: 1,
+      });
+      mockRejectSetting.mockResolvedValue({
+        id: 'step-1',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'REJECTED',
+        output: '设定内容',
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      await wrapper.find('[data-testid="reject-setting-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockRejectSetting).toHaveBeenCalledWith('test-project-1');
+    });
+
+    it('hides reject button when setting is confirmed', async () => {
+      mockGetSetting.mockResolvedValue({
+        id: 'step-1',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'CONFIRMED',
+        output: '已确认的设定',
+        review: { powerSystemCheck: { passed: true, flags: [] } },
+        version: 1,
+        confirmedAt: new Date().toISOString(),
+      });
+
+      const { useWorkflowStore } = await import('@/stores/useWorkflowStore');
+      const store = useWorkflowStore();
+      store.setStepStatus('SETTING', 'CONFIRMED');
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(wrapper.find('[data-testid="reject-setting-btn"]').exists()).toBe(false);
     });
   });
 

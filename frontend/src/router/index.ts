@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import ProjectHubView from '@/views/ProjectHubView.vue';
 import WorkflowView from '@/views/WorkflowView.vue';
 import SettingView from '@/views/SettingView.vue';
+import OutlineView from '@/views/OutlineView.vue';
 
 const routes = [
   {
@@ -18,6 +19,12 @@ const routes = [
         path: 'setting',
         name: 'workflow.setting',
         component: SettingView,
+        props: (route) => ({ projectId: route.params.id }),
+      },
+      {
+        path: 'outline',
+        name: 'workflow.outline',
+        component: OutlineView,
         props: (route) => ({ projectId: route.params.id }),
       },
     ],

@@ -28,6 +28,12 @@ export class StepController {
     return this.stepService.confirmSetting(projectId);
   }
 
+  @Post('reject')
+  @HttpCode(200)
+  reject(@Param('projectId') projectId: string): Promise<StepData> {
+    return this.stepService.rejectSetting(projectId);
+  }
+
   @Get()
   getSetting(@Param('projectId') projectId: string): StepData {
     const step = this.stepService.getSettingByProjectId(projectId);

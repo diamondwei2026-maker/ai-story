@@ -194,6 +194,71 @@ describe('Setting Phase (e2e)', () => {
     });
   });
 
+  describe('POST /projects/:id/steps/setting/reject', () => {
+    it('should reject a generated setting', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/projects')
+        .send({ title: '驳回设定项目' })
+        .expect(201);
+
+      const projectId = createRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/projects/${projectId}`)
+        .send({ status: 'SETTING' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${projectId}/steps/setting/generate`)
+        .send({ idea: '测试' })
+        .expect(201);
+
+      const rejectRes = await request(app.getHttpServer())
+        .post(`/projects/${projectId}/steps/setting/reject`)
+        .expect(200);
+
+      expect(rejectRes.body.status).toBe('REJECTED');
+    });
+
+    it('should return 400 when no generated setting exists', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/projects')
+        .send({ title: '无设定驳回' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${createRes.body.id}/steps/setting/reject`)
+        .expect(400);
+    });
+
+    it('should return 400 when setting is already confirmed', async () => {
+      const createRes = await request(app.getHttpServer())
+        .post('/projects')
+        .send({ title: '已确认驳回' })
+        .expect(201);
+
+      const projectId = createRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/projects/${projectId}`)
+        .send({ status: 'SETTING' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${projectId}/steps/setting/generate`)
+        .send({ idea: '测试' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${projectId}/steps/setting/confirm`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${projectId}/steps/setting/reject`)
+        .expect(400);
+    });
+  });
+
   describe('GET /projects/:id/steps/setting', () => {
     it('should return the latest SETTING step for a project', async () => {
       const createRes = await request(app.getHttpServer())

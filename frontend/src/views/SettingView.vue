@@ -62,6 +62,13 @@
           {{ regenerating ? '刷新中...' : '刷新关联内容' }}
         </button>
         <button
+          data-testid="reject-setting-btn"
+          class="setting-view__reject-btn"
+          @click="handleReject"
+        >
+          驳回，重新生成
+        </button>
+        <button
           data-testid="confirm-setting-btn"
           class="setting-view__confirm-btn"
           @click="handleConfirm"
@@ -74,9 +81,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useWorkflowStore } from '@/stores/useWorkflowStore';
-import { generateSetting, confirmSetting, getSetting } from '@/api/setting';
+import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
+import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
 import type { SettingResponse } from '@/api/setting';
 import WorldBuilder from '@/components/WorldBuilder.vue';
 import CharacterCard from '@/components/CharacterCard.vue';
@@ -86,76 +92,27 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const store = useWorkflowStore();
-
-const settingData = ref<SettingResponse | null>(null);
-const loading = ref(false);
-const error = ref<string | null>(null);
-
-const isConfirmed = computed(() => {
-  return (
-    settingData.value?.status === 'CONFIRMED' ||
-    store.getStepStatus('SETTING') === 'CONFIRMED'
-  );
+const {
+  data: settingData,
+  loading,
+  regenerating,
+  error,
+  isConfirmed,
+  reviewAnnotations,
+  handleGenerate,
+  handleRegenerate,
+  handleConfirm,
+  handleReject,
+} = usePhaseWorkflow<SettingResponse>({
+  projectId: props.projectId,
+  phase: 'SETTING',
+  nextPhase: 'OUTLINE',
+  getFn: getSetting,
+  generateFn: generateSetting,
+  confirmFn: confirmSetting,
+  rejectFn: rejectSetting,
+  generateArgs: () => ({ idea: '' }),
 });
-
-const reviewAnnotations = computed(() => {
-  const annotations = settingData.value?.review?.annotations;
-  return typeof annotations === 'string' ? annotations : null;
-});
-
-onMounted(async () => {
-  try {
-    const existing = await getSetting(props.projectId);
-    if (existing) {
-      settingData.value = existing;
-    }
-  } catch {
-    // Silently ignore fetch errors on mount
-  }
-});
-
-async function handleGenerate() {
-  loading.value = true;
-  error.value = null;
-  try {
-    const result = await generateSetting(props.projectId, { idea: '' });
-    settingData.value = result;
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '生成失败';
-  } finally {
-    loading.value = false;
-  }
-}
-
-const regenerating = ref(false);
-
-async function handleRegenerate() {
-  regenerating.value = true;
-  error.value = null;
-  try {
-    const result = await generateSetting(props.projectId, {
-      idea: '',
-      currentContent: settingData.value?.output ?? '',
-    });
-    settingData.value = result;
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '刷新失败';
-  } finally {
-    regenerating.value = false;
-  }
-}
-
-async function handleConfirm() {
-  try {
-    const result = await confirmSetting(props.projectId);
-    settingData.value = result;
-    store.setStepStatus('SETTING', 'CONFIRMED');
-    store.setCurrentPhase('OUTLINE');
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '确认失败';
-  }
-}
 </script>
 
 <style scoped>
@@ -261,6 +218,23 @@ async function handleConfirm() {
 .setting-view__regenerate-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.setting-view__reject-btn {
+  background: transparent;
+  color: #c62828;
+  border: 1px solid #c62828;
+  padding: 10px 32px;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  margin-right: 16px;
+  transition: all 0.3s;
+}
+
+.setting-view__reject-btn:hover {
+  background: #c62828;
+  color: #fff;
 }
 
 .setting-view__confirm-btn {
