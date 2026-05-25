@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import ProjectHubView from '@/views/ProjectHubView.vue';
 import WorkflowView from '@/views/WorkflowView.vue';
+import IdeaView from '@/views/IdeaView.vue';
 import SettingView from '@/views/SettingView.vue';
 import OutlineView from '@/views/OutlineView.vue';
 
@@ -15,6 +16,12 @@ const routes = [
     name: 'workflow',
     component: WorkflowView,
     children: [
+      {
+        path: 'idea',
+        name: 'workflow.idea',
+        component: IdeaView,
+        props: (route) => ({ projectId: route.params.id }),
+      },
       {
         path: 'setting',
         name: 'workflow.setting',

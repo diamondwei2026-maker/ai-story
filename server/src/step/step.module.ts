@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StepController } from './step.controller';
+import { IdeaController } from './idea.controller';
 import { OutlineController } from './outline.controller';
 import { BeatsController, BeatModificationController } from './beats.controller';
 import { ChapterController } from './chapter.controller';
@@ -10,6 +11,7 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 @Module({
   imports: [ProjectModule, AIGatewayModule],
   controllers: [
+    IdeaController,
     StepController,
     OutlineController,
     BeatsController,

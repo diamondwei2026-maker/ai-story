@@ -29,6 +29,32 @@ const mockChatModel = {
         content:
           '\n## Chapter 5: 逆转时刻\n- 冲突点: 反击开始\n- 钩子预设: 扭转局势, 新的盟友\n- 读者期待值: 高\n- 目标字数: 3800\n',
       };
+    } else if (input.includes('卖点方案') || input.includes('sellPoint')) {
+      yield {
+        content:
+          '## 卖点方案 1: 星际医妃风华录\n- 核心卖点: 现代女医生重生星际时代，将现代医学与异能修炼融合，开创"医能"新体系\n- 市场匹配度: 8.5/10\n- 爆款参考: 《星际超级医生》、《重生之医妃倾城》\n- 差异化分析: 将专业医学知识融入异能战斗，形成独特的知识壁垒和爽点\n\n',
+      };
+      yield {
+        content:
+          '## 卖点方案 2: 毒妃逆袭：星际制药女王\n- 核心卖点: 毒理学博士穿越成废材王妃，以制药能力逆袭星际商界和修炼界\n- 市场匹配度: 7.8/10\n- 爆款参考: 《制药女王》、《狂妃逆袭：毒步天下》\n- 差异化分析: 商战+修炼双线并行，毒药流在星际背景下有新意\n\n',
+      };
+      yield {
+        content:
+          '## 卖点方案 3: 星海巡诊：医妃的宇宙诊所\n- 核心卖点: 主角绑定"宇宙诊所"系统，穿越不同星球行医，收集异能和伙伴\n- 市场匹配度: 9.2/10\n- 爆款参考: 《无限诊所系统》、《星际游医》\n- 差异化分析: 单元剧结构+长线主线，兼具系统流的爽感和单元故事的丰富性\n\n',
+      };
+      yield {
+        content:
+          '## 卖点方案 4: 庸医惑星：反套路治愈系\n- 核心卖点: 半吊子实习生意外治愈了重伤的星际元帅，被误认为神医，在星际引发一系列笑料\n- 市场匹配度: 8.0/10\n- 爆款参考: 《神医凰后》、《废柴逆天：神医不好惹》\n- 差异化分析: 反套路搞笑人设+治愈系温情，差异化明显\n',
+      };
+    } else if (input.includes('summary') || input.includes('简介')) {
+      yield {
+        content:
+          '## 一句话简介\n现代女医生重生星际时代，以一柄手术刀和现代医学知识，在异能至上的星际文明中开创"医能"新体系，成为星际最强医妃。\n\n',
+      };
+      yield {
+        content:
+          '## 500字简介\n林清音是二十一世纪最年轻的心外科主任医师，却在一次手术中因过劳猝死。当她再次睁开眼睛，发现自己重生在万年后的星际时代——一个异能者掌控一切的世界。原主是星域帝国最废材的王妃，因无法觉醒异能被家族抛弃。\n\n但林清音很快发现，这个世界的所谓"异能"，本质上不过是基因突变导致的特殊能力——而基因，恰恰是她最熟悉的领域。现代医学知识成为她最大的金手指：她用手术刀精准切割能量回路，用药物学知识改良修炼丹药，用心电监护原理开发出全新的"医能"修炼体系。\n\n随着她一次次用"医术"创造奇迹——治愈了被判定为不治的异能反噬，让退役老兵断肢再生，甚至用疫苗概念开发出异能觉醒的"安全诱导法"——整个星际开始为这位"废材王妃"震动。古老的世家纷纷抛出橄榄枝，帝国军部求贤若渴，而对她不屑一顾的王爷夫君，也开始重新审视这位他从未正眼瞧过的王妃。\n\n然而，她的崛起也触动了既得利益者的神经。当异能垄断组织向她伸出黑手，当星际战争因她的"医能"技术而一触即发，林清音必须用自己的方式——手术刀和医学——守护她想保护的一切。',
+      };
     } else {
       yield { content: '## 时代背景\n这是一个修真世界。\n' };
       yield { content: '## 力量体系\n炼气、筑基、金丹、元婴、化神。\n' };
@@ -41,6 +67,12 @@ const mockPromptLoader = {
     (_domain: string, template: string, _vars: Record<string, unknown>) => {
       if (template === 'beats-generation') {
         return 'beats generation prompt';
+      }
+      if (template === 'idea-generation') {
+        return '卖点方案 generation prompt with feedback';
+      }
+      if (template === 'idea-summary-generation') {
+        return 'summary 简介 generation prompt';
       }
       return 'rendered setting prompt';
     },
@@ -1207,6 +1239,349 @@ describe('StepService', () => {
       for (const ch of chapters) {
         expect(ch.projectId).toBe(project.id);
       }
+    });
+  });
+
+  // ─── IDEA Phase ────────────────────────────────────────────
+
+  describe('generateIdea', () => {
+    it('should generate 3-5 sell point proposals via AI and store as StepData', async () => {
+      const project = projectService.create({ title: '灵感测试' });
+      // New projects default to IDEA status
+
+      const step = await service.generateIdea(project.id, {
+        idea: '一个医生重生到星际时代的故事',
+      });
+
+      expect(step).toBeDefined();
+      expect(step.projectId).toBe(project.id);
+      expect(step.phaseType).toBe('IDEA');
+      expect(step.status).toBe('AWAITING_REVIEW');
+      expect(step.output).toBeTruthy();
+      expect(step.output).toContain('卖点方案');
+      expect(step.version).toBe(1);
+      expect(step.input).toContain('一个医生重生到星际时代的故事');
+    });
+
+    it('should generate exactly 3-5 sell point proposals', async () => {
+      const project = projectService.create({ title: '卖点数量测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '星际医生',
+      });
+
+      const sellPointCount = (step.output!.match(/## 卖点方案 \d+/g) || []).length;
+      expect(sellPointCount).toBeGreaterThanOrEqual(3);
+      expect(sellPointCount).toBeLessThanOrEqual(5);
+    });
+
+    it('should include market match score in each sell point', async () => {
+      const project = projectService.create({ title: '市场评分测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '测试创意',
+      });
+
+      const output = step.output!;
+      const scoreMatches = output.match(/市场匹配度:\s*([\d.]+)\/10/g);
+      expect(scoreMatches).toBeDefined();
+      expect(scoreMatches!.length).toBeGreaterThanOrEqual(3);
+      for (const match of scoreMatches!) {
+        const score = parseFloat(match.match(/[\d.]+/)![0]);
+        expect(score).toBeGreaterThanOrEqual(0);
+        expect(score).toBeLessThanOrEqual(10);
+      }
+    });
+
+    it('should include similar hit references in each sell point', async () => {
+      const project = projectService.create({ title: '爆款参考测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '测试创意',
+      });
+
+      const output = step.output!;
+      expect(output).toContain('爆款参考');
+      const refCount = (output.match(/爆款参考:/g) || []).length;
+      expect(refCount).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should include review annotations in the StepData', async () => {
+      const project = projectService.create({ title: '审核测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '现代都市异能',
+      });
+
+      expect(step.review).toBeDefined();
+      expect(step.review).toHaveProperty('complianceCheck');
+      expect(step.review).toHaveProperty('annotations');
+      expect(step.review!.annotations).toContain('仅供参考');
+    });
+
+    it('should throw when project does not exist', async () => {
+      await expect(
+        service.generateIdea('nonexistent-id', { idea: 'test' }),
+      ).rejects.toThrow(/Project not found/);
+    });
+
+    it('should throw when project status is not IDEA', async () => {
+      const project = projectService.create({ title: 'SETTING阶段项目' });
+      project.status = 'SETTING';
+      projectService.update(project.id, {});
+
+      await expect(
+        service.generateIdea(project.id, { idea: 'test' }),
+      ).rejects.toThrow(/status must be IDEA/);
+    });
+
+    it('should support feedback-based regeneration', async () => {
+      const project = projectService.create({ title: '反馈重新生成' });
+
+      await service.generateIdea(project.id, {
+        idea: '星际医生',
+        feedback: '希望更偏向轻松搞笑风格，不要太多商战元素',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'idea-generation',
+        expect.objectContaining({ feedback: expect.stringContaining('轻松搞笑') }),
+      );
+    });
+
+    it('should reuse existing step on regenerate', async () => {
+      const project = projectService.create({ title: '复用步骤测试' });
+
+      const first = await service.generateIdea(project.id, {
+        idea: '第一次生成',
+      });
+      const stepId = first.id;
+      const firstVersion = first.version;
+
+      await service.rejectIdea(project.id);
+
+      const second = await service.generateIdea(project.id, {
+        idea: '第二次生成',
+      });
+
+      expect(second.id).toBe(stepId);
+      expect(second.version).toBeGreaterThan(firstVersion);
+    });
+
+    it('should call AIGatewayService with TaskType.IDEA', async () => {
+      const project = projectService.create({ title: '调用测试' });
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      const step = await service.generateIdea(project.id, {
+        idea: '测试',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalled();
+      expect(step.output).toBeTruthy();
+    });
+  });
+
+  describe('generateIdeaSummary', () => {
+    it('should generate one-liner + 500-word summary after sell point selection', async () => {
+      const project = projectService.create({ title: '简介生成测试' });
+
+      await service.generateIdea(project.id, {
+        idea: '星际医生故事',
+      });
+
+      const step = await service.generateIdeaSummary(project.id, {
+        selectedSellPoint: 0,
+      });
+
+      expect(step).toBeDefined();
+      expect(step.phaseType).toBe('IDEA');
+      expect(step.output).toContain('一句话简介');
+      expect(step.output).toContain('500字简介');
+    });
+
+    it('should include the one-liner summary', async () => {
+      const project = projectService.create({ title: '一句话简介测试' });
+
+      await service.generateIdea(project.id, {
+        idea: '星际医生',
+      });
+
+      const step = await service.generateIdeaSummary(project.id, {
+        selectedSellPoint: 0,
+      });
+
+      const oneLinerMatch = step.output!.match(/## 一句话简介\n(.+)/);
+      expect(oneLinerMatch).toBeDefined();
+      expect(oneLinerMatch![1].trim().length).toBeGreaterThan(10);
+    });
+
+    it('should include the 500-word summary', async () => {
+      const project = projectService.create({ title: '500字简介测试' });
+
+      await service.generateIdea(project.id, {
+        idea: '星际医生',
+      });
+
+      const step = await service.generateIdeaSummary(project.id, {
+        selectedSellPoint: 0,
+      });
+
+      const fullSummary = step.output!.split('## 500字简介\n')[1];
+      expect(fullSummary).toBeDefined();
+      expect(fullSummary.trim().length).toBeGreaterThan(200);
+    });
+
+    it('should throw when no IDEA step exists to generate summary for', async () => {
+      const project = projectService.create({ title: '无灵感步骤' });
+
+      await expect(
+        service.generateIdeaSummary(project.id, {
+          selectedSellPoint: 0,
+        }),
+      ).rejects.toThrow(/No generated idea/);
+    });
+
+    it('should throw when sellPointContent and selectedSellPoint are both missing', async () => {
+      const project = projectService.create({ title: '缺卖点测试' });
+
+      await service.generateIdea(project.id, { idea: 'test' });
+
+      await expect(
+        service.generateIdeaSummary(project.id, {}),
+      ).rejects.toThrow(/selectedSellPoint/);
+    });
+  });
+
+  describe('confirmIdea', () => {
+    it('should confirm idea and transition project from IDEA to SETTING', async () => {
+      const project = projectService.create({ title: '确认测试' });
+
+      await service.generateIdea(project.id, { idea: '测试创意' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+
+      const result = await service.confirmIdea(project.id, {
+        selectedSellPoint: 0,
+      });
+
+      expect(result.phaseType).toBe('IDEA');
+      expect(result.status).toBe('CONFIRMED');
+      expect(result.confirmedAt).toBeInstanceOf(Date);
+
+      const updated = projectService.findById(project.id);
+      expect(updated!.status).toBe('SETTING');
+    });
+
+    it('should store selectedSellPoint and customBrief in the step', async () => {
+      const project = projectService.create({ title: '存储卖点测试' });
+
+      await service.generateIdea(project.id, { idea: '测试创意' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+
+      const result = await service.confirmIdea(project.id, {
+        selectedSellPoint: 2,
+        customBrief: '修改后的一句话简介：星际医妃以手术刀撬动星际权力格局',
+      });
+
+      expect(result.review).toHaveProperty('selectedSellPoint', 2);
+      expect(result.review).toHaveProperty('customBrief');
+    });
+
+    it('should throw when no generated idea exists to confirm', async () => {
+      const project = projectService.create({ title: '无灵感确认' });
+
+      await expect(
+        service.confirmIdea(project.id, { selectedSellPoint: 0 }),
+      ).rejects.toThrow(/No generated idea/);
+    });
+
+    it('should throw when idea is already confirmed', async () => {
+      const project = projectService.create({ title: '重复确认' });
+
+      await service.generateIdea(project.id, { idea: '测试' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+      await service.confirmIdea(project.id, { selectedSellPoint: 0 });
+
+      await expect(
+        service.confirmIdea(project.id, { selectedSellPoint: 0 }),
+      ).rejects.toThrow(/already confirmed/);
+    });
+
+    it('should throw when idea is rejected (not AWAITING_REVIEW)', async () => {
+      const project = projectService.create({ title: '驳回后确认' });
+
+      await service.generateIdea(project.id, { idea: '测试' });
+      await service.rejectIdea(project.id);
+
+      await expect(
+        service.confirmIdea(project.id, { selectedSellPoint: 0 }),
+      ).rejects.toThrow(/must be AWAITING_REVIEW/);
+    });
+  });
+
+  describe('rejectIdea', () => {
+    it('should reject a generated idea', async () => {
+      const project = projectService.create({ title: '驳回测试' });
+
+      await service.generateIdea(project.id, { idea: '测试创意' });
+
+      const result = await service.rejectIdea(project.id);
+
+      expect(result.phaseType).toBe('IDEA');
+      expect(result.status).toBe('REJECTED');
+    });
+
+    it('should throw when no generated idea exists to reject', async () => {
+      const project = projectService.create({ title: '无灵感驳回' });
+
+      await expect(service.rejectIdea(project.id)).rejects.toThrow(
+        /No generated idea/,
+      );
+    });
+
+    it('should throw when idea is already confirmed', async () => {
+      const project = projectService.create({ title: '已确认驳回' });
+
+      await service.generateIdea(project.id, { idea: '测试' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+      await service.confirmIdea(project.id, { selectedSellPoint: 0 });
+
+      await expect(service.rejectIdea(project.id)).rejects.toThrow(
+        /already confirmed/,
+      );
+    });
+
+    it('should throw when idea is already rejected', async () => {
+      const project = projectService.create({ title: '重复驳回' });
+
+      await service.generateIdea(project.id, { idea: '测试' });
+      await service.rejectIdea(project.id);
+
+      await expect(service.rejectIdea(project.id)).rejects.toThrow(
+        /already rejected/,
+      );
+    });
+  });
+
+  describe('getIdeaByProjectId', () => {
+    it('should retrieve the latest IDEA step for a project', async () => {
+      const project = projectService.create({ title: '查询测试' });
+
+      const generated = await service.generateIdea(project.id, {
+        idea: '查询用创意',
+      });
+
+      const found = service.getIdeaByProjectId(project.id);
+      expect(found).toBeDefined();
+      expect(found!.id).toBe(generated.id);
+      expect(found!.output).toBe(generated.output);
+    });
+
+    it('should return null when no IDEA step exists', () => {
+      const project = projectService.create({ title: '无灵感步骤' });
+
+      expect(service.getIdeaByProjectId(project.id)).toBeNull();
     });
   });
 });

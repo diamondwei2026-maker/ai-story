@@ -105,6 +105,108 @@ export class StepService {
     return this.getStepByProjectId(projectId, 'OUTLINE');
   }
 
+  // ─── IDEA Phase ──────────────────────────────────────────
+
+  async generateIdea(
+    projectId: string,
+    opts: { idea?: string; feedback?: string },
+  ): Promise<StepData> {
+    const project = this.projectService.findById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    if (project.status !== 'IDEA') {
+      throw new BadRequestException('Project status must be IDEA');
+    }
+
+    const existing = this.getIdeaByProjectId(projectId);
+    const step = existing ?? this.createPendingStep(projectId, 'IDEA');
+
+    const idea = opts.idea ?? '';
+    const feedback = opts.feedback ?? '';
+    const prompt = this.promptLoader.renderTemplate(
+      'creation',
+      'idea-generation',
+      { idea, feedback },
+    );
+
+    step.status = 'AI_GENERATING';
+    const output = await this.collectAiOutput(TaskType.IDEA, prompt);
+
+    step.status = 'AWAITING_REVIEW';
+    step.output = output;
+    step.input = feedback
+      ? `idea: ${idea}\nfeedback: ${feedback}`
+      : idea;
+    step.review = {
+      complianceCheck: this.runPowerSystemCheck(output),
+      annotations: 'AI 生成内容，仅供参考',
+    };
+    step.version += 1;
+
+    this.steps.set(step.id, step);
+    return step;
+  }
+
+  async generateIdeaSummary(
+    projectId: string,
+    opts: { selectedSellPoint?: number; customBrief?: string },
+  ): Promise<StepData> {
+    const existing = this.getIdeaByProjectId(projectId);
+    if (!existing) {
+      throw new BadRequestException('No generated idea to generate summary for');
+    }
+    if (opts.selectedSellPoint === undefined || opts.selectedSellPoint === null) {
+      throw new BadRequestException('selectedSellPoint is required');
+    }
+
+    const prompt = this.promptLoader.renderTemplate(
+      'creation',
+      'idea-summary-generation',
+      {
+        sellPointContent: existing.output ?? '',
+        selectedSellPoint: String(opts.selectedSellPoint),
+        customBrief: opts.customBrief ?? '',
+      },
+    );
+
+    existing.status = 'AI_GENERATING';
+    const summaryOutput = await this.collectAiOutput(TaskType.IDEA, prompt);
+
+    existing.status = 'AWAITING_REVIEW';
+    existing.output = (existing.output ?? '') + '\n\n' + summaryOutput;
+    existing.review = {
+      ...(existing.review as Record<string, unknown>),
+      selectedSellPoint: opts.selectedSellPoint,
+      summaryGenerated: true,
+    };
+    existing.version += 1;
+
+    this.steps.set(existing.id, existing);
+    return existing;
+  }
+
+  async confirmIdea(
+    projectId: string,
+    opts: { selectedSellPoint: number; customBrief?: string },
+  ): Promise<StepData> {
+    const step = await this.confirmPhase(projectId, 'IDEA', 'SETTING', 'idea');
+    step.review = {
+      ...(step.review as Record<string, unknown>),
+      selectedSellPoint: opts.selectedSellPoint,
+      customBrief: opts.customBrief ?? null,
+    };
+    return step;
+  }
+
+  async rejectIdea(projectId: string): Promise<StepData> {
+    return this.rejectPhase(projectId, 'IDEA', 'idea');
+  }
+
+  getIdeaByProjectId(projectId: string): StepData | null {
+    return this.getStepByProjectId(projectId, 'IDEA');
+  }
+
   // ─── OUTLINE Phase ──────────────────────────────────────────
 
   async generateOutline(

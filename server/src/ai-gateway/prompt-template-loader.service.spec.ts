@@ -76,8 +76,9 @@ describe('PromptTemplateLoaderService', () => {
   describe('listTemplates', () => {
     it('should list all templates in a given category', () => {
       const templates = service.listTemplates('creation');
-      expect(templates).toHaveLength(3);
+      expect(templates).toHaveLength(4);
       expect(templates).toContain('idea-generation');
+      expect(templates).toContain('idea-summary-generation');
       expect(templates).toContain('setting-generation');
       expect(templates).toContain('outline-generation');
     });
