@@ -20,6 +20,7 @@ import {
   AIGenerateChunk,
 } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
+import { FactsheetCompensationService } from './factsheet-compensation.service';
 
 const POWER_SYSTEM_REDLINES: { label: string; keywords: string[] }[] = [
   { label: '禁止宣扬暴力至上', keywords: ['暴力至上', '以暴制暴', '暴力崇拜'] },
@@ -66,13 +67,57 @@ export class StepService {
   private beatsByProject: Map<string, BeatData[]> = new Map();
   private chaptersByProject: Map<string, ChapterData[]> = new Map();
   private pausedChapterIds: Set<string> = new Set();
-  private factSheetByProject: Map<string, Record<string, unknown>> = new Map();
+  private factSheetByProject: Map<
+    string,
+    { data: Record<string, unknown>; version: number }
+  > = new Map();
 
   constructor(
     private readonly projectService: ProjectService,
     private readonly aiGateway: AIGatewayService,
     private readonly promptLoader: PromptTemplateLoaderService,
+    private readonly factsheetCompensation: FactsheetCompensationService,
   ) {}
+
+  getFactsheet(projectId: string): { data: Record<string, unknown>; version: number } | null {
+    const sheet = this.factSheetByProject.get(projectId);
+    if (!sheet) return null;
+    return { data: { ...sheet.data }, version: sheet.version };
+  }
+
+  private readFactsheet(
+    projectId: string,
+  ): { data: Record<string, unknown>; version: number } {
+    let sheet = this.factSheetByProject.get(projectId);
+    if (!sheet) {
+      sheet = { data: {}, version: 0 };
+      this.factSheetByProject.set(projectId, sheet);
+    }
+    return { data: { ...sheet.data }, version: sheet.version };
+  }
+
+  private casWriteFactsheet(
+    projectId: string,
+    data: Record<string, unknown>,
+    expectedVersion: number,
+  ): boolean {
+    const sheet = this.factSheetByProject.get(projectId);
+    if (!sheet || sheet.version !== expectedVersion) return false;
+    sheet.data = data;
+    sheet.version++;
+    return true;
+  }
+
+  private applyCompensationQueue(projectId: string): void {
+    const sheet = this.factSheetByProject.get(projectId)!;
+    const result = this.factsheetCompensation.consumeQueue(
+      projectId,
+      sheet.data,
+    );
+    if (result.consumedCount > 0) {
+      Object.assign(sheet.data, result.mergedEntries);
+    }
+  }
 
   async generateSetting(
     projectId: string,
@@ -733,22 +778,43 @@ export class StepService {
       `Extract fingerprint for: ${chapter.content}`,
     );
 
-    // Step 3: FactSheet optimistic lock update
-    const currentSheet = this.factSheetByProject.get(projectId) ?? {};
-    const updatedSheet = { ...currentSheet };
+    // Step 3: FactSheet update with optimistic lock + compensation queue
     const sheetUpdateRaw = await this.collectAiOutput(
       TaskType.FACTSHEET_UPDATE,
       `Update FactSheet with: ${chapter.content}`,
     );
+
+    let updateEntries: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(sheetUpdateRaw);
-      Object.assign(updatedSheet, parsed);
+      updateEntries = JSON.parse(sheetUpdateRaw);
     } catch {
-      updatedSheet['chapter_' + chapter.chapterNumber] = {
-        annotation: sheetUpdateRaw,
+      updateEntries = {
+        ['chapter_' + chapter.chapterNumber]: { annotation: sheetUpdateRaw },
       };
     }
-    this.factSheetByProject.set(projectId, updatedSheet);
+
+    let written = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const current = this.readFactsheet(projectId);
+      const merged = { ...current.data };
+      Object.assign(merged, updateEntries);
+
+      if (this.casWriteFactsheet(projectId, merged, current.version)) {
+        written = true;
+        break;
+      }
+    }
+
+    if (written) {
+      this.applyCompensationQueue(projectId);
+    } else {
+      this.factsheetCompensation.enqueue(
+        projectId,
+        chapter.id,
+        chapter.chapterNumber,
+        updateEntries,
+      );
+    }
 
     // Step 4: Independent review
     const reviewRaw = await this.collectAiOutput(

@@ -9,6 +9,7 @@ import { ProjectService } from '../project/project.service';
 import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
+import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { ChapterData } from './step.entity';
 
 // ─── Mock AI ─────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ describe('ChangeAnalysisService', () => {
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
         { provide: PromptTemplateLoaderService, useValue: mockPromptLoader },
         { provide: ContextBudgetService, useValue: mockBudgetService },
+        FactsheetCompensationService,
       ],
     }).compile();
 

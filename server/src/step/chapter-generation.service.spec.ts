@@ -4,6 +4,7 @@ import { ProjectService } from '../project/project.service';
 import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
+import { FactsheetCompensationService } from './factsheet-compensation.service';
 
 // Mock AI that yields chapter content token-by-token via SSE stream
 const mockChatModel = {
@@ -66,6 +67,7 @@ describe('StepService - Chapter Generation (DRAFTING)', () => {
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
         { provide: PromptTemplateLoaderService, useValue: mockPromptLoader },
         { provide: ContextBudgetService, useValue: mockBudgetService },
+        FactsheetCompensationService,
       ],
     }).compile();
 

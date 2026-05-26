@@ -19,7 +19,12 @@ describe('WorkflowStepper', () => {
     { phase: 'DRAFTING', label: '正文迭代', status: 'PENDING' },
   ];
 
-  const mountStepper = async (props: { steps: StepInfo[]; currentPhase: PhaseType; phaseOrder: PhaseType[] }) => {
+  const mountStepper = async (props: {
+    steps: StepInfo[];
+    currentPhase: PhaseType;
+    phaseOrder: PhaseType[];
+    factsheetAlert?: { level: string; depth: number };
+  }) => {
     const { default: WorkflowStepper } = await import('@/components/WorkflowStepper.vue');
     return mount(WorkflowStepper, { props });
   };
@@ -116,5 +121,134 @@ describe('WorkflowStepper', () => {
 
     expect(wrapper.text()).toContain('3');
     expect(wrapper.text()).toContain('5');
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Factsheet alert banner
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('factsheet alert banner', () => {
+    it('should not render alert banner when factsheetAlert prop is not passed', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'OUTLINE',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+      });
+
+      expect(wrapper.find('[data-testid="factsheet-alert-banner"]').exists()).toBe(false);
+    });
+
+    it('should not render alert banner when level is NORMAL', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'OUTLINE',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'NORMAL', depth: 0 },
+      });
+
+      expect(wrapper.find('[data-testid="factsheet-alert-banner"]').exists()).toBe(false);
+    });
+
+    it('should not render alert banner when level is PRIORITY', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'OUTLINE',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'PRIORITY', depth: 7 },
+      });
+
+      expect(wrapper.find('[data-testid="factsheet-alert-banner"]').exists()).toBe(false);
+    });
+
+    it('should render alert banner when level is WARNING', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'WARNING', depth: 15 },
+      });
+
+      const banner = wrapper.find('[data-testid="factsheet-alert-banner"]');
+      expect(banner.exists()).toBe(true);
+    });
+
+    it('should render alert banner when level is CRITICAL', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'CRITICAL', depth: 50 },
+      });
+
+      const banner = wrapper.find('[data-testid="factsheet-alert-banner"]');
+      expect(banner.exists()).toBe(true);
+    });
+
+    it('should display warning message in the alert banner', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'WARNING', depth: 12 },
+      });
+
+      const textEl = wrapper.find('[data-testid="factsheet-alert-text"]');
+      expect(textEl.exists()).toBe(true);
+      expect(textEl.text()).toContain('事实簿同步延迟');
+      expect(textEl.text()).toContain('建议暂停生成新章');
+    });
+
+    it('should display queue depth in the alert banner', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'WARNING', depth: 23 },
+      });
+
+      const depthEl = wrapper.find('[data-testid="factsheet-alert-depth"]');
+      expect(depthEl.exists()).toBe(true);
+      expect(depthEl.text()).toContain('23');
+    });
+
+    it('should display force sync button in the alert banner', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'WARNING', depth: 15 },
+      });
+
+      const btn = wrapper.find('[data-testid="force-sync-btn"]');
+      expect(btn.exists()).toBe(true);
+    });
+
+    it('should emit force-sync when button is clicked', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'WARNING', depth: 15 },
+      });
+
+      const btn = wrapper.find('[data-testid="force-sync-btn"]');
+      await btn.trigger('click');
+
+      expect(wrapper.emitted('force-sync')).toBeTruthy();
+      expect(wrapper.emitted('force-sync')!.length).toBe(1);
+    });
+
+    it('should show same text for CRITICAL level as WARNING', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        factsheetAlert: { level: 'CRITICAL', depth: 50 },
+      });
+
+      const textEl = wrapper.find('[data-testid="factsheet-alert-text"]');
+      expect(textEl.exists()).toBe(true);
+      expect(textEl.text()).toContain('事实簿同步延迟');
+    });
   });
 });

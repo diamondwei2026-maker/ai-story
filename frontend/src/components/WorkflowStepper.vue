@@ -1,5 +1,28 @@
 <template>
   <div class="workflow-stepper">
+    <div
+      v-if="showAlertBanner"
+      data-testid="factsheet-alert-banner"
+      class="factsheet-alert-banner"
+      :class="{
+        'factsheet-alert-banner--warning': factsheetAlert?.level === 'WARNING',
+        'factsheet-alert-banner--critical': factsheetAlert?.level === 'CRITICAL',
+      }"
+    >
+      <span data-testid="factsheet-alert-text" class="factsheet-alert-banner__text">
+        事实簿同步延迟，建议暂停生成新章并手动触发同步
+      </span>
+      <span data-testid="factsheet-alert-depth" class="factsheet-alert-banner__depth">
+        队列深度: {{ factsheetAlert?.depth ?? 0 }}
+      </span>
+      <button
+        data-testid="force-sync-btn"
+        class="factsheet-alert-banner__sync-btn"
+        @click="emit('force-sync')"
+      >
+        手动同步
+      </button>
+    </div>
     <div class="stepper__counter">步骤 {{ currentIndex + 1 }}/{{ steps.length }}</div>
     <div class="stepper__items">
       <div
@@ -44,17 +67,32 @@ export interface StepInfo {
   status: StepStatus;
 }
 
+export interface FactsheetAlert {
+  level: 'NORMAL' | 'PRIORITY' | 'WARNING' | 'CRITICAL';
+  depth: number;
+}
+
 const props = defineProps<{
   steps: StepInfo[];
   currentPhase: PhaseType;
   phaseOrder: PhaseType[];
+  factsheetAlert?: FactsheetAlert;
 }>();
 
 const emit = defineEmits<{
   'step-click': [phase: PhaseType];
+  'force-sync': [];
 }>();
 
 const currentIndex = computed(() => props.phaseOrder.indexOf(props.currentPhase));
+
+const showAlertBanner = computed(() => {
+  if (!props.factsheetAlert) return false;
+  return (
+    props.factsheetAlert.level === 'WARNING' ||
+    props.factsheetAlert.level === 'CRITICAL'
+  );
+});
 
 function isClickable(index: number): boolean {
   return index <= currentIndex.value;
@@ -162,5 +200,56 @@ function handleClick(step: StepInfo, index: number) {
 
 .step-item__check {
   font-size: 16px;
+}
+
+/* ─── Factsheet Alert Banner ─── */
+
+.factsheet-alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.factsheet-alert-banner--warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+}
+
+.factsheet-alert-banner--critical {
+  background-color: #f8d7da;
+  border: 1px solid #dc3545;
+  color: #721c24;
+}
+
+.factsheet-alert-banner__text {
+  font-weight: 600;
+}
+
+.factsheet-alert-banner__depth {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.factsheet-alert-banner__sync-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-gold, #d4a017);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.factsheet-alert-banner__sync-btn:hover {
+  opacity: 0.85;
 }
 </style>

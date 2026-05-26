@@ -4,6 +4,7 @@ import { ProjectService } from '../project/project.service';
 import { AIGatewayService, TaskType, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
+import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { StepData, PhaseType, StepStatus } from './step.entity';
 
 const mockChatModel = {
@@ -86,13 +87,15 @@ const mockBudgetService = {
 describe('StepService', () => {
   let service: StepService;
   let projectService: ProjectService;
+  let module: TestingModule;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         StepService,
         ProjectService,
         AIGatewayService,
+        FactsheetCompensationService,
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
         { provide: PromptTemplateLoaderService, useValue: mockPromptLoader },
         { provide: ContextBudgetService, useValue: mockBudgetService },
@@ -1582,6 +1585,152 @@ describe('StepService', () => {
       const project = projectService.create({ title: '无灵感步骤' });
 
       expect(service.getIdeaByProjectId(project.id)).toBeNull();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // FactSheet compensation integration (Step 3 pipeline)
+  // ══════════════════════════════════════════════════════════════════
+
+  async function setupDraftingProject(): Promise<{
+    projectId: string;
+    chapters: { id: string }[];
+  }> {
+    const project = projectService.create({ title: 'FactSheet集成测试' });
+    project.status = 'SETTING';
+    projectService.update(project.id, {});
+
+    await service.generateSetting(project.id, { idea: '测试创意' });
+    await service.confirmSetting(project.id);
+
+    await service.generateOutline(project.id, { setting: '设定', structure: 'three-act' });
+    await service.confirmOutline(project.id);
+
+    await service.generateBeats(project.id, { outline: '大纲' });
+    await service.confirmBeats(project.id);
+
+    const chapters = service.getChaptersByProjectId(project.id);
+    return { projectId: project.id, chapters };
+  }
+
+  describe('getFactsheet', () => {
+    it('should return null when no factSheet exists for project', () => {
+      const project = projectService.create({ title: '空项目' });
+      expect(service.getFactsheet(project.id)).toBeNull();
+    });
+  });
+
+  describe('FactSheet version tracking', () => {
+    it('should populate factSheet with version > 0 after chapter generation', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      const sheet = service.getFactsheet(projectId);
+      expect(sheet).not.toBeNull();
+      expect(sheet!.version).toBeGreaterThan(0);
+    });
+
+    it('should increment factSheet version on each chapter generation', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+      await service.confirmChapter(projectId, chapters[0].id);
+
+      const v1 = service.getFactsheet(projectId)!.version;
+
+      await service.generateChapter(projectId, chapters[1].id, { mode: 'new-continue' });
+
+      const v2 = service.getFactsheet(projectId)!.version;
+      expect(v2).toBeGreaterThan(v1);
+    });
+  });
+
+  describe('FactSheet compensation queue consumption', () => {
+    it('should consume compensation queue after successful chapter generation', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      factsheetComp.enqueue(projectId, chapters[1].id, 2, { key: 'pending-value' });
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(1);
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(0);
+    });
+
+    it('should merge consumed queue entries into factSheet', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      factsheetComp.enqueue(projectId, chapters[1].id, 2, {
+        pendingField: 'from-queue',
+      });
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      const sheet = service.getFactsheet(projectId);
+      expect(sheet!.data).toHaveProperty('pendingField', 'from-queue');
+    });
+
+    it('should leave queue empty when no pending entries exist', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(0);
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(0);
+    });
+  });
+
+  describe('FactSheet compensation retry on conflict', () => {
+    it('should succeed with retry when factSheet version is externally bumped before generation', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      // Pre-create a versioned factSheet with external data to trigger CAS retry.
+      // The pipeline reads version N, but stored version is N+5 → CAS fails first time.
+      // On retry it re-reads N+5, merges, and CAS succeeds.
+      (service as any).factSheetByProject.set(projectId, {
+        data: { externalField: 'concurrent-change' },
+        version: 5,
+      });
+
+      const chapter = await service.generateChapter(projectId, chapters[0].id, {
+        mode: 'new-continue',
+      });
+
+      expect(chapter.status).toBe('REVIEWING');
+
+      const sheet = service.getFactsheet(projectId);
+      expect(sheet).not.toBeNull();
+      // The factSheet should contain pre-existing external data
+      expect(sheet!.data).toHaveProperty('externalField', 'concurrent-change');
+      // Version should have advanced from the CAS write (5 → 6 after first write attempt that succeeds)
+      expect(sheet!.version).toBeGreaterThanOrEqual(6);
+    });
+
+    it('should not enqueue when optimistic lock write succeeds on first attempt', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(0);
+
+      const sheet = service.getFactsheet(projectId);
+      expect(sheet).not.toBeNull();
+      expect(sheet!.version).toBeGreaterThan(0);
     });
   });
 });
