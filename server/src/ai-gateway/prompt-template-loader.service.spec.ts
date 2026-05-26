@@ -83,9 +83,14 @@ describe('PromptTemplateLoaderService', () => {
       expect(templates).toContain('outline-generation');
     });
 
-    it('should return empty array for category with no templates', () => {
-      // review 和 extraction 目录存在但还没有模板文件
+    it('should list review templates', () => {
       const templates = service.listTemplates('review');
+      expect(templates).toContain('independent-review');
+      expect(templates).toContain('appeal-review');
+    });
+
+    it('should return empty array for category with no templates', () => {
+      const templates = service.listTemplates('extraction');
       expect(templates).toEqual([]);
     });
 
