@@ -23,6 +23,19 @@
         手动同步
       </button>
     </div>
+
+    <div
+      v-if="showCompletionBanner"
+      data-testid="completion-banner-area"
+      class="completion-banner-area"
+    >
+      <slot name="completion-banner" />
+    </div>
+
+    <div v-if="isReadonly" data-testid="readonly-overlay" class="readonly-overlay">
+      <div class="readonly-overlay__badge">只读模式 · 已完本</div>
+    </div>
+
     <div class="stepper__counter">步骤 {{ currentIndex + 1 }}/{{ steps.length }}</div>
     <div class="stepper__items">
       <div
@@ -54,6 +67,16 @@
         <div v-if="index < steps.length - 1" class="step-item__connector" />
       </div>
     </div>
+
+    <div v-if="isReadonly" class="stepper__reopen">
+      <button
+        data-testid="reopen-project-btn"
+        class="reopen-project-btn"
+        @click="emit('reopen-project')"
+      >
+        继续创作
+      </button>
+    </div>
   </div>
 </template>
 
@@ -77,11 +100,14 @@ const props = defineProps<{
   currentPhase: PhaseType;
   phaseOrder: PhaseType[];
   factsheetAlert?: FactsheetAlert;
+  projectStatus?: string;
+  allChaptersCompleted?: boolean;
 }>();
 
 const emit = defineEmits<{
   'step-click': [phase: PhaseType];
   'force-sync': [];
+  'reopen-project': [];
 }>();
 
 const currentIndex = computed(() => props.phaseOrder.indexOf(props.currentPhase));
@@ -94,7 +120,16 @@ const showAlertBanner = computed(() => {
   );
 });
 
+const isReadonly = computed(() => props.projectStatus === 'COMPLETED');
+
+const showCompletionBanner = computed(() => {
+  return (
+    props.allChaptersCompleted === true && props.projectStatus !== 'COMPLETED'
+  );
+});
+
 function isClickable(index: number): boolean {
+  if (isReadonly.value) return false;
   return index <= currentIndex.value;
 }
 
@@ -251,5 +286,57 @@ function handleClick(step: StepInfo, index: number) {
 
 .factsheet-alert-banner__sync-btn:hover {
   opacity: 0.85;
+}
+
+/* ─── Completion Banner Area ─── */
+
+.completion-banner-area {
+  margin-bottom: 12px;
+}
+
+/* ─── Read-only Overlay ─── */
+
+.readonly-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  margin-bottom: 12px;
+}
+
+.readonly-overlay__badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 12px;
+  background-color: #e8f5e9;
+  border: 1px solid #81c784;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ─── Reopen Button ─── */
+
+.stepper__reopen {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.reopen-project-btn {
+  padding: 8px 28px;
+  border: 2px solid var(--color-gold, #d4a017);
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--color-gold, #d4a017);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reopen-project-btn:hover {
+  background-color: var(--color-gold, #d4a017);
+  color: #fff;
 }
 </style>

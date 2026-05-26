@@ -13,7 +13,7 @@ import {
   ReviewDimensionResult,
 } from './step.entity';
 import { ProjectService } from '../project/project.service';
-import { ProjectStatus } from '../project/project.entity';
+import { ProjectStatus, StatusHistoryEntry } from '../project/project.entity';
 import {
   AIGatewayService,
   TaskType,
@@ -1144,6 +1144,96 @@ export class StepService {
       throw new BadRequestException('No review result');
     }
     return reviewResult;
+  }
+
+  // ─── Project Completion (Issue #16) ──────────────────────────
+
+  async confirmCompletion(
+    projectId: string,
+    action?: 'sync-and-complete' | 'skip-and-complete',
+  ): Promise<{
+    status?: ProjectStatus;
+    needsQueueResolution: boolean;
+    options?: { action: string; label: string }[];
+  }> {
+    const project = this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+
+    const chapters = this.getChaptersByProjectId(projectId);
+    if (chapters.length === 0) {
+      throw new BadRequestException('No chapters found');
+    }
+
+    const allCompletedOrDisputed = chapters.every(
+      (ch) => ch.status === 'COMPLETED' || ch.status === 'DISPUTED',
+    );
+    if (!allCompletedOrDisputed) {
+      throw new BadRequestException(
+        'All chapters must be COMPLETED or DISPUTED before project completion',
+      );
+    }
+
+    const queueDepth = this.factsheetCompensation.getQueueDepth(projectId);
+
+    if (action) {
+      if (action === 'sync-and-complete' && queueDepth > 0) {
+        const factSheet = this.getFactsheet(projectId) ?? {
+          data: {},
+          version: 0,
+        };
+        this.factsheetCompensation.forceSync(projectId, factSheet);
+      }
+      this.appendMilestone(
+        project,
+        'COMPLETED',
+        `User confirmed completion (${action})`,
+      );
+      this.projectService.update(projectId, { status: 'COMPLETED' });
+      return { needsQueueResolution: false, status: 'COMPLETED' };
+    }
+
+    if (queueDepth > 0) {
+      return {
+        needsQueueResolution: true,
+        options: [
+          { action: 'sync-and-complete', label: '立即同步并完本' },
+          { action: 'skip-and-complete', label: '跳过并完本（队列保留）' },
+          { action: 'cancel', label: '取消' },
+        ],
+      };
+    }
+
+    this.appendMilestone(project, 'COMPLETED', 'User confirmed project completion');
+    this.projectService.update(projectId, { status: 'COMPLETED' });
+
+    return { needsQueueResolution: false, status: 'COMPLETED' };
+  }
+
+  async reopenProject(projectId: string): Promise<{ status: ProjectStatus }> {
+    const project = this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'COMPLETED') {
+      throw new BadRequestException('Only COMPLETED projects can be reopened');
+    }
+
+    this.appendMilestone(
+      project,
+      'DRAFTING',
+      'User chose to reopen project for continued creation',
+    );
+    this.projectService.update(projectId, { status: 'DRAFTING' });
+
+    return { status: 'DRAFTING' };
+  }
+
+  private appendMilestone(
+    project: { id: string; statusHistory?: StatusHistoryEntry[] },
+    status: ProjectStatus,
+    reason: string,
+  ): void {
+    const history = [...(project.statusHistory ?? [])];
+    history.push({ status, changedAt: new Date().toISOString(), reason });
+    this.projectService.update(project.id, { statusHistory: history });
   }
 
   private runPowerSystemCheck(output: string): Record<string, unknown> {

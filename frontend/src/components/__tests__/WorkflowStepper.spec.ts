@@ -24,6 +24,8 @@ describe('WorkflowStepper', () => {
     currentPhase: PhaseType;
     phaseOrder: PhaseType[];
     factsheetAlert?: { level: string; depth: number };
+    projectStatus?: string;
+    allChaptersCompleted?: boolean;
   }) => {
     const { default: WorkflowStepper } = await import('@/components/WorkflowStepper.vue');
     return mount(WorkflowStepper, { props });
@@ -249,6 +251,153 @@ describe('WorkflowStepper', () => {
       const textEl = wrapper.find('[data-testid="factsheet-alert-text"]');
       expect(textEl.exists()).toBe(true);
       expect(textEl.text()).toContain('事实簿同步延迟');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Project Completion — read-only mode (Issue #16)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('COMPLETED read-only mode', () => {
+    const completedSteps: StepInfo[] = [
+      { phase: 'IDEA', label: '灵感提取', status: 'CONFIRMED' },
+      { phase: 'SETTING', label: '设定集', status: 'CONFIRMED' },
+      { phase: 'OUTLINE', label: '剧情大纲', status: 'CONFIRMED' },
+      { phase: 'BEATS', label: '细纲拆解', status: 'CONFIRMED' },
+      { phase: 'DRAFTING', label: '正文迭代', status: 'CONFIRMED' },
+    ];
+
+    it('should render read-only overlay when projectStatus is COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'COMPLETED',
+      });
+
+      const overlay = wrapper.find('[data-testid="readonly-overlay"]');
+      expect(overlay.exists()).toBe(true);
+    });
+
+    it('should not render read-only overlay when projectStatus is not COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'DRAFTING',
+      });
+
+      expect(wrapper.find('[data-testid="readonly-overlay"]').exists()).toBe(false);
+    });
+
+    it('should not emit step-click when in COMPLETED read-only mode', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'COMPLETED',
+      });
+
+      await wrapper.findAll('[data-testid="step-item"]')[0].trigger('click');
+
+      expect(wrapper.emitted('step-click')).toBeFalsy();
+    });
+
+    it('should render "继续创作" button when projectStatus is COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'COMPLETED',
+      });
+
+      const btn = wrapper.find('[data-testid="reopen-project-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.text()).toContain('继续创作');
+    });
+
+    it('should not render "继续创作" button when projectStatus is not COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'DRAFTING',
+      });
+
+      expect(wrapper.find('[data-testid="reopen-project-btn"]').exists()).toBe(false);
+    });
+
+    it('should emit reopen-project when "继续创作" button is clicked', async () => {
+      const wrapper = await mountStepper({
+        steps: completedSteps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        projectStatus: 'COMPLETED',
+      });
+
+      const btn = wrapper.find('[data-testid="reopen-project-btn"]');
+      await btn.trigger('click');
+
+      expect(wrapper.emitted('reopen-project')).toBeTruthy();
+      expect(wrapper.emitted('reopen-project')!.length).toBe(1);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Completion banner visibility (Issue #16)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('completion banner in stepper', () => {
+    it('should render completion banner slot when allChaptersCompleted is true and project is not COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: [
+          { phase: 'IDEA', label: '灵感提取', status: 'CONFIRMED' },
+          { phase: 'SETTING', label: '设定集', status: 'CONFIRMED' },
+          { phase: 'OUTLINE', label: '剧情大纲', status: 'CONFIRMED' },
+          { phase: 'BEATS', label: '细纲拆解', status: 'CONFIRMED' },
+          { phase: 'DRAFTING', label: '正文迭代', status: 'CONFIRMED' },
+        ],
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        allChaptersCompleted: true,
+        projectStatus: 'DRAFTING',
+      });
+
+      const banner = wrapper.find('[data-testid="completion-banner-area"]');
+      expect(banner.exists()).toBe(true);
+    });
+
+    it('should not render completion banner area when allChaptersCompleted is false', async () => {
+      const wrapper = await mountStepper({
+        steps,
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        allChaptersCompleted: false,
+      });
+
+      expect(wrapper.find('[data-testid="completion-banner-area"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it('should not render completion banner area when project is already COMPLETED', async () => {
+      const wrapper = await mountStepper({
+        steps: [
+          { phase: 'IDEA', label: '灵感提取', status: 'CONFIRMED' },
+          { phase: 'SETTING', label: '设定集', status: 'CONFIRMED' },
+          { phase: 'OUTLINE', label: '剧情大纲', status: 'CONFIRMED' },
+          { phase: 'BEATS', label: '细纲拆解', status: 'CONFIRMED' },
+          { phase: 'DRAFTING', label: '正文迭代', status: 'CONFIRMED' },
+        ],
+        currentPhase: 'DRAFTING',
+        phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+        allChaptersCompleted: true,
+        projectStatus: 'COMPLETED',
+      });
+
+      expect(wrapper.find('[data-testid="completion-banner-area"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

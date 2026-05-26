@@ -10,6 +10,12 @@ export interface PendingFactUpdate {
   queuedAt: string;
 }
 
+export interface StatusHistoryEntry {
+  status: ProjectStatus;
+  changedAt: string;
+  reason: string;
+}
+
 export type ProjectStatus = 'IDEA' | 'SETTING' | 'OUTLINE' | 'BEATS' | 'DRAFTING' | 'COMPLETED' | 'ARCHIVED';
 
 export interface Project {
@@ -22,6 +28,7 @@ export interface Project {
     genre?: string;
   };
   pendingFactUpdates?: PendingFactUpdate[];
+  statusHistory?: StatusHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
 }

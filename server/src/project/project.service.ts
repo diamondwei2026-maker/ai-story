@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Project, ProjectStatus } from './project.entity';
+import { Project, ProjectStatus, PendingFactUpdate, StatusHistoryEntry } from './project.entity';
 
 @Injectable()
 export class ProjectService {
@@ -13,6 +13,14 @@ export class ProjectService {
       title: data.title.trim(),
       status: 'IDEA' as ProjectStatus,
       config: data.config ?? {},
+      pendingFactUpdates: [],
+      statusHistory: [
+        {
+          status: 'IDEA' as ProjectStatus,
+          changedAt: now.toISOString(),
+          reason: 'Project created',
+        },
+      ],
       createdAt: now,
       updatedAt: now,
     };
@@ -32,7 +40,13 @@ export class ProjectService {
 
   update(
     id: string,
-    data: { title?: string; config?: Project['config']; status?: Project['status'] },
+    data: {
+      title?: string;
+      config?: Project['config'];
+      status?: Project['status'];
+      pendingFactUpdates?: PendingFactUpdate[];
+      statusHistory?: StatusHistoryEntry[];
+    },
   ): Project | null {
     const project = this.projects.get(id);
     if (!project) return null;
@@ -44,6 +58,12 @@ export class ProjectService {
     }
     if (data.status !== undefined) {
       project.status = data.status;
+    }
+    if (data.pendingFactUpdates !== undefined) {
+      project.pendingFactUpdates = data.pendingFactUpdates;
+    }
+    if (data.statusHistory !== undefined) {
+      project.statusHistory = data.statusHistory;
     }
     project.updatedAt = new Date();
     return project;

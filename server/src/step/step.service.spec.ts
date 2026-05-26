@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { StepService } from './step.service';
 import { ProjectService } from '../project/project.service';
 import { AIGatewayService, TaskType, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
@@ -1731,6 +1732,224 @@ describe('StepService', () => {
       const sheet = service.getFactsheet(projectId);
       expect(sheet).not.toBeNull();
       expect(sheet!.version).toBeGreaterThan(0);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Project Completion (Issue #16)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('confirmCompletion', () => {
+    it('should transition project to COMPLETED when all chapters are COMPLETED', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      const result = await service.confirmCompletion(projectId);
+
+      expect(result.status).toBe('COMPLETED');
+      const project = projectService.findById(projectId);
+      expect(project!.status).toBe('COMPLETED');
+    });
+
+    it('should transition project to COMPLETED when chapters are mixed COMPLETED and DISPUTED', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (let i = 0; i < 3; i++) {
+        await service.generateChapter(projectId, chapters[i].id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, chapters[i].id);
+      }
+      for (let i = 3; i < chapters.length; i++) {
+        await service.generateChapter(projectId, chapters[i].id, { mode: 'new-continue' });
+        await service.disputeChapter(projectId, chapters[i].id);
+      }
+
+      const result = await service.confirmCompletion(projectId);
+
+      expect(result.status).toBe('COMPLETED');
+    });
+
+    it('should throw BadRequestException if any chapter is not COMPLETED or DISPUTED', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+      await service.confirmChapter(projectId, chapters[0].id);
+
+      await expect(service.confirmCompletion(projectId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should record statusHistory milestone on completion', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      await service.confirmCompletion(projectId);
+
+      const project = projectService.findById(projectId);
+      expect(project!.statusHistory).toBeDefined();
+      expect(project!.statusHistory!.length).toBeGreaterThanOrEqual(1);
+      const milestone = project!.statusHistory![
+        project!.statusHistory!.length - 1
+      ];
+      expect(milestone.status).toBe('COMPLETED');
+      expect(milestone.changedAt).toBeTruthy();
+      expect(milestone.reason).toBeTruthy();
+    });
+
+    it('should check pendingFactUpdates and return options when queue is non-empty', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      factsheetComp.enqueue(projectId, chapters[0].id, 1, { key: 'pending-value' });
+
+      const result = await service.confirmCompletion(projectId);
+
+      expect(result.needsQueueResolution).toBe(true);
+      expect(result.options).toBeDefined();
+      expect(result.options!).toHaveLength(3);
+      expect(result.options![0]).toMatchObject({ action: 'sync-and-complete' });
+      expect(result.options![1]).toMatchObject({ action: 'skip-and-complete' });
+      expect(result.options![2]).toMatchObject({ action: 'cancel' });
+      // Project should NOT be COMPLETED yet
+      const project = projectService.findById(projectId);
+      expect(project!.status).not.toBe('COMPLETED');
+    });
+
+    it('should immediately complete when pendingFactUpdates queue is empty', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      const result = await service.confirmCompletion(projectId);
+
+      expect(result.status).toBe('COMPLETED');
+      expect(result.needsQueueResolution).toBeFalsy();
+    });
+
+    it('should force sync queue and complete when action is sync-and-complete', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      factsheetComp.enqueue(projectId, chapters[0].id, 1, { key: 'pending-value' });
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(1);
+
+      const result = await service.confirmCompletion(projectId, 'sync-and-complete');
+
+      expect(result.status).toBe('COMPLETED');
+      expect(result.needsQueueResolution).toBeFalsy();
+      // Queue should be drained after sync-and-complete
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(0);
+      const project = projectService.findById(projectId);
+      expect(project!.status).toBe('COMPLETED');
+      expect(project!.statusHistory!.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should complete without consuming queue when action is skip-and-complete', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+
+      const factsheetComp = module.get<FactsheetCompensationService>(
+        FactsheetCompensationService,
+      );
+      factsheetComp.enqueue(projectId, chapters[0].id, 1, { key: 'pending-value' });
+      const depthBefore = factsheetComp.getQueueDepth(projectId);
+      expect(depthBefore).toBe(1);
+
+      const result = await service.confirmCompletion(projectId, 'skip-and-complete');
+
+      expect(result.status).toBe('COMPLETED');
+      expect(result.needsQueueResolution).toBeFalsy();
+      // Queue should be preserved after skip-and-complete
+      expect(factsheetComp.getQueueDepth(projectId)).toBe(depthBefore);
+      const project = projectService.findById(projectId);
+      expect(project!.status).toBe('COMPLETED');
+      expect(project!.statusHistory!.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('reopenProject', () => {
+    it('should transition project from COMPLETED to DRAFTING', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+      await service.confirmCompletion(projectId);
+
+      const result = await service.reopenProject(projectId);
+
+      expect(result.status).toBe('DRAFTING');
+      const project = projectService.findById(projectId);
+      expect(project!.status).toBe('DRAFTING');
+    });
+
+    it('should keep all chapter statuses unchanged after reopen', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+      await service.confirmCompletion(projectId);
+
+      await service.reopenProject(projectId);
+
+      const allChapters = service.getChaptersByProjectId(projectId);
+      for (const ch of allChapters) {
+        expect(ch.status).toBe('COMPLETED');
+      }
+    });
+
+    it('should record statusHistory milestone on reopen', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      for (const ch of chapters) {
+        await service.generateChapter(projectId, ch.id, { mode: 'new-continue' });
+        await service.confirmChapter(projectId, ch.id);
+      }
+      await service.confirmCompletion(projectId);
+
+      await service.reopenProject(projectId);
+
+      const project = projectService.findById(projectId);
+      const reopenMilestone = project!.statusHistory!.find(
+        (m: any) => m.status === 'DRAFTING',
+      );
+      expect(reopenMilestone).toBeDefined();
+      expect(reopenMilestone!.reason).toContain('reopen');
+    });
+
+    it('should throw BadRequestException if project is not COMPLETED', async () => {
+      const project = projectService.create({ title: '测试项目' });
+
+      await expect(service.reopenProject(project.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw NotFoundException if project does not exist', async () => {
+      await expect(service.reopenProject('non-existent-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });
