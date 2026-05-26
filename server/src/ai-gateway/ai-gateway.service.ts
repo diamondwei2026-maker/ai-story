@@ -31,6 +31,14 @@ export interface AIGenerateChunk {
   failed?: boolean;
 }
 
+export interface DegradationLogEntry {
+  taskType: TaskType;
+  originalModel: string;
+  degradedModel: string;
+  failureReason: string;
+  timestamp: string;
+}
+
 export const AI_MODEL_TOKEN = 'AI_MODEL_TOKEN';
 
 export interface IChatModel {
@@ -57,11 +65,16 @@ const FALLBACK_MAP: Record<string, string> = {
   'deepseek-r1': 'deepseek-chat-v3',
 };
 
-const CONTENT_GENERATION_TASKS: TaskType[] = [
+const BLOCKING_TASKS: TaskType[] = [
   TaskType.CHAPTER_GENERATION,
   TaskType.CRITICAL_CHAPTER,
   TaskType.CHAPTER_REWRITE,
   TaskType.CHAPTER_POLISH,
+  TaskType.INDEPENDENT_REVIEW,
+  TaskType.IDEA,
+  TaskType.SETTING,
+  TaskType.OUTLINE,
+  TaskType.BEATS,
 ];
 
 const SKIP_ON_FAILURE_TASKS: TaskType[] = [
@@ -72,6 +85,8 @@ const SKIP_ON_FAILURE_TASKS: TaskType[] = [
 
 @Injectable()
 export class AIGatewayService {
+  private degradationLogs: DegradationLogEntry[] = [];
+
   constructor(
     @Inject(AI_MODEL_TOKEN) private readonly chatModel: IChatModel,
   ) {}
@@ -88,24 +103,46 @@ export class AIGatewayService {
     const primaryModel = this.getModelForTask(request.taskType);
 
     return new Observable<AIGenerateChunk>((subscriber) => {
-      this.streamGenerate(
+      this.streamGenerateCore(
         request.taskType,
         primaryModel,
         request.prompt,
         primaryModel,
         false,
         subscriber,
+        false,
       );
     });
   }
 
-  private async streamGenerate(
+  callWithFallback(taskType: TaskType, prompt: string): Observable<AIGenerateChunk> {
+    const primaryModel = this.getModelForTask(taskType);
+
+    return new Observable<AIGenerateChunk>((subscriber) => {
+      this.streamGenerateCore(
+        taskType,
+        primaryModel,
+        prompt,
+        primaryModel,
+        false,
+        subscriber,
+        true,
+      );
+    });
+  }
+
+  getDegradationLogs(): DegradationLogEntry[] {
+    return this.degradationLogs;
+  }
+
+  private async streamGenerateCore(
     taskType: TaskType,
     model: string,
     prompt: string,
     modelUsed: string,
     degraded: boolean,
     subscriber: Subscriber<AIGenerateChunk>,
+    logDegradation: boolean,
   ): Promise<void> {
     try {
       const stream = this.chatModel.stream(prompt);
@@ -116,16 +153,27 @@ export class AIGatewayService {
       }
       subscriber.next({ content: '', done: true, modelUsed, degraded });
       subscriber.complete();
-    } catch {
+    } catch (err) {
+      const failureReason = err instanceof Error ? err.message : String(err);
       const fallback = this.getFallbackModel(model);
       if (fallback && !degraded) {
-        await this.streamGenerate(
+        if (logDegradation) {
+          this.degradationLogs.push({
+            taskType,
+            originalModel: modelUsed,
+            degradedModel: fallback,
+            failureReason,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        await this.streamGenerateCore(
           taskType,
           fallback,
           prompt,
           modelUsed,
           true,
           subscriber,
+          logDegradation,
         );
         return;
       }
@@ -138,7 +186,7 @@ export class AIGatewayService {
     modelUsed: string,
     subscriber: Subscriber<AIGenerateChunk>,
   ): void {
-    if (CONTENT_GENERATION_TASKS.includes(taskType)) {
+    if (BLOCKING_TASKS.includes(taskType)) {
       subscriber.error(
         new Error('AI 服务暂时不可用，请稍后重试'),
       );

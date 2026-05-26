@@ -1952,4 +1952,81 @@ describe('StepService', () => {
       );
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Issue #19: AI metadata propagation (aiMeta)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('generateIdea — aiMeta propagation (Issue #19)', () => {
+    it('should include aiMeta with modelUsed in StepData after generation', async () => {
+      const project = projectService.create({ title: 'aiMeta测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '测试创意',
+      });
+
+      expect(step.aiMeta).toBeDefined();
+      expect(step.aiMeta!.modelUsed).toBeTruthy();
+      expect(typeof step.aiMeta!.modelUsed).toBe('string');
+    });
+
+    it('should set aiMeta.degraded to false on primary model success', async () => {
+      const project = projectService.create({ title: '无降级测试' });
+
+      const step = await service.generateIdea(project.id, {
+        idea: '测试创意',
+      });
+
+      expect(step.aiMeta).toBeDefined();
+      expect(step.aiMeta!.degraded).toBe(false);
+    });
+  });
+
+  describe('generateSetting — aiMeta propagation (Issue #19)', () => {
+    it('should include aiMeta in StepData after setting generation', async () => {
+      const project = projectService.create({ title: '设定aiMeta' });
+      project.status = 'SETTING';
+      projectService.update(project.id, {});
+
+      const step = await service.generateSetting(project.id, {
+        idea: '测试创意',
+      });
+
+      expect(step.aiMeta).toBeDefined();
+      expect(step.aiMeta!.modelUsed).toBeTruthy();
+      expect(step.aiMeta!.degraded).toBe(false);
+    });
+  });
+
+  describe('generateOutline — aiMeta propagation (Issue #19)', () => {
+    it('should include aiMeta in StepData after outline generation', async () => {
+      const project = projectService.create({ title: '大纲aiMeta' });
+      project.status = 'OUTLINE';
+      projectService.update(project.id, {});
+
+      const step = await service.generateOutline(project.id, {
+        setting: '设定内容',
+        structure: 'three-act',
+      });
+
+      expect(step.aiMeta).toBeDefined();
+      expect(step.aiMeta!.modelUsed).toBeTruthy();
+      expect(step.aiMeta!.degraded).toBe(false);
+    });
+  });
+
+  describe('generateBeats — aiMeta propagation (Issue #19)', () => {
+    it('should not throw and should store StepData with aiMeta', async () => {
+      const project = projectService.create({ title: '细纲aiMeta' });
+      project.status = 'BEATS';
+      projectService.update(project.id, {});
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const step = service.getStepByProjectId(project.id, 'BEATS');
+      expect(step).toBeDefined();
+      expect(step!.aiMeta).toBeDefined();
+      expect(step!.aiMeta!.modelUsed).toBeTruthy();
+    });
+  });
 });

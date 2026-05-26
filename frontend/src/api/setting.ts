@@ -9,6 +9,7 @@ export interface SettingResponse {
   review: Record<string, unknown>;
   version: number;
   confirmedAt?: string | null;
+  aiMeta?: { modelUsed: string; degraded: boolean; failed?: boolean };
 }
 
 export async function generateSetting(

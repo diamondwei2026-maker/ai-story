@@ -9,6 +9,12 @@ export type StepStatus =
   | 'CONFIRMED'
   | 'REJECTED';
 
+export interface AiMeta {
+  modelUsed: string;
+  degraded: boolean;
+  failed?: boolean;
+}
+
 export interface StepData {
   id: string;
   projectId: string;
@@ -19,6 +25,7 @@ export interface StepData {
   review: Record<string, unknown> | null;
   version: number;
   confirmedAt: Date | null;
+  aiMeta?: AiMeta;
 }
 
 export type BeatStatus = 'PENDING' | 'STALE' | 'CONFIRMED';

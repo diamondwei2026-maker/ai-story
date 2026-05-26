@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="visible"
-    data-testid="error-modal"
+    :data-testid="testId"
     class="error-modal-overlay"
     @close="emit('close')"
     @click.self="emit('close')"
@@ -29,9 +29,11 @@ withDefaults(defineProps<{
   visible: boolean;
   message?: string;
   retryLabel?: string;
+  testId?: string;
 }>(), {
   message: 'AI 服务暂时不可用，请稍后重试',
   retryLabel: '手动重试',
+  testId: 'error-modal',
 });
 
 const emit = defineEmits<{

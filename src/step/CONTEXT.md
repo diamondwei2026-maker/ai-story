@@ -51,6 +51,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
   - `updateBeatWordCount()` — 仅改字数：该 Beat 标记 STALE，AI 重平衡前后 Beat 字数配额。邻居 Beat 不标 STALE，已生成 Chapter 不标 STALE（仅更新 targetWordCount）
   - `updateBeatStructure()` — 改结构内容（冲突点/钩子/POV）：该 Beat 标记 STALE，对应 Chapter（如已生成）标记 STALE。上下游 Beat 不受影响
   - 两种修改均不触发跨 Phase 回退（Project.status 保持 DRAFTING）
+  - `shouldUseR1()` — 关键章节双重判定（ADR-0007 Decision 3）：结构位置（开篇 1-3 章 / 结局最后 3 章）|| hookCount ≥ 3 || isClimax → 满足任一即标记 `useR1`。在 `confirmBeats()` 中批量计算并固化到 Beat 文档
 - **正文迭代 (DRAFTING)**: `generateChapter()` → `confirmChapter()` / `disputeChapter()`；支持三种模式（new-continue / paragraph-rewrite / style-upgrade）
 
 ### Chapter 生命周期
@@ -97,7 +98,13 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - `reopenProject(projectId)` — 继续创作（COMPLETED → DRAFTING）
 - `appendMilestone()` — 里程碑记录
 
-### 上下文注入与预算控制 (`context-budget.service.ts`)
+### 模型降级与容错 (Issue #19)
+
+- **`callWithFallback(taskType, prompt)`** — AIGatewayService 公开降级方法，单向链 V3→R1→阻塞 / R1→V3→阻塞
+- **降级日志**: `getDegradationLogs()` 返回 `DegradationLogEntry[]`（taskType / originalModel / degradedModel / failureReason / timestamp），暂用内存存储
+- **扩展阻断分类 (`BLOCKING_TASKS`)**: 生成（CHAPTER_GENERATION / CRITICAL_CHAPTER / CHAPTER_REWRITE / CHAPTER_POLISH）+ 审核（INDEPENDENT_REVIEW）+ 创意（IDEA / SETTING / OUTLINE / BEATS）= 9 种 TaskType 在双模型均失败时 throw；3 种后台任务（FINGERPRINT_EXTRACTION / FACTSHEET_UPDATE / CHANGE_ANALYSIS）skip
+- **AI 元数据传播**: `collectAiOutput()` 返回 `{ content, aiMeta }` → `StepData.aiMeta`（含 modelUsed / degraded / failed）→ 前端 API 响应 → `useAiStatus` composable
+- **前端组件**: `<AiUnavailableModal />` 双模型不可用弹窗 + `<ModelBadge />` 模型状态指示器
 
 - **三层硬上限**: 全局静态 3000t / 全局动态 2000t / 局部上下文 3000t，总预算 8000t
 - **优先级裁剪**: 总预算超限时按 local → globalDynamic → globalStatic 顺序压缩
@@ -119,7 +126,4 @@ BLOCKED → 手动修改/上诉 → 重新审核
 
 ## 尚未实现（来自 PRD）
 
-- 关键章节双重判定自动标记（ADR-0007 Decision 3）
-- 模型降级单向链 + 用户阻塞（ADR-0007 Decision 4）
 - Token 预计算模块（经由 OpenRouter API token counting 端点）
-- 前端"模型状态指示器"组件

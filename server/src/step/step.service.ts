@@ -11,6 +11,7 @@ import {
   ReviewAction,
   ReviewResult,
   ReviewDimensionResult,
+  AiMeta,
 } from './step.entity';
 import { ProjectService } from '../project/project.service';
 import { ProjectStatus, StatusHistoryEntry } from '../project/project.entity';
@@ -143,10 +144,11 @@ export class StepService {
     );
 
     step.status = 'AI_GENERATING';
-    const output = await this.collectAiOutput(TaskType.SETTING, prompt);
+    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.SETTING, prompt);
 
     step.status = 'AWAITING_REVIEW';
     step.output = output;
+    step.aiMeta = aiMeta;
     step.input = currentContent
       ? `${idea}\n\n--- 用户编辑内容 ---\n${currentContent}`
       : idea;
@@ -211,10 +213,11 @@ export class StepService {
     );
 
     step.status = 'AI_GENERATING';
-    const output = await this.collectAiOutput(TaskType.IDEA, prompt);
+    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
     step.status = 'AWAITING_REVIEW';
     step.output = output;
+    step.aiMeta = aiMeta;
     step.input = feedback
       ? `idea: ${idea}\nfeedback: ${feedback}`
       : idea;
@@ -251,7 +254,7 @@ export class StepService {
     );
 
     existing.status = 'AI_GENERATING';
-    const summaryOutput = await this.collectAiOutput(TaskType.IDEA, prompt);
+    const { content: summaryOutput } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
     existing.status = 'AWAITING_REVIEW';
     existing.output = (existing.output ?? '') + '\n\n' + summaryOutput;
@@ -318,10 +321,11 @@ export class StepService {
     );
 
     step.status = 'AI_GENERATING';
-    const output = await this.collectAiOutput(TaskType.OUTLINE, prompt);
+    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.OUTLINE, prompt);
 
     step.status = 'AWAITING_REVIEW';
     step.output = output;
+    step.aiMeta = aiMeta;
     step.input = currentContent
       ? `structure: ${structure}\nsetting: ${setting}\n\n--- 用户编辑内容 ---\n${currentContent}`
       : `structure: ${structure}\nsetting: ${setting}`;
@@ -375,7 +379,7 @@ export class StepService {
       },
     );
 
-    const output = await this.collectAiOutput(TaskType.OUTLINE, prompt);
+    const { content: output } = await this.collectAiOutput(TaskType.OUTLINE, prompt);
 
     const review = {
       structurePacing: this.runPacingReview(output),
@@ -420,8 +424,9 @@ export class StepService {
     );
 
     step.status = 'AI_GENERATING';
-    const output = await this.collectAiOutput(TaskType.BEATS, prompt);
+    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.BEATS, prompt);
 
+    step.aiMeta = aiMeta;
     const existingBeats = this.beatsByProject.get(projectId) ?? [];
     const newBeats = this.parseBeatsFromOutput(output, projectId);
 
@@ -554,7 +559,7 @@ export class StepService {
 
     // Step 1: SSE streaming content generation
     chapter.status = 'DRAFT';
-    chapter.content = await this.collectAiOutput(
+    const chResult = await this.collectAiOutput(
       TaskType.CHAPTER_GENERATION,
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
         mode: opts.mode,
@@ -564,6 +569,7 @@ export class StepService {
         previousSummary: previous?.contextSummary ?? '',
       }),
     );
+    chapter.content = chResult.content;
 
     // Steps 2–5: post-generation pipeline
     await this.runPostGenerationPipeline(chapter, projectId);
@@ -624,7 +630,7 @@ export class StepService {
       }),
     );
 
-    chapter.content = opts.currentContent + continuation;
+    chapter.content = opts.currentContent + continuation.content;
 
     await this.runPostGenerationPipeline(chapter, projectId);
 
@@ -679,7 +685,7 @@ export class StepService {
       },
     );
 
-    const raw = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, prompt);
+    const { content: raw } = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, prompt);
     const parsed = this.parseAiReviewResponse(raw);
 
     const result: ReviewResult = this.buildReviewResult(parsed, {
@@ -723,7 +729,7 @@ export class StepService {
       },
     );
 
-    const raw = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, prompt);
+    const { content: raw } = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, prompt);
     const parsed = this.parseAiReviewResponse(raw);
 
     const result: ReviewResult = this.buildReviewResult(parsed, {
@@ -773,23 +779,24 @@ export class StepService {
     projectId: string,
   ): Promise<void> {
     // Step 2: Fingerprint extraction
-    chapter.chapterFingerprint = await this.collectAiOutput(
+    const fpResult = await this.collectAiOutput(
       TaskType.FINGERPRINT_EXTRACTION,
       `Extract fingerprint for: ${chapter.content}`,
     );
+    chapter.chapterFingerprint = fpResult.content;
 
     // Step 3: FactSheet update with optimistic lock + compensation queue
-    const sheetUpdateRaw = await this.collectAiOutput(
+    const sheetUpdateResult = await this.collectAiOutput(
       TaskType.FACTSHEET_UPDATE,
       `Update FactSheet with: ${chapter.content}`,
     );
 
     let updateEntries: Record<string, unknown>;
     try {
-      updateEntries = JSON.parse(sheetUpdateRaw);
+      updateEntries = JSON.parse(sheetUpdateResult.content);
     } catch {
       updateEntries = {
-        ['chapter_' + chapter.chapterNumber]: { annotation: sheetUpdateRaw },
+        ['chapter_' + chapter.chapterNumber]: { annotation: sheetUpdateResult.content },
       };
     }
 
@@ -817,23 +824,24 @@ export class StepService {
     }
 
     // Step 4: Independent review
-    const reviewRaw = await this.collectAiOutput(
+    const reviewResult = await this.collectAiOutput(
       TaskType.INDEPENDENT_REVIEW,
       `Review content: ${chapter.content}`,
     );
     chapter.reviewResult = {
       passed: true,
-      raw: reviewRaw,
+      raw: reviewResult.content,
       reviewedAt: new Date().toISOString(),
     };
 
     // Step 5: Context summary (only if content > 2500 tokens)
     const estimatedTokens = this.estimateTokens(chapter.content!);
     if (estimatedTokens > 2500) {
-      chapter.contextSummary = await this.collectAiOutput(
+      const summaryResult = await this.collectAiOutput(
         TaskType.CHAPTER_GENERATION,
         `Summarize: ${chapter.content!.substring(0, 8000)}`,
       );
+      chapter.contextSummary = summaryResult.content;
     }
   }
 
@@ -1038,13 +1046,23 @@ export class StepService {
     return step;
   }
 
-  private async collectAiOutput(taskType: TaskType, prompt: string): Promise<string> {
+  private async collectAiOutput(
+    taskType: TaskType,
+    prompt: string,
+  ): Promise<{ content: string; aiMeta: AiMeta }> {
     const chunks$: Observable<AIGenerateChunk> = this.aiGateway.generate({
       taskType,
       prompt,
     });
     const chunks = await lastValueFrom(chunks$.pipe(toArray()));
-    return chunks.map((c) => c.content).join('');
+    const lastChunk = chunks[chunks.length - 1];
+    const content = chunks.map((c) => c.content).join('');
+    const aiMeta: AiMeta = {
+      modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
+      degraded: lastChunk?.degraded ?? false,
+      failed: lastChunk?.failed ?? false,
+    };
+    return { content, aiMeta };
   }
 
   private extractKeyPlotPoints(output: string): string {

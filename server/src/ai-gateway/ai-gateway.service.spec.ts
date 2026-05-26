@@ -211,17 +211,6 @@ describe('AIGatewayService', () => {
       await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
     });
 
-    it('should emit failed=true for review tasks instead of throwing', async () => {
-      const obs$ = failService.generate({
-        taskType: TaskType.INDEPENDENT_REVIEW,
-        prompt: 'test',
-      });
-      const chunks = await collectChunks(obs$);
-      const lastChunk = chunks[chunks.length - 1];
-      expect(lastChunk.done).toBe(true);
-      expect(lastChunk.failed).toBe(true);
-    });
-
     it('should emit failed=true for extraction tasks instead of throwing', async () => {
       const obs$ = failService.generate({
         taskType: TaskType.FINGERPRINT_EXTRACTION,
@@ -231,6 +220,296 @@ describe('AIGatewayService', () => {
       const lastChunk = chunks[chunks.length - 1];
       expect(lastChunk.done).toBe(true);
       expect(lastChunk.failed).toBe(true);
+    });
+  });
+
+  // ============================================================
+  // Issue #19: callWithFallback — 公开降级方法 + 降级日志
+  // ============================================================
+
+  describe('callWithFallback — public degradation method', () => {
+    it('应该作为公开方法存在于 AIGatewayService 上', () => {
+      expect(typeof (service as any).callWithFallback).toBe('function');
+    });
+
+    it('应该返回 Observable<AIGenerateChunk>，行为与 generate 一致', async () => {
+      const result$ = (service as any).callWithFallback(
+        TaskType.CHAPTER_GENERATION,
+        'test prompt',
+      );
+      const chunks = await collectChunks(result$);
+      expect(chunks.length).toBeGreaterThan(0);
+      const lastChunk = chunks[chunks.length - 1];
+      expect(lastChunk.done).toBe(true);
+      expect(lastChunk.modelUsed).toBeTruthy();
+      expect(lastChunk.degraded).toBe(false);
+    });
+
+    it('主模型成功时不产生降级日志', async () => {
+      await collectChunks(
+        (service as any).callWithFallback(
+          TaskType.CHAPTER_GENERATION,
+          'test prompt',
+        ),
+      );
+      const logs = (service as any).getDegradationLogs();
+      expect(logs).toHaveLength(0);
+    });
+  });
+
+  describe('callWithFallback — 降级日志记录', () => {
+    it('V3 失败降级到 R1 时应记录降级日志', async () => {
+      let callCount = 0;
+      const failV3ThenR1Ok = {
+        stream: async function* () {
+          callCount++;
+          if (callCount === 1) throw new Error('V3 unavailable');
+          yield { content: 'R1 response' };
+        },
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: failV3ThenR1Ok },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      await collectChunks(
+        (svc as any).callWithFallback(TaskType.CHAPTER_GENERATION, 'test'),
+      );
+
+      const logs = (svc as any).getDegradationLogs();
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({
+        taskType: 'CHAPTER_GENERATION',
+        originalModel: expect.stringContaining('v3'),
+        degradedModel: expect.stringContaining('r1'),
+        failureReason: expect.stringContaining('V3'),
+        timestamp: expect.any(String),
+      });
+    });
+
+    it('R1 失败降级到 V3 时应记录降级日志', async () => {
+      let callCount = 0;
+      const failR1ThenV3Ok = {
+        stream: async function* () {
+          callCount++;
+          if (callCount === 1) throw new Error('R1 timeout');
+          yield { content: 'V3 response' };
+        },
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: failR1ThenV3Ok },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      await collectChunks(
+        (svc as any).callWithFallback(TaskType.IDEA, 'test'),
+      );
+
+      const logs = (svc as any).getDegradationLogs();
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({
+        taskType: 'IDEA',
+        originalModel: expect.stringContaining('r1'),
+        degradedModel: expect.stringContaining('v3'),
+        failureReason: expect.stringContaining('R1'),
+        timestamp: expect.any(String),
+      });
+    });
+
+    it('双模型均失败时应记录降级日志', async () => {
+      let callCount = 0;
+      const alwaysFail = {
+        stream: async function* () {
+          callCount++;
+          throw new Error(`Both models down (attempt ${callCount})`);
+        },
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: alwaysFail },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      try {
+        await collectChunks(
+          (svc as any).callWithFallback(TaskType.CHAPTER_GENERATION, 'test'),
+        );
+      } catch {
+        // expected — both models failed for content generation
+      }
+
+      const logs = (svc as any).getDegradationLogs();
+      expect(logs.length).toBeGreaterThanOrEqual(1);
+      expect(logs[0]).toMatchObject({
+        taskType: 'CHAPTER_GENERATION',
+        originalModel: expect.any(String),
+        degradedModel: expect.any(String),
+        failureReason: expect.any(String),
+        timestamp: expect.any(String),
+      });
+    });
+  });
+
+  describe('callWithFallback — 单向链保证（不循环）', () => {
+    it('V3→R1 失败后不应再尝试 V3（单向降级）', async () => {
+      const modelCalls: string[] = [];
+      const alwaysFail = {
+        stream: async function* () {
+          modelCalls.push('call');
+          throw new Error('Model unavailable');
+        },
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: alwaysFail },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      try {
+        await collectChunks(
+          (svc as any).callWithFallback(TaskType.CHAPTER_GENERATION, 'test'),
+        );
+      } catch {
+        // expected
+      }
+
+      // 只应调用 2 次（主模型 + 1 次降级），不应有第 3 次回环
+      expect(modelCalls.length).toBe(2);
+    });
+  });
+
+  // ============================================================
+  // Issue #19: 扩展双模型失败时的阻断范围
+  // 生成/审核 → throw；指纹/FactSheet/ChangeAnalysis → skip
+  // ============================================================
+
+  describe('generate — both models failed (expanded blocking: 审核+创意)', () => {
+    const alwaysFail = {
+      stream: async function* () {
+        throw new Error('Both models down');
+      },
+    };
+
+    let failService: AIGatewayService;
+
+    beforeEach(async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: alwaysFail },
+        ],
+      }).compile();
+      failService = module.get<AIGatewayService>(AIGatewayService);
+    });
+
+    it('审核任务 (INDEPENDENT_REVIEW) 双模型失败时应 throw', async () => {
+      const obs$ = failService.generate({
+        taskType: TaskType.INDEPENDENT_REVIEW,
+        prompt: 'test',
+      });
+      await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
+    });
+
+    it('创意任务 (IDEA) 双模型失败时应 throw', async () => {
+      const obs$ = failService.generate({
+        taskType: TaskType.IDEA,
+        prompt: 'test',
+      });
+      await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
+    });
+
+    it('创意任务 (SETTING) 双模型失败时应 throw', async () => {
+      const obs$ = failService.generate({
+        taskType: TaskType.SETTING,
+        prompt: 'test',
+      });
+      await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
+    });
+
+    it('创意任务 (OUTLINE) 双模型失败时应 throw', async () => {
+      const obs$ = failService.generate({
+        taskType: TaskType.OUTLINE,
+        prompt: 'test',
+      });
+      await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
+    });
+
+    it('创意任务 (BEATS) 双模型失败时应 throw', async () => {
+      const obs$ = failService.generate({
+        taskType: TaskType.BEATS,
+        prompt: 'test',
+      });
+      await expect(collectChunks(obs$)).rejects.toThrow(/AI 服务暂时不可用/);
+    });
+  });
+
+  describe('generate — both models failed (skip: 指纹/FactSheet/ChangeAnalysis)', () => {
+    const alwaysFail = {
+      stream: async function* () {
+        throw new Error('Both models down');
+      },
+    };
+
+    let failService: AIGatewayService;
+
+    beforeEach(async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          { provide: AI_MODEL_TOKEN, useValue: alwaysFail },
+        ],
+      }).compile();
+      failService = module.get<AIGatewayService>(AIGatewayService);
+    });
+
+    it('FINGERPRINT_EXTRACTION 双模型失败时应 emit failed=true 而非 throw', async () => {
+      const chunks = await collectChunks(
+        failService.generate({
+          taskType: TaskType.FINGERPRINT_EXTRACTION,
+          prompt: 'test',
+        }),
+      );
+      const last = chunks[chunks.length - 1];
+      expect(last.done).toBe(true);
+      expect(last.failed).toBe(true);
+    });
+
+    it('FACTSHEET_UPDATE 双模型失败时应 emit failed=true 而非 throw', async () => {
+      const chunks = await collectChunks(
+        failService.generate({
+          taskType: TaskType.FACTSHEET_UPDATE,
+          prompt: 'test',
+        }),
+      );
+      const last = chunks[chunks.length - 1];
+      expect(last.done).toBe(true);
+      expect(last.failed).toBe(true);
+    });
+
+    it('CHANGE_ANALYSIS 双模型失败时应 emit failed=true 而非 throw', async () => {
+      const chunks = await collectChunks(
+        failService.generate({
+          taskType: TaskType.CHANGE_ANALYSIS,
+          prompt: 'test',
+        }),
+      );
+      const last = chunks[chunks.length - 1];
+      expect(last.done).toBe(true);
+      expect(last.failed).toBe(true);
     });
   });
 });
