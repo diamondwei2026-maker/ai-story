@@ -28,9 +28,10 @@
 - **重新打开**：提供"继续创作"按钮 → Project.status 退回到 DRAFTING，所有 Chapter 保持 COMPLETED 不变
 - 重新打开后，用户可修改任意 Chapter——行为与正常 DRAFTING 阶段完全一致（编辑→ChangeAnalysis→ImpactPropagation）
 - COMPLETED 状态保留在 Project 的 statusHistory 中作为里程碑记录
-- 无"归档"或"锁定"——COMPLETED 是软性里程碑，不阻止后续修改
+- Project 额外提供 `archive()` 操作（COMPLETED → ARCHIVED）：归档项目从活跃列表中隐藏，`restore()` 可恢复至 DRAFTING。ARCHIVED 是软归档，与"继续创作"（COMPLETED → DRAFTING）是两条独立路径——前者用于清理工作区，后者用于继续迭代
+- COMPLETED 本身是软性里程碑，不阻止"继续创作"退回 DRAFTING
 
-**理由**：创作是迭代过程，即使"完本"后也可能回头修改。COMPLETED 应是一个可逆的里程碑而非终点锁。
+**理由**：创作是迭代过程，即使"完本"后也可能回头修改。COMPLETED 应是一个可逆的里程碑而非终点锁。ARCHIVED 独立于继续创作路径，用于用户主动清理活跃项目列表，避免 COMPLETED 作品长期占据 ProjectHub。
 
 **完结前检查**：用户点击"确认完本"时，系统检查 Project.pendingFactUpdates 队列——若队列非空，展示提示"有 N 条待处理的事实簿更新，建议同步后再完本"，提供三个选项："立即同步并完本"（触发 forceSync → 消费队列 → 完结）、"跳过并完本"（队列保留，下次"继续创作"时消费）、"取消"（回到 DRAFTING）。若用户选择跳过，队列中的条目不丢失，仅在 COMPLETED 只读期间暂不消费。
 
@@ -92,11 +93,13 @@ PENDING | DRAFT | REVIEWING | COMPLETED | DISPUTED
 
 移除 `PUBLISHED`——当前 Out of Scope 已明确不涉及平台发布。若后续引入发布功能，Chapter 应新增独立的 `publishStatus` 字段与创作状态解耦，而非在 status 枚举中混入发布语义。
 
-Project.status 枚举保持不变：
+Project.status 枚举：
 
 ```
-IDEA | SETTING | OUTLINE | BEATS | DRAFTING | COMPLETED
+IDEA | SETTING | OUTLINE | BEATS | DRAFTING | COMPLETED | ARCHIVED
 ```
+
+- ARCHIVED 在 Decision 2 中定义，用于软归档已完成作品，与 COMPLETED→DRAFTING 继续创作路径分离
 
 ---
 
