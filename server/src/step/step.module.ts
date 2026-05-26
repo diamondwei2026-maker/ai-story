@@ -5,6 +5,7 @@ import { OutlineController } from './outline.controller';
 import { BeatsController, BeatModificationController } from './beats.controller';
 import { ChapterController } from './chapter.controller';
 import { StepService } from './step.service';
+import { ChangeAnalysisService } from './change-analysis.service';
 import { ProjectModule } from '../project/project.module';
 import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 
@@ -18,7 +19,7 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
     BeatModificationController,
     ChapterController,
   ],
-  providers: [StepService],
-  exports: [StepService],
+  providers: [StepService, ChangeAnalysisService],
+  exports: [StepService, ChangeAnalysisService],
 })
 export class StepModule {}

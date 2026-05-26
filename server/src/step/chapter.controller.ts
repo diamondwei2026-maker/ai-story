@@ -7,11 +7,15 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { StepService } from './step.service';
+import { ChangeAnalysisService, AnalyzeChangeResult, TargetedFixResult } from './change-analysis.service';
 import { ChapterData } from './step.entity';
 
 @Controller('projects/:projectId/chapters')
 export class ChapterController {
-  constructor(private readonly stepService: StepService) {}
+  constructor(
+    private readonly stepService: StepService,
+    private readonly changeAnalysisService: ChangeAnalysisService,
+  ) {}
 
   @Get()
   getChapters(@Param('projectId') projectId: string): ChapterData[] {
@@ -78,5 +82,33 @@ export class ChapterController {
     },
   ): Promise<ChapterData> {
     return this.stepService.retryChapterGeneration(projectId, chapterId, body);
+  }
+
+  @Post(':chapterId/analyze-change')
+  @HttpCode(200)
+  analyzeChange(
+    @Param('projectId') projectId: string,
+    @Param('chapterId') chapterId: string,
+    @Body() body: { newContent: string },
+  ): Promise<AnalyzeChangeResult> {
+    return this.changeAnalysisService.analyzeChange(
+      projectId,
+      chapterId,
+      body.newContent,
+    );
+  }
+
+  @Post(':chapterId/targeted-fix')
+  @HttpCode(200)
+  applyTargetedFix(
+    @Param('projectId') projectId: string,
+    @Param('chapterId') chapterId: string,
+    @Body() body: { impactedChapterId: string },
+  ): Promise<TargetedFixResult> {
+    return this.changeAnalysisService.applyTargetedFix(
+      projectId,
+      chapterId,
+      body.impactedChapterId,
+    );
   }
 }

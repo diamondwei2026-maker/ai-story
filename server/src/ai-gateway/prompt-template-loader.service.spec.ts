@@ -76,11 +76,13 @@ describe('PromptTemplateLoaderService', () => {
   describe('listTemplates', () => {
     it('should list all templates in a given category', () => {
       const templates = service.listTemplates('creation');
-      expect(templates).toHaveLength(4);
+      expect(templates).toHaveLength(6);
       expect(templates).toContain('idea-generation');
       expect(templates).toContain('idea-summary-generation');
       expect(templates).toContain('setting-generation');
       expect(templates).toContain('outline-generation');
+      expect(templates).toContain('change-analysis');
+      expect(templates).toContain('targeted-fix');
     });
 
     it('should list review templates', () => {
