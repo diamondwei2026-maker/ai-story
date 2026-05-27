@@ -1,21 +1,46 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { FactsheetController } from './factsheet.controller';
+import { StepService } from './step.service';
 import { ProjectService } from '../project/project.service';
+import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
+import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
+
+const mockChatModel = {
+  stream: async function* () { yield { content: 'mock' }; },
+  getNumTokens: async () => 42,
+};
+
+const mockAiGateway = {
+  generate: jest.fn(),
+  callWithFallback: jest.fn(),
+  getModelForTask: jest.fn().mockReturnValue('deepseek-chat-v3'),
+  getFallbackModel: jest.fn().mockReturnValue(null),
+  getDegradationLogs: jest.fn().mockReturnValue([]),
+};
 
 describe('FactsheetController', () => {
   let controller: FactsheetController;
   let compensationService: FactsheetCompensationService;
+  let stepService: StepService;
   let projectService: ProjectService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FactsheetController],
-      providers: [FactsheetCompensationService, ProjectService],
+      providers: [
+        FactsheetCompensationService,
+        ProjectService,
+        StepService,
+        { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
+        { provide: AIGatewayService, useValue: mockAiGateway },
+        { provide: PromptTemplateLoaderService, useValue: { renderTemplate: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get<FactsheetController>(FactsheetController);
     compensationService = module.get<FactsheetCompensationService>(FactsheetCompensationService);
+    stepService = module.get<StepService>(StepService);
     projectService = module.get<ProjectService>(ProjectService);
   });
 
@@ -66,7 +91,7 @@ describe('FactsheetController', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('POST :projectId/factsheet-force-sync', () => {
-    it('should drain the queue and return consumed entries', () => {
+    it('should drain the queue and write merged entries to FactSheet', () => {
       const projectId = createProject();
       compensationService.enqueue(projectId, 'ch1', 1, { a: '1', b: '2' });
       compensationService.enqueue(projectId, 'ch2', 2, { a: 'overridden', c: '3' });
@@ -76,6 +101,12 @@ describe('FactsheetController', () => {
       expect(result.consumedCount).toBe(2);
       expect(result.mergedEntries).toEqual({ a: 'overridden', b: '2', c: '3' });
       expect(compensationService.getQueueDepth(projectId)).toBe(0);
+
+      // Verify entries were persisted to StepService's FactSheet
+      const sheet = stepService.getFactsheet(projectId);
+      expect(sheet).toBeDefined();
+      expect((sheet!.data as any).b).toBe('2');
+      expect((sheet!.data as any).c).toBe('3');
     });
 
     it('should return empty result when queue is empty', () => {
@@ -83,18 +114,8 @@ describe('FactsheetController', () => {
 
       const result = controller.forceFactsheetSync(projectId);
 
-      expect(result).toEqual({ mergedEntries: {}, consumedCount: 0, conflicts: [] });
-    });
-
-    it('should not include conflicts when no key is written by multiple entries', () => {
-      const projectId = createProject();
-      compensationService.enqueue(projectId, 'ch1', 1, { x: '1' });
-      compensationService.enqueue(projectId, 'ch2', 2, { y: '2' });
-
-      const result = controller.forceFactsheetSync(projectId);
-
-      expect(result.conflicts).toEqual([]);
-      expect(result.consumedCount).toBe(2);
+      expect(result.consumedCount).toBe(0);
+      expect(result.mergedEntries).toEqual({});
     });
   });
 });

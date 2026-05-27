@@ -65,6 +65,14 @@ export class FactsheetCompensationService {
   ): PendingFactUpdate {
     const queue = this.ensureQueue(projectId);
 
+    // Dedup by chapterId: if same chapter re-enqueues (e.g. concurrent CAS failures),
+    // merge entries into its existing queue entry (latest-wins for same keys).
+    const existing = queue.find((e) => e.chapterId === chapterId);
+    if (existing) {
+      Object.assign(existing.entries, entries);
+      return existing;
+    }
+
     if (queue.length >= FactsheetCompensationService.CRITICAL_THRESHOLD) {
       throw new FactsheetQueueFullError(projectId, queue.length);
     }

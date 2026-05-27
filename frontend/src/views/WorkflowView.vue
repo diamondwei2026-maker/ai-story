@@ -7,6 +7,11 @@
       <span data-testid="project-id-display" class="workflow-view__id">
         {{ projectId }}
       </span>
+      <ModelBadge
+        v-if="aiStatus.aiMeta.value"
+        :model-name="aiStatus.aiMeta.value.modelUsed"
+        :degraded="aiStatus.aiMeta.value.degraded"
+      />
     </div>
     <WorkflowStepper
       :steps="steps"
@@ -17,6 +22,11 @@
     <div class="workflow-view__content">
       <router-view />
     </div>
+    <AiUnavailableModal
+      :visible="aiStatus.isUnavailable.value"
+      @retry="handleAiRetry"
+      @close="aiStatus.setUnavailable(false)"
+    />
   </div>
 </template>
 
@@ -26,9 +36,14 @@ import { useRoute } from 'vue-router';
 import { useWorkflowStore, PHASE_ORDER } from '@/stores/useWorkflowStore';
 import type { StepInfo } from '@/components/WorkflowStepper.vue';
 import WorkflowStepper from '@/components/WorkflowStepper.vue';
+import ModelBadge from '@/components/ModelBadge.vue';
+import AiUnavailableModal from '@/components/AiUnavailableModal.vue';
+import { useAiStatus } from '@/composables/useAiStatus';
 
 const route = useRoute();
 const store = useWorkflowStore();
+
+const aiStatus = useAiStatus();
 
 const projectId = computed(() => route.params.id as string);
 
@@ -50,6 +65,11 @@ const steps = computed<StepInfo[]>(() =>
 
 function handleStepClick(phase: string) {
   store.setCurrentPhase(phase as any);
+}
+
+function handleAiRetry() {
+  aiStatus.setUnavailable(false);
+  window.location.reload();
 }
 </script>
 

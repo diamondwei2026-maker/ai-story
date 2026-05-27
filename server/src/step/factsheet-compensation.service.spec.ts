@@ -110,6 +110,31 @@ describe('FactsheetCompensationService', () => {
       expect(result.queuedAt >= before).toBe(true);
       expect(result.queuedAt <= after).toBe(true);
     });
+
+    it('should merge into existing entry when same chapterId re-enqueues', () => {
+      const project = createProject();
+      const first = service.enqueue(project.id, 'ch-1', 1, { a: '1', b: '2' });
+
+      // Same chapterId re-enqueuing (concurrent CAS failures)
+      const second = service.enqueue(project.id, 'ch-1', 1, { a: 'updated', c: '3' });
+
+      // Should return same entry (not a new one)
+      expect(second.id).toBe(first.id);
+
+      // Entries should be merged (latest wins for overlapping keys)
+      expect(second.entries).toEqual({ a: 'updated', b: '2', c: '3' });
+
+      // Queue depth should still be 1 (not 2)
+      expect(service.getQueueDepth(project.id)).toBe(1);
+    });
+
+    it('should not dedup across different chapterIds', () => {
+      const project = createProject();
+      service.enqueue(project.id, 'ch-1', 1, { a: '1' });
+      service.enqueue(project.id, 'ch-2', 2, { b: '2' });
+
+      expect(service.getQueueDepth(project.id)).toBe(2);
+    });
   });
 
   // ══════════════════════════════════════════════════════════════════

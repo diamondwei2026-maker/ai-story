@@ -11,5 +11,5 @@ AI 调用层从「DeepSeek 代理 + OpenAI 兼容 SDK」切换为「OpenRouter �
 - 模型分配由代码中的 `TaskType → ModelName` 集中映射（非模板文件声明），便于审计和测试。
 - Prompt 模板存放在 `prompts/` 目录的独立 `.md` 文件中，与模型路由解耦。
 - SSE 流式路径：NestJS `@Sse()` + RxJS Observable 包装 LangChain `.stream()` 的 AsyncIterable。
-- 断点续传策略：已生成 ≥ 60% 回传全部内容续写，< 60% 直接重试，最多 3 次。（*当前 Phase 1 实现仅覆盖逐 token SSE 流式推送和单向模型降级；断点续传 + 指数退避重试留待后续迭代。*）
+- 断点续传策略：已生成 ≥ 60% 回传全部内容续写，< 60% 直接重试，最多 3 次。（*Phase 1 已实现 `pauseChapterGeneration`/`continueChapterGeneration` 暂停续写流程；指数退避重试留待后续迭代。*）
 - 未来切换到非 DeepSeek 模型只需修改路由 Map，不改 Prompt 文件。

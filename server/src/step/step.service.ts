@@ -120,6 +120,22 @@ export class StepService {
     }
   }
 
+  forceSyncFactsheet(
+    projectId: string,
+  ): { mergedEntries: Record<string, unknown>; consumedCount: number } {
+    const current = this.readFactsheet(projectId);
+    const result = this.factsheetCompensation.forceSync(projectId, current.data);
+    if (result.consumedCount > 0) {
+      const merged = { ...current.data };
+      Object.assign(merged, result.mergedEntries);
+      this.factSheetByProject.set(projectId, {
+        data: merged,
+        version: current.version + 1,
+      });
+    }
+    return { mergedEntries: result.mergedEntries, consumedCount: result.consumedCount };
+  }
+
   async generateSetting(
     projectId: string,
     opts: { idea?: string; currentContent?: string },
@@ -513,6 +529,8 @@ export class StepService {
     beat.plan = { ...beat.plan, ...plan };
     if (plan.isClimax === true) beat.isClimax = true;
     beat.hookCount = this.extractHookCount(beat.plan);
+    const totalChapters = (this.beatsByProject.get(beat.projectId) ?? []).length;
+    beat.useR1 = this.shouldUseR1(beat, totalChapters);
     beat.status = 'STALE';
     beat.updatedAt = new Date();
 
@@ -1060,10 +1078,10 @@ export class StepService {
     taskType: TaskType,
     prompt: string,
   ): Promise<{ content: string; aiMeta: AiMeta }> {
-    const chunks$: Observable<AIGenerateChunk> = this.aiGateway.generate({
+    const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(
       taskType,
       prompt,
-    });
+    );
     const chunks = await lastValueFrom(chunks$.pipe(toArray()));
     const lastChunk = chunks[chunks.length - 1];
     const content = chunks.map((c) => c.content).join('');

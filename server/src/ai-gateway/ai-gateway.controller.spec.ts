@@ -93,4 +93,12 @@ describe('AIGatewayController', () => {
       expect(status.progress).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('GET /ai/degradation-logs', () => {
+    it('should return empty array when no degradations occurred', () => {
+      const logs = controller.getDegradationLogs();
+      expect(Array.isArray(logs)).toBe(true);
+      expect(logs.length).toBe(0);
+    });
+  });
 });

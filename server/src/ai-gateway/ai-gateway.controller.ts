@@ -6,6 +6,7 @@ import {
   AIGenerateRequest,
   AIGenerateChunk,
   TaskType,
+  DegradationLogEntry,
 } from './ai-gateway.service';
 
 export interface StreamStatus {
@@ -38,7 +39,7 @@ export class AIGatewayController {
       temperature: temperature ? parseFloat(temperature) : undefined,
     };
     return this.aiGateway
-      .generate(request)
+      .callWithFallback(request.taskType, request.prompt)
       .pipe(map((chunk) => ({ data: chunk })));
   }
 
@@ -49,5 +50,10 @@ export class AIGatewayController {
       status: 'completed',
       progress: 100,
     };
+  }
+
+  @Get('degradation-logs')
+  getDegradationLogs(): DegradationLogEntry[] {
+    return this.aiGateway.getDegradationLogs();
   }
 }

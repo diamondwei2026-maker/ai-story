@@ -63,7 +63,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - `confirmChapter()` → COMPLETED
 - `disputeChapter()` → DISPUTED
 
-### 审核决策路径 (`review.service.ts`)
+### 审核决策路径 (`step.service.ts` — 审核方法内嵌于 StepService，无独立 review.service.ts)
 
 - 四档结论（PASS / PASS_WITH_SUGGESTIONS / NEEDS_REVISION / BLOCKED）
 - `evaluateChapter()` — 自动审核
@@ -117,6 +117,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - **`countTokens(text)`** — 精确 Token 计数，委托 `IChatModel.getNumTokens()`（OpenRouter DeepSeek tokenizer），用于 `computeBudgetPrecise()` 预算预计算
 - 第 1 章特殊处理：用 IDEA 简介替代前一章
 - 前一章优先使用 contextSummary（若有），否则使用全文
+- **当前状态**：`ContextBudgetService` 的 `computeBudget`/`computeBudgetPrecise` 已实现并通过测试，但 `STEP_DATA_ACCESS` provider 尚未注册——Chapter 生成管道（`generateChapter`/`continueChapterGeneration`）暂未调用预算裁剪。当前直接通过 Prompt 模板变量构造上下文，三层硬上限待后续迭代连线
 
 ### 跨 Phase 回退后 FactSheet 处理
 

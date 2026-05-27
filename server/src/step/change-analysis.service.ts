@@ -236,10 +236,10 @@ export class ChangeAnalysisService {
     taskType: TaskType,
     prompt: string,
   ): Promise<string> {
-    const chunks$: Observable<AIGenerateChunk> = this.aiGateway.generate({
+    const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(
       taskType,
       prompt,
-    });
+    );
     const chunks = await lastValueFrom(chunks$.pipe(toArray()));
     return chunks.map((c) => c.content).join('');
   }
