@@ -62,6 +62,10 @@ const mockChatModel = {
       yield { content: '## 力量体系\n炼气、筑基、金丹、元婴、化神。\n' };
     }
   },
+  getNumTokens: async (text: string) => {
+    if (!text) return 0;
+    return Math.round(text.length / 4);
+  },
 };
 
 const mockPromptLoader = {

@@ -114,6 +114,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - **`generateContextSummary(chapterContent)`** — 长章 AI 摘要生成（>2500t 触发，目标 400t），含出场角色/关键事件/情感转折三维度
 - **`trimToBudget(text, maxTokens)`** — 单层裁剪
 - **`estimateTokens(text)`** — Token 估算（4 chars/token）
+- **`countTokens(text)`** — 精确 Token 计数，委托 `IChatModel.getNumTokens()`（OpenRouter DeepSeek tokenizer），用于 `computeBudgetPrecise()` 预算预计算
 - 第 1 章特殊处理：用 IDEA 简介替代前一章
 - 前一章优先使用 contextSummary（若有），否则使用全文
 
@@ -127,4 +128,4 @@ BLOCKED → 手动修改/上诉 → 重新审核
 
 ## 尚未实现（来自 PRD）
 
-- Token 预计算模块（经由 OpenRouter API token counting 端点）
+（无——所有 PRD 规划的领域功能均已实现）

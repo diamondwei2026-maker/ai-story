@@ -9,6 +9,10 @@ const mockChatModel = {
     yield { content: '响应' };
     yield { content: '内容' };
   },
+  getNumTokens: async (text: string) => {
+    if (!text) return 0;
+    return Math.round(text.length / 4);
+  },
 };
 
 const collectChunks = async (obs$: Observable<AIGenerateChunk>): Promise<AIGenerateChunk[]> => {

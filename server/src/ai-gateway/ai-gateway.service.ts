@@ -43,6 +43,7 @@ export const AI_MODEL_TOKEN = 'AI_MODEL_TOKEN';
 
 export interface IChatModel {
   stream(input: string): AsyncIterable<{ content: string }>;
+  getNumTokens(text: string): Promise<number>;
 }
 
 const MODEL_MAP: Record<TaskType, string> = {

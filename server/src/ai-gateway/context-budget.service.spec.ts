@@ -19,6 +19,21 @@ const mockChatModel = {
         '从对力量的恐惧到对力量的渴望——他明白了在这个异能至上的世界，没有实力就无法守护任何人。',
     };
   },
+  getNumTokens: async (text: string) => {
+    // OpenRouter DeepSeek tokenizer: Chinese characters ~1.5-2 chars/token
+    // ASCII text ~4 chars/token
+    if (!text) return 0;
+    let asciiCount = 0;
+    let cjkCount = 0;
+    for (const ch of text) {
+      if (/[一-鿿　-〿＀-￯]/.test(ch)) {
+        cjkCount++;
+      } else {
+        asciiCount++;
+      }
+    }
+    return Math.round(asciiCount / 4 + cjkCount / 1.8);
+  },
 };
 
 // Step data access stub — ContextBudgetService will depend on this for computeBudget
@@ -493,6 +508,22 @@ describe('ContextBudgetService', () => {
       expect(result.budget.local).toBe(estimatedLc);
       expect(result.budget.total).toBe(estimatedGs + estimatedGd + estimatedLc);
     });
+
+    describe('computeBudgetPrecise (Token pre-calculation)', () => {
+      it('should provide accurate budget via countTokens', async () => {
+        const { projectId, chapterId } = setupProjectWithContext();
+        const result = await service.computeBudgetPrecise(projectId, chapterId);
+
+        expect(result).toBeDefined();
+        expect(result.budget.globalStatic).toBeGreaterThan(0);
+        expect(result.budget.globalDynamic).toBeGreaterThan(0);
+        expect(result.budget.local).toBeGreaterThan(0);
+        expect(result.budget.globalStatic).toBeLessThanOrEqual(3000);
+        expect(result.budget.globalDynamic).toBeLessThanOrEqual(2000);
+        expect(result.budget.local).toBeLessThanOrEqual(3000);
+        expect(result.budget.total).toBeLessThanOrEqual(8000);
+      });
+    });
   });
 
   // ════════════════════════════════════════════════════════════════
@@ -543,6 +574,39 @@ describe('ContextBudgetService', () => {
       const summary = await service.generateContextSummary(boundaryContent);
       // Strictly greater than 2500 triggers summary; exactly 2500 → null
       expect(summary).toBeNull();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  // countTokens — OpenRouter API token counting (NEW — Token pre-calculation)
+  // ════════════════════════════════════════════════════════════════
+
+  describe('countTokens', () => {
+    it('should return 0 for empty string', async () => {
+      const count = await service.countTokens('');
+      expect(count).toBe(0);
+    });
+
+    it('should return a positive token count for text', async () => {
+      const count = await service.countTokens('Hello world');
+      expect(count).toBeGreaterThan(0);
+    });
+
+    it('should return higher token count for Chinese text than heuristic estimateTokens', async () => {
+      // 4 chars/token heuristic underestimates Chinese tokens (real ratio ~1.5-2.5 chars/token)
+      const chineseText = '星际医妃传是一部融合现代医学与异能战斗的创新之作';
+      const heuristicCount = service.estimateTokens(chineseText);
+      const preciseCount = await service.countTokens(chineseText);
+
+      // Precise tokenizer should count more tokens than 4 chars/token heuristic
+      expect(preciseCount).toBeGreaterThan(heuristicCount);
+    });
+
+    it('should be consistent across calls for the same text', async () => {
+      const text = '林清音站在城墙之上，面对着整个异能军团';
+      const count1 = await service.countTokens(text);
+      const count2 = await service.countTokens(text);
+      expect(count1).toBe(count2);
     });
   });
 });

@@ -10,6 +10,10 @@ const mockChatModel = {
   stream: async function* () {
     yield { content: 'mock' };
   },
+  getNumTokens: async (text: string) => {
+    if (!text) return 0;
+    return Math.round(text.length / 4);
+  },
 };
 
 const mockPromptLoader = {

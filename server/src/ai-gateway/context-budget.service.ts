@@ -96,6 +96,11 @@ export class ContextBudgetService {
     return Math.round(text.length / CHARS_PER_TOKEN);
   }
 
+  async countTokens(text: string): Promise<number> {
+    if (!text) return 0;
+    return this.chatModel.getNumTokens(text);
+  }
+
   // ════════════════════════════════════════════════════════════════
   // Trimming
   // ════════════════════════════════════════════════════════════════
@@ -205,6 +210,27 @@ export class ContextBudgetService {
     const local = this.assembleLocalLayer(projectId, chapter);
 
     return this.calculateBudget(globalStatic, globalDynamic, local);
+  }
+
+  async computeBudgetPrecise(projectId: string, chapterId: string): Promise<BudgetResult> {
+    const result = this.computeBudget(projectId, chapterId);
+    if (!result.globalStatic && !result.globalDynamic && !result.local) return result;
+
+    const [gsTokens, gdTokens, lcTokens] = await Promise.all([
+      this.countTokens(result.globalStatic),
+      this.countTokens(result.globalDynamic),
+      this.countTokens(result.local),
+    ]);
+
+    return {
+      ...result,
+      budget: {
+        globalStatic: gsTokens,
+        globalDynamic: gdTokens,
+        local: lcTokens,
+        total: gsTokens + gdTokens + lcTokens,
+      },
+    };
   }
 
   // ════════════════════════════════════════════════════════════════
