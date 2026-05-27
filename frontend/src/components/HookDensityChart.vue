@@ -111,10 +111,10 @@ function barHeight(hookCount: number): string {
   transition: height 0.3s;
 }
 .bar-normal {
-  background: #c8b6a6;
+  background: var(--color-bg-tertiary);
 }
 .bar-high {
-  background: var(--color-gold);
+  background: var(--color-primary);
 }
 .bar-label {
   font-size: 10px;
@@ -126,11 +126,11 @@ function barHeight(hookCount: number): string {
   position: absolute;
   left: 48px;
   right: 8px;
-  border-top: 1px dashed rgba(212, 168, 83, 0.6);
+  border-top: 1px dashed var(--color-primary);
 }
 .threshold-label {
   font-size: 10px;
-  color: var(--color-gold-dark);
+  color: var(--color-primary-dark);
   position: absolute;
   top: -14px;
   right: 0;

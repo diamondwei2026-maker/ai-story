@@ -51,13 +51,13 @@ defineEmits<{
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .summary-card {
   padding: 24px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 12px;
-  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .summary-card__title {
@@ -94,7 +94,7 @@ defineEmits<{
 
 .summary-card__oneliner {
   font-size: 15px;
-  color: var(--color-gold);
+  color: var(--color-primary);
   font-weight: 500;
   margin: 0;
   line-height: 1.6;
@@ -112,17 +112,19 @@ defineEmits<{
   width: 100%;
   min-height: 50px;
   padding: 10px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 14px;
   color: var(--color-text-primary);
-  background-color: var(--color-bg-primary);
+  background-color: var(--color-bg);
   resize: vertical;
   margin-top: 6px;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .summary-card__custom-input:focus {
   outline: none;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 </style>

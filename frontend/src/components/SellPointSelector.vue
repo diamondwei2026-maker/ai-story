@@ -85,7 +85,6 @@ function onRegenerate() {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .sellpoint-selector {
   padding: 24px;
@@ -116,40 +115,43 @@ function onRegenerate() {
   gap: 10px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border);
 }
 
 .sellpoint-selector__feedback-input {
   width: 100%;
   min-height: 60px;
   padding: 10px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 13px;
   color: var(--color-text-primary);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg);
   resize: vertical;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .sellpoint-selector__feedback-input:focus {
   outline: none;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 .sellpoint-selector__regenerate-btn {
   align-self: flex-start;
   padding: 8px 20px;
-  border: 1px solid var(--color-gold);
-  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--color-gold);
+  color: var(--color-primary);
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-fast);
 }
 
 .sellpoint-selector__regenerate-btn:hover:not(:disabled) {
-  background-color: rgba(212, 175, 55, 0.1);
+  background-color: var(--color-primary-bg);
 }
 
 .sellpoint-selector__regenerate-btn:disabled {
@@ -162,16 +164,18 @@ function onRegenerate() {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 8px;
-  background-color: var(--color-gold);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.3s;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .sellpoint-selector__summary-btn:hover {
-  opacity: 0.9;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 </style>

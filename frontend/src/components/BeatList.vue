@@ -59,12 +59,12 @@ const emit = defineEmits<{ select: [beat: Beat] }>();
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--transition-fast);
 }
 .beat-row:hover {
-  background-color: rgba(212, 168, 83, 0.08);
+  background-color: var(--color-primary-bg);
 }
 .beat-chapter {
   font-weight: 600;
@@ -81,25 +81,25 @@ const emit = defineEmits<{ select: [beat: Beat] }>();
   font-size: 13px;
 }
 .beat-hook-count.hook-high {
-  color: var(--color-gold-dark);
+  color: var(--color-accent-dark);
   font-weight: 600;
 }
 .beat-badge {
   font-size: 11px;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
 }
 .beat-badge.climax {
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--color-accent-light);
+  color: #92400e;
 }
 .beat-badge.r1 {
-  background: #e8eaf6;
-  color: #283593;
+  background: var(--color-info-light);
+  color: #1e40af;
 }
 .beat-badge.stale {
-  background: #fbe9e7;
-  color: #bf360c;
+  background: var(--color-error-light);
+  color: #991b1b;
 }
 </style>

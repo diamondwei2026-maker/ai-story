@@ -193,12 +193,13 @@ async function handleSwitchStructure() {
 }
 
 .outline-view__review-banner {
-  background-color: #fff8e1;
-  color: #795548;
-  padding: 8px 16px;
-  border-radius: 4px;
+  background-color: var(--color-accent-light);
+  color: var(--color-accent-dark);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   margin-bottom: 16px;
+  border-left: 3px solid var(--color-accent);
 }
 
 .outline-view__loading {
@@ -209,10 +210,10 @@ async function handleSwitchStructure() {
 }
 
 .outline-view__error {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: var(--color-error-light);
+  color: var(--color-error);
   padding: 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   text-align: center;
   margin-bottom: 16px;
 }
@@ -220,12 +221,18 @@ async function handleSwitchStructure() {
 .outline-view__retry-btn {
   margin-top: 8px;
   padding: 6px 20px;
-  background-color: #c62828;
+  background-color: var(--color-error);
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: opacity var(--transition-fast);
+}
+
+.outline-view__retry-btn:hover {
+  opacity: 0.9;
 }
 
 .outline-view__empty {
@@ -249,36 +256,45 @@ async function handleSwitchStructure() {
 }
 
 .outline-view__structure-select select {
-  padding: 4px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border, #ccc);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
 }
 
 .outline-view__generate-btn {
-  background-color: var(--color-gold);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
   border: none;
   padding: 10px 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .outline-view__generate-btn:hover {
-  background-color: var(--color-gold-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .outline-view__generate-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .outline-view__tree {
-  background-color: var(--color-bg-secondary, #f5f5f5);
+  background-color: var(--color-bg-secondary);
   padding: 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
+  border: 1px solid var(--color-border);
 }
 
 .outline-view__tree pre {
@@ -295,10 +311,11 @@ async function handleSwitchStructure() {
   display: inline-block;
   padding: 2px 10px;
   margin-right: 8px;
-  background-color: #e3f2fd;
-  color: #1565c0;
+  background-color: var(--color-info-light);
+  color: var(--color-info);
   border-radius: 12px;
   font-size: 13px;
+  font-weight: 500;
 }
 
 .outline-view__actions {
@@ -308,55 +325,60 @@ async function handleSwitchStructure() {
 
 .outline-view__regenerate-btn {
   background: transparent;
-  color: var(--color-gold);
-  border: 1px solid var(--color-gold);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   padding: 10px 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
   margin-right: 16px;
-  transition: all 0.3s;
+  transition: all var(--transition-fast);
 }
 
 .outline-view__regenerate-btn:hover:not(:disabled) {
-  background: var(--color-gold);
+  background: var(--color-primary);
   color: #fff;
 }
 
 .outline-view__regenerate-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .outline-view__reject-btn {
   background: transparent;
-  color: #c62828;
-  border: 1px solid #c62828;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
   padding: 10px 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
   margin-right: 16px;
-  transition: all 0.3s;
+  transition: all var(--transition-fast);
 }
 
 .outline-view__reject-btn:hover {
-  background: #c62828;
+  background: var(--color-error);
   color: #fff;
 }
 
 .outline-view__confirm-btn {
-  background-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
   color: #fff;
   border: none;
   padding: 10px 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .outline-view__confirm-btn:hover {
-  opacity: 0.9;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 </style>

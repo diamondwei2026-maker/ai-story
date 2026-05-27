@@ -27,14 +27,15 @@ defineProps<{
   padding: 2px 10px;
   border-radius: 12px;
   font-size: 12px;
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #a5d6a7;
+  font-weight: 500;
+  background-color: var(--color-success-light);
+  color: #065f46;
+  border: 1px solid var(--color-success);
 }
 
 .badge--degraded {
-  background-color: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffcc80;
+  background-color: var(--color-warning-light);
+  color: #92400e;
+  border: 1px solid var(--color-warning);
 }
 </style>

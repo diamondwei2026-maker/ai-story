@@ -19,7 +19,7 @@ interface Particle {
   char: string;
 }
 
-const CHARS = ['墨', '文', '字', '书', '笔', '·', '。', '、'];
+const CHARS = ['创', '意', '文', '字', '书', '笔', '墨', '思'];
 
 const props = withDefaults(defineProps<{
   particleCount?: number;
@@ -54,7 +54,7 @@ function animate() {
 
   for (const p of particles) {
     ctx.font = `${p.size}px serif`;
-    ctx.fillStyle = `rgba(139, 119, 90, ${p.opacity})`;
+    ctx.fillStyle = `rgba(13, 148, 136, ${p.opacity})`;
     ctx.fillText(p.char, p.x, p.y);
 
     p.x += p.vx;

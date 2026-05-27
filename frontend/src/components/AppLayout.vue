@@ -16,19 +16,20 @@
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .app-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg-warm);
+  background-color: var(--color-bg);
   color: var(--color-text-primary);
 }
 
 .app-layout__header {
-  border-bottom: 1px solid var(--color-gold);
+  border-bottom: 1px solid var(--color-border);
   padding: 0 24px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-layout__body {
@@ -37,9 +38,10 @@
 }
 
 .app-layout__footer {
-  border-top: 1px solid var(--color-gold);
+  border-top: 1px solid var(--color-border);
   padding: 12px 24px;
   text-align: center;
   color: var(--color-text-secondary);
+  background: var(--color-surface);
 }
 </style>

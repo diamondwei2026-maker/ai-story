@@ -207,7 +207,6 @@ function handleAction(key: string) {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .review-panel {
   background: var(--color-surface);
@@ -231,10 +230,10 @@ function handleAction(key: string) {
   border-radius: 4px;
 }
 
-.verdict-badge--pass { background: #e6f7e6; color: #2d7d2d; }
-.verdict-badge--suggestions { background: #fff7e6; color: #b8860b; }
-.verdict-badge--needs-revision { background: #ffe6e6; color: #c0392b; }
-.verdict-badge--blocked { background: #f5e6e6; color: #a71d2a; }
+.verdict-badge--pass { background: var(--color-success-light); color: #065f46; }
+.verdict-badge--suggestions { background: var(--color-warning-light); color: #92400e; }
+.verdict-badge--needs-revision { background: var(--color-error-light); color: #991b1b; }
+.verdict-badge--blocked { background: #fce4ec; color: #880e4f; }
 
 .review-panel__score {
   font-size: 16px;
@@ -340,13 +339,13 @@ function handleAction(key: string) {
 }
 
 .review-panel__action-btn--primary {
-  background: var(--color-gold);
+  background: var(--color-primary);
   color: #fff;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
 }
 
 .review-panel__action-btn--primary:hover:not(:disabled) {
-  background: var(--color-gold-dark);
+  background: var(--color-primary-dark);
 }
 
 .review-panel__action-btn--danger {

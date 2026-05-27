@@ -54,7 +54,6 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .targeted-fix-diff {
   background: var(--color-surface);
@@ -135,12 +134,12 @@ const emit = defineEmits<{
 }
 
 .targeted-fix-diff__btn--primary {
-  background: var(--color-gold);
+  background: var(--color-primary);
   color: #fff;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
 }
 
 .targeted-fix-diff__btn--primary:hover:not(:disabled) {
-  background: var(--color-gold-dark);
+  background: var(--color-primary-dark);
 }
 </style>

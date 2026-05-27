@@ -2,9 +2,11 @@
 
 .edit-card {
   padding: 16px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .edit-card__header {
@@ -16,32 +18,47 @@
 
 .edit-card__title {
   font-size: 16px;
+  font-weight: 600;
   color: var(--color-text-primary);
   margin: 0;
 }
 
 .edit-card__edit-btn {
   padding: 4px 16px;
-  border: 1px solid var(--color-gold);
+  border: 1px solid var(--color-primary);
   background: transparent;
-  color: var(--color-gold);
-  border-radius: 4px;
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.edit-card__edit-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .edit-card__save-btn {
   padding: 4px 16px;
-  border: 1px solid var(--color-gold);
-  background: var(--color-gold);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
   color: #fff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: opacity var(--transition-fast);
+}
+
+.edit-card__save-btn:hover {
+  opacity: 0.9;
 }
 
 .edit-card__section-label {
   font-size: 14px;
+  font-weight: 600;
   color: var(--color-text-primary);
   margin: 0 0 6px 0;
 }
@@ -53,18 +70,24 @@
   white-space: pre-wrap;
   margin: 0;
   padding: 8px;
-  background: #fafafa;
-  border-radius: 4px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
 }
 
 .edit-card__section-textarea {
   width: 100%;
   padding: 8px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 14px;
   line-height: 1.8;
   resize: vertical;
   font-family: inherit;
   color: var(--color-text-secondary);
+  transition: border-color var(--transition-fast);
+}
+
+.edit-card__section-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }

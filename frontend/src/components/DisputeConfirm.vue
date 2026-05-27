@@ -53,7 +53,6 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .dispute-modal-overlay {
   position: fixed;

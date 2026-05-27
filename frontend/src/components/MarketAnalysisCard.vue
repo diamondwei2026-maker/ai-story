@@ -48,26 +48,27 @@ defineEmits<{
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .market-card {
-  border: 2px solid var(--color-border-light);
-  border-radius: 12px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   padding: 20px;
   cursor: pointer;
-  transition: all 0.3s;
-  background-color: var(--color-bg-secondary);
+  transition: all var(--transition-normal);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .market-card:hover {
-  border-color: var(--color-gold);
-  box-shadow: 0 2px 12px rgba(212, 175, 55, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .card--selected {
-  border-color: var(--color-gold);
-  background-color: rgba(212, 175, 55, 0.08);
-  box-shadow: 0 2px 16px rgba(212, 175, 55, 0.25);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-bg);
+  box-shadow: 0 0 0 4px var(--color-primary-light);
 }
 
 .market-card__title {
@@ -91,7 +92,7 @@ defineEmits<{
 .market-card__score {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-gold);
+  color: var(--color-primary);
 }
 
 .market-card__references {
@@ -111,8 +112,9 @@ defineEmits<{
   font-size: 12px;
   padding: 2px 8px;
   background-color: var(--color-bg-tertiary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 .market-card__diff {

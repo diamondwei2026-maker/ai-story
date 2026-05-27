@@ -161,16 +161,16 @@ function handleSaveStructure() {
 .r1-badge {
   font-size: 11px;
   padding: 2px 7px;
-  border-radius: 4px;
-  background: #e8eaf6;
-  color: #283593;
+  border-radius: var(--radius-sm);
+  background: var(--color-info-light);
+  color: #1e40af;
   font-weight: 600;
 }
 .mode-tabs {
   display: flex;
   gap: 0;
   margin-bottom: 12px;
-  border-bottom: 2px solid var(--color-border-light);
+  border-bottom: 2px solid var(--color-border);
 }
 .mode-tab {
   padding: 8px 16px;
@@ -184,8 +184,8 @@ function handleSaveStructure() {
   transition: color 0.2s, border-color 0.2s;
 }
 .mode-tab.active {
-  color: var(--color-gold-dark);
-  border-bottom-color: var(--color-gold);
+  color: var(--color-primary-dark);
+  border-bottom-color: var(--color-primary);
   font-weight: 600;
 }
 .hook-density {
@@ -198,8 +198,8 @@ function handleSaveStructure() {
   display: inline-block;
 }
 .hook-density.hook-high {
-  color: var(--color-gold-dark);
-  background: #fff8e1;
+  color: var(--color-accent-dark);
+  background: var(--color-accent-light);
   font-weight: 600;
 }
 .climax-row {
@@ -223,14 +223,16 @@ label {
 }
 .editor-input {
   padding: 8px 10px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
 }
 .editor-input:focus {
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
   outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 .checkbox-label {
   display: flex;
@@ -241,17 +243,19 @@ label {
 .save-btn {
   margin-top: 4px;
   padding: 8px 20px;
-  background: var(--color-gold);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
   align-self: flex-start;
 }
 .save-btn:hover {
-  background: var(--color-gold-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 </style>

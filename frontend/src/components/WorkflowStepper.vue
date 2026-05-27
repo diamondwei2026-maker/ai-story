@@ -141,7 +141,6 @@ function handleClick(step: StepInfo, index: number) {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .workflow-stepper {
   padding: 16px 0;
@@ -176,16 +175,17 @@ function handleClick(step: StepInfo, index: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-border-light);
-  color: var(--color-text-secondary);
+  background-color: var(--color-border);
+  color: var(--color-text-muted);
   font-size: 14px;
   margin-bottom: 8px;
-  transition: all 0.3s;
+  transition: all var(--transition-normal);
 }
 
 .step--active .step-item__indicator {
-  background-color: var(--color-gold);
+  background-color: var(--color-primary);
   color: #fff;
+  box-shadow: 0 0 0 4px var(--color-primary-light);
 }
 
 .step--completed .step-item__indicator {
@@ -216,7 +216,7 @@ function handleClick(step: StepInfo, index: number) {
 }
 
 .step--active .step-item__label {
-  color: var(--color-gold);
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -226,7 +226,7 @@ function handleClick(step: StepInfo, index: number) {
   left: calc(50% + 20px);
   width: calc(100% - 40px);
   height: 2px;
-  background-color: var(--color-border-light);
+  background-color: var(--color-border);
 }
 
 .step--completed .step-item__connector {
@@ -252,15 +252,15 @@ function handleClick(step: StepInfo, index: number) {
 }
 
 .factsheet-alert-banner--warning {
-  background-color: #fff3cd;
-  border: 1px solid #ffc107;
-  color: #856404;
+  background-color: var(--color-warning-light);
+  border: 1px solid var(--color-warning);
+  color: #92400e;
 }
 
 .factsheet-alert-banner--critical {
-  background-color: #f8d7da;
-  border: 1px solid #dc3545;
-  color: #721c24;
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  color: #991b1b;
 }
 
 .factsheet-alert-banner__text {
@@ -275,13 +275,13 @@ function handleClick(step: StepInfo, index: number) {
 .factsheet-alert-banner__sync-btn {
   padding: 6px 16px;
   border: none;
-  border-radius: 4px;
-  background-color: var(--color-gold, #d4a017);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-primary);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
 }
 
 .factsheet-alert-banner__sync-btn:hover {
@@ -308,9 +308,9 @@ function handleClick(step: StepInfo, index: number) {
   display: inline-block;
   padding: 4px 14px;
   border-radius: 12px;
-  background-color: #e8f5e9;
-  border: 1px solid #81c784;
-  color: #2e7d32;
+  background-color: var(--color-success-light);
+  border: 1px solid var(--color-success);
+  color: #065f46;
   font-size: 12px;
   font-weight: 600;
 }
@@ -325,18 +325,18 @@ function handleClick(step: StepInfo, index: number) {
 
 .reopen-project-btn {
   padding: 8px 28px;
-  border: 2px solid var(--color-gold, #d4a017);
-  border-radius: 6px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
   background-color: transparent;
-  color: var(--color-gold, #d4a017);
+  color: var(--color-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .reopen-project-btn:hover {
-  background-color: var(--color-gold, #d4a017);
+  background-color: var(--color-primary);
   color: #fff;
 }
 </style>

@@ -43,7 +43,6 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .error-modal-overlay {
   position: fixed;
@@ -70,7 +69,7 @@ const emit = defineEmits<{
 
 .error-modal__icon {
   font-size: 48px;
-  color: var(--color-gold);
+  color: var(--color-accent);
   margin-bottom: 12px;
 }
 
@@ -88,17 +87,18 @@ const emit = defineEmits<{
 }
 
 .error-modal__retry-btn {
-  background-color: var(--color-gold);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
   border: none;
   padding: 8px 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: opacity var(--transition-fast);
 }
 
 .error-modal__retry-btn:hover {
-  background-color: var(--color-gold-dark);
+  opacity: 0.9;
 }
 </style>

@@ -80,7 +80,6 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .appeal-modal-overlay {
   position: fixed;
@@ -140,7 +139,8 @@ function handleSubmit() {
 
 .appeal-modal__input:focus {
   outline: none;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 .appeal-modal__actions {
@@ -162,9 +162,9 @@ function handleSubmit() {
 }
 
 .appeal-modal__submit-btn {
-  background: var(--color-gold);
+  background: var(--color-primary);
   color: #fff;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
 }
 
 .appeal-modal__submit-btn:disabled {
@@ -173,6 +173,6 @@ function handleSubmit() {
 }
 
 .appeal-modal__submit-btn:hover:not(:disabled) {
-  background: var(--color-gold-dark);
+  background: var(--color-primary-dark);
 }
 </style>

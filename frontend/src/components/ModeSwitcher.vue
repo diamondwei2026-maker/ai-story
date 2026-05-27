@@ -27,3 +27,36 @@ const modes = [
   { value: 'style-upgrade', label: '文笔升级' },
 ];
 </script>
+
+<style scoped>
+.mode-switcher {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.mode-option {
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mode-option:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+
+.mode-option.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+</style>

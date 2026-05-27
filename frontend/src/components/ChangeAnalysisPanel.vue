@@ -140,7 +140,6 @@ const severityLabels: Record<string, string> = {
 </template>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .change-analysis-panel {
   background: var(--color-surface);
@@ -251,12 +250,12 @@ const severityLabels: Record<string, string> = {
 }
 
 .change-analysis-panel__btn--primary {
-  background: var(--color-gold);
+  background: var(--color-primary);
   color: #fff;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
 }
 
 .change-analysis-panel__btn--primary:hover:not(:disabled) {
-  background: var(--color-gold-dark);
+  background: var(--color-primary-dark);
 }
 </style>

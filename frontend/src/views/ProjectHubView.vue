@@ -31,7 +31,6 @@ async function handleCreateProject() {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .project-hub {
   max-width: 900px;
@@ -40,9 +39,11 @@ async function handleCreateProject() {
 
 .project-hub__title {
   font-size: 28px;
+  font-weight: 700;
   color: var(--color-text-primary);
   margin-bottom: 24px;
   text-align: center;
+  letter-spacing: -0.5px;
 }
 
 .project-hub__toolbar {
@@ -52,23 +53,34 @@ async function handleCreateProject() {
 }
 
 .project-hub__create-btn {
-  padding: 8px 20px;
-  background-color: var(--color-gold);
+  padding: 10px 24px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .project-hub__create-btn:hover {
-  opacity: 0.9;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.project-hub__create-btn:active {
+  transform: translateY(0);
 }
 
 .project-hub__empty {
   text-align: center;
-  color: var(--color-text-secondary);
-  padding: 48px 0;
+  color: var(--color-text-muted);
+  padding: 64px 0;
   font-size: 15px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-border);
 }
 </style>

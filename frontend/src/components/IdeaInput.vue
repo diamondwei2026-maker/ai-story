@@ -30,7 +30,6 @@ const defaultPlaceholder = '输入你的小说创意，例如：一个医生重�
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .idea-input {
   display: flex;
@@ -49,18 +48,19 @@ const defaultPlaceholder = '输入你的小说创意，例如：一个医生重�
   width: 100%;
   min-height: 120px;
   padding: 12px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 14px;
   color: var(--color-text-primary);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg);
   resize: vertical;
-  transition: border-color 0.3s;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .idea-input__textarea:focus {
   outline: none;
-  border-color: var(--color-gold);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 .idea-input__textarea:disabled {

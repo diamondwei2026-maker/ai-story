@@ -74,7 +74,6 @@ function handleAiRetry() {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .workflow-view {
   max-width: 900px;
@@ -90,6 +89,7 @@ function handleAiRetry() {
 
 .workflow-view__title {
   font-size: 24px;
+  font-weight: 700;
   color: var(--color-text-primary);
 }
 
@@ -101,8 +101,9 @@ function handleAiRetry() {
 .workflow-view__content {
   margin-top: 24px;
   padding: 24px;
-  background-color: #fff;
-  border-radius: 8px;
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 </style>

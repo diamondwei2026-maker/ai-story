@@ -83,14 +83,13 @@ function handleOption(action: string) {
 </script>
 
 <style scoped>
-@import url('@/styles/css-variables.css');
 
 .completion-banner {
   padding: 12px 20px;
   margin-bottom: 16px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #fff9e6, #ffe8a0);
-  border: 2px solid var(--color-gold, #d4a017);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-accent-light), #fde68a);
+  border: 2px solid var(--color-accent);
 }
 
 .completion-banner__content {
@@ -104,19 +103,19 @@ function handleOption(action: string) {
 .completion-banner__text {
   font-size: 15px;
   font-weight: 700;
-  color: #6b4900;
+  color: #92400e;
 }
 
 .completion-banner__confirm-btn {
   padding: 8px 24px;
   border: none;
-  border-radius: 4px;
-  background-color: var(--color-gold, #d4a017);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
 }
 
 .completion-banner__confirm-btn:hover {

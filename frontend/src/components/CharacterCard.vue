@@ -204,9 +204,9 @@ function save() {
 .character-card__role-label {
   font-size: 13px;
   color: #fff;
-  background: var(--color-gold);
+  background: var(--color-primary);
   padding: 2px 10px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .character-card__char-name {
@@ -229,10 +229,11 @@ function save() {
 
 .character-card__arc-label {
   font-size: 12px;
-  color: var(--color-gold);
+  color: var(--color-primary);
   min-width: 32px;
   flex-shrink: 0;
   padding-top: 2px;
+  font-weight: 500;
 }
 
 .character-card__arc-text {
