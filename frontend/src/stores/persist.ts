@@ -11,3 +11,15 @@ export function loadJSON<T>(key: string, fallback: T): T {
 export function saveJSON<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
+
+export interface StorePersistence<T> {
+  load: () => T;
+  save: (state: T) => void;
+}
+
+export function createStorePersistence<T>(key: string, fallback: T): StorePersistence<T> {
+  return {
+    load: () => loadJSON(key, fallback),
+    save: (state: T) => saveJSON(key, state),
+  };
+}

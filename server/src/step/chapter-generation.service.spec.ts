@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StepService } from './step.service';
+import { ReviewService } from './review.service';
 import { ProjectService } from '../project/project.service';
 import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
 
 // Mock AI that yields chapter content token-by-token via SSE stream
 const mockChatModel = {
@@ -62,6 +64,8 @@ describe('StepService - Chapter Generation (DRAFTING)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StepService,
+        ReviewService,
+        FactsheetService,
         ProjectService,
         AIGatewayService,
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },

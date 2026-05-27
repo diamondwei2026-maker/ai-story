@@ -123,7 +123,7 @@ import {
   getOutline,
   switchStructure,
 } from '@/api/outline';
-import type { OutlineResponse } from '@/api/outline';
+import type { StepDataResponse } from '@/api/common';
 
 const props = defineProps<{
   projectId: string;
@@ -142,7 +142,7 @@ const {
   handleRegenerate,
   handleConfirm,
   handleReject,
-} = usePhaseWorkflow<OutlineResponse>({
+} = usePhaseWorkflow<StepDataResponse>({
   projectId: props.projectId,
   phase: 'OUTLINE',
   nextPhase: 'BEATS',

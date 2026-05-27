@@ -1,45 +1,28 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  NotFoundException,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, NotFoundException } from '@nestjs/common';
 import { StepService } from './step.service';
-import { StepData } from './step.entity';
+import { PhaseControllerBase } from './phase.controller.base';
 
 @Controller('projects/:projectId/steps/setting')
-export class StepController {
-  constructor(private readonly stepService: StepService) {}
+export class SettingController extends PhaseControllerBase {
+  constructor(stepService: StepService) {
+    super(stepService);
+  }
 
-  @Post('generate')
-  generate(
-    @Param('projectId') projectId: string,
-    @Body() body: { idea?: string; currentContent?: string },
-  ): Promise<StepData> {
+  protected doGenerate(projectId: string, body: any) {
     return this.stepService.generateSetting(projectId, body);
   }
 
-  @Post('confirm')
-  @HttpCode(200)
-  confirm(@Param('projectId') projectId: string): Promise<StepData> {
+  protected doConfirm(projectId: string) {
     return this.stepService.confirmSetting(projectId);
   }
 
-  @Post('reject')
-  @HttpCode(200)
-  reject(@Param('projectId') projectId: string): Promise<StepData> {
+  protected doReject(projectId: string) {
     return this.stepService.rejectSetting(projectId);
   }
 
-  @Get()
-  getSetting(@Param('projectId') projectId: string): StepData {
+  protected doGet(projectId: string) {
     const step = this.stepService.getSettingByProjectId(projectId);
-    if (!step) {
-      throw new NotFoundException('No SETTING step found for this project');
-    }
+    if (!step) throw new NotFoundException('No SETTING step found for this project');
     return step;
   }
 }

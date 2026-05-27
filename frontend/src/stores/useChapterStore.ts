@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { loadJSON, saveJSON } from './persist';
+import { createStorePersistence } from './persist';
+import { sortByChapter } from './sort';
 
 export interface Chapter {
   id: string;
@@ -33,31 +34,41 @@ interface PersistedState {
   chapters: Chapter[];
 }
 
-const STORAGE_KEY = 'chapterStore';
+const THROTTLE_MS = 300;
 
-const FALLBACK: PersistedState = {
+const storePersist = createStorePersistence<PersistedState>('chapterStore', {
   chapters: [],
-};
-
-function persist(chapters: Chapter[]) {
-  saveJSON(STORAGE_KEY, { chapters });
-}
-
-function sortByChapter(chapters: Chapter[]): Chapter[] {
-  return [...chapters].sort((a, b) => a.chapterNumber - b.chapterNumber);
-}
+});
 
 export const useChapterStore = defineStore('chapterStore', () => {
-  const persisted = loadJSON(STORAGE_KEY, { ...FALLBACK });
+  const persisted = storePersist.load();
 
   const chapters = ref<Chapter[]>(persisted.chapters);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const generationMode = ref<GenerationMode>('new-continue');
 
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function schedulePersist() {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      storePersist.save({ chapters: chapters.value });
+    }, THROTTLE_MS);
+  }
+
+  function flushPersist() {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+      storePersist.save({ chapters: chapters.value });
+    }
+  }
+
   function setChapters(newChapters: Chapter[]) {
     chapters.value = sortByChapter(newChapters);
-    persist(chapters.value);
+    storePersist.save({ chapters: chapters.value });
   }
 
   function updateChapterContent(chapterId: string, token: string) {
@@ -65,7 +76,7 @@ export const useChapterStore = defineStore('chapterStore', () => {
     if (!chapter) return;
     chapter.content = (chapter.content ?? '') + token;
     chapter.updatedAt = new Date().toISOString();
-    persist(chapters.value);
+    schedulePersist();
   }
 
   function updateChapterStatus(
@@ -76,7 +87,7 @@ export const useChapterStore = defineStore('chapterStore', () => {
     if (!chapter) return;
     chapter.status = status;
     chapter.updatedAt = new Date().toISOString();
-    persist(chapters.value);
+    storePersist.save({ chapters: chapters.value });
   }
 
   function setGenerationMode(mode: GenerationMode) {
@@ -92,5 +103,6 @@ export const useChapterStore = defineStore('chapterStore', () => {
     updateChapterContent,
     updateChapterStatus,
     setGenerationMode,
+    flushPersist,
   };
 });

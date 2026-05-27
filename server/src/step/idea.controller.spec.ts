@@ -141,7 +141,7 @@ describe('IdeaController', () => {
       const mockStep = { id: 'step-1', phaseType: 'IDEA', output: '卖点方案...' };
       mockStepService.getIdeaByProjectId.mockReturnValue(mockStep);
 
-      const result = controller.getIdea('proj-1');
+      const result = controller.getPhaseData('proj-1');
 
       expect(stepService.getIdeaByProjectId).toHaveBeenCalledWith('proj-1');
       expect(result).toEqual(mockStep);
@@ -150,7 +150,7 @@ describe('IdeaController', () => {
     it('should throw NotFoundException when no IDEA step exists', () => {
       mockStepService.getIdeaByProjectId.mockReturnValue(null);
 
-      expect(() => controller.getIdea('proj-1')).toThrow();
+      expect(() => controller.getPhaseData('proj-1')).toThrow();
     });
   });
 });

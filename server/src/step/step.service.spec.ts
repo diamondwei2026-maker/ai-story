@@ -6,6 +6,8 @@ import { AIGatewayService, TaskType, AI_MODEL_TOKEN } from '../ai-gateway/ai-gat
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
+import { ReviewService } from './review.service';
 import { StepData, PhaseType, StepStatus } from './step.entity';
 
 const mockChatModel = {
@@ -92,12 +94,15 @@ const mockBudgetService = {
 describe('StepService', () => {
   let service: StepService;
   let projectService: ProjectService;
+  let factsheetService: FactsheetService;
   let module: TestingModule;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
       providers: [
         StepService,
+        ReviewService,
+        FactsheetService,
         ProjectService,
         AIGatewayService,
         FactsheetCompensationService,
@@ -109,6 +114,7 @@ describe('StepService', () => {
 
     service = module.get<StepService>(StepService);
     projectService = module.get<ProjectService>(ProjectService);
+    factsheetService = module.get<FactsheetService>(FactsheetService);
   });
 
   describe('generateSetting', () => {
@@ -1703,7 +1709,7 @@ describe('StepService', () => {
       // Pre-create a versioned factSheet with external data to trigger CAS retry.
       // The pipeline reads version N, but stored version is N+5 → CAS fails first time.
       // On retry it re-reads N+5, merges, and CAS succeeds.
-      (service as any).factSheetByProject.set(projectId, {
+      (factsheetService as any).factSheetByProject.set(projectId, {
         data: { externalField: 'concurrent-change' },
         version: 5,
       });

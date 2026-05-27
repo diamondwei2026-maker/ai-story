@@ -106,7 +106,7 @@ import {
   rejectIdea,
   getIdea,
 } from '@/api/idea';
-import type { IdeaResponse } from '@/api/idea';
+import type { StepDataResponse } from '@/api/common';
 import IdeaInput from '@/components/IdeaInput.vue';
 import SellPointSelector from '@/components/SellPointSelector.vue';
 import SummaryCard from '@/components/SummaryCard.vue';
@@ -118,7 +118,7 @@ const props = defineProps<{
 
 const store = useWorkflowStore();
 
-const ideaData = ref<IdeaResponse | null>(null);
+const ideaData = ref<StepDataResponse | null>(null);
 const ideaText = ref('');
 const feedbackText = ref('');
 const selectedSellPointIndex = ref(-1);

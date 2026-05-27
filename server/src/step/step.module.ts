@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { StepController } from './step.controller';
+import { SettingController } from './step.controller';
 import { IdeaController } from './idea.controller';
 import { OutlineController } from './outline.controller';
 import { BeatsController, BeatModificationController } from './beats.controller';
@@ -8,6 +8,8 @@ import { FactsheetController } from './factsheet.controller';
 import { StepService } from './step.service';
 import { ChangeAnalysisService } from './change-analysis.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
+import { ReviewService } from './review.service';
 import { StepDataAccessAdapter } from './step-data-access.adapter';
 import { ProjectModule } from '../project/project.module';
 import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
@@ -17,7 +19,7 @@ import { STEP_DATA_ACCESS } from '../ai-gateway/context-budget.service';
   imports: [ProjectModule, AIGatewayModule],
   controllers: [
     IdeaController,
-    StepController,
+    SettingController,
     OutlineController,
     BeatsController,
     BeatModificationController,
@@ -28,6 +30,8 @@ import { STEP_DATA_ACCESS } from '../ai-gateway/context-budget.service';
     StepService,
     ChangeAnalysisService,
     FactsheetCompensationService,
+    FactsheetService,
+    ReviewService,
     StepDataAccessAdapter,
     { provide: STEP_DATA_ACCESS, useExisting: StepDataAccessAdapter },
   ],

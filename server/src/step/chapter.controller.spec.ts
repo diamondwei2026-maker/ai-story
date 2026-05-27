@@ -2,7 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ChapterController } from './chapter.controller';
 import { ChangeAnalysisService } from './change-analysis.service';
 import { StepService } from './step.service';
+import { ReviewService } from './review.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
 import { ProjectService } from '../project/project.service';
 import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
@@ -70,6 +72,8 @@ describe('ChapterController — ChangeAnalysis endpoints', () => {
       providers: [
         ChangeAnalysisService,
         StepService,
+        ReviewService,
+        FactsheetService,
         FactsheetCompensationService,
         ProjectService,
         AIGatewayService,

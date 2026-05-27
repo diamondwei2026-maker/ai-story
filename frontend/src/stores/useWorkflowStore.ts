@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { loadJSON, saveJSON } from './persist';
+import { createStorePersistence } from './persist';
 
 export type PhaseType = 'IDEA' | 'SETTING' | 'OUTLINE' | 'BEATS' | 'DRAFTING' | 'COMPLETED';
 export type StepStatus = 'PENDING' | 'IN_PROGRESS' | 'CONFIRMED' | 'REJECTED';
@@ -12,8 +12,6 @@ interface PersistedState {
   stepStatuses: Record<PhaseType, StepStatus>;
 }
 
-const STORAGE_KEY = 'workflowStore';
-
 const DEFAULT_STEP_STATUSES: Record<PhaseType, StepStatus> = {
   IDEA: 'PENDING',
   SETTING: 'PENDING',
@@ -23,17 +21,13 @@ const DEFAULT_STEP_STATUSES: Record<PhaseType, StepStatus> = {
   COMPLETED: 'PENDING',
 };
 
-const FALLBACK: PersistedState = {
+const storePersist = createStorePersistence<PersistedState>('workflowStore', {
   currentPhase: 'IDEA',
   stepStatuses: { ...DEFAULT_STEP_STATUSES },
-};
-
-function persist(currentPhase: PhaseType, stepStatuses: Record<PhaseType, StepStatus>) {
-  saveJSON(STORAGE_KEY, { currentPhase, stepStatuses });
-}
+});
 
 export const useWorkflowStore = defineStore('workflowStore', () => {
-  const persisted = loadJSON(STORAGE_KEY, { ...FALLBACK });
+  const persisted = storePersist.load();
 
   const currentPhase = ref<PhaseType>(persisted.currentPhase);
   const stepStatuses = ref<Record<PhaseType, StepStatus>>({
@@ -49,12 +43,12 @@ export const useWorkflowStore = defineStore('workflowStore', () => {
 
   function setCurrentPhase(phase: PhaseType) {
     currentPhase.value = phase;
-    persist(currentPhase.value, stepStatuses.value);
+    storePersist.save({ currentPhase: currentPhase.value, stepStatuses: stepStatuses.value });
   }
 
   function setStepStatus(phase: PhaseType, status: StepStatus) {
     stepStatuses.value[phase] = status;
-    persist(currentPhase.value, stepStatuses.value);
+    storePersist.save({ currentPhase: currentPhase.value, stepStatuses: stepStatuses.value });
   }
 
   function getStepStatus(phase: PhaseType): StepStatus {

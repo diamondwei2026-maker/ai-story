@@ -1,46 +1,28 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Body,
-  Param,
-  NotFoundException,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, Patch, Body, Param, NotFoundException } from '@nestjs/common';
 import { StepService } from './step.service';
-import { StepData, BeatData } from './step.entity';
+import { PhaseControllerBase } from './phase.controller.base';
 
 @Controller('projects/:projectId/steps/beats')
-export class BeatsController {
-  constructor(private readonly stepService: StepService) {}
+export class BeatsController extends PhaseControllerBase {
+  constructor(stepService: StepService) {
+    super(stepService);
+  }
 
-  @Post('generate')
-  generate(
-    @Param('projectId') projectId: string,
-    @Body() body: { outline?: string; currentContent?: string },
-  ): Promise<BeatData[]> {
+  protected doGenerate(projectId: string, body: any) {
     return this.stepService.generateBeats(projectId, body);
   }
 
-  @Post('confirm')
-  @HttpCode(200)
-  confirm(@Param('projectId') projectId: string): Promise<StepData> {
+  protected doConfirm(projectId: string) {
     return this.stepService.confirmBeats(projectId);
   }
 
-  @Post('reject')
-  @HttpCode(200)
-  reject(@Param('projectId') projectId: string): Promise<StepData> {
+  protected doReject(projectId: string) {
     return this.stepService.rejectBeats(projectId);
   }
 
-  @Get()
-  getBeats(@Param('projectId') projectId: string): BeatData[] {
+  protected doGet(projectId: string) {
     const beats = this.stepService.getBeatsByProjectId(projectId);
-    if (beats.length === 0) {
-      throw new NotFoundException('No BEATS step found for this project');
-    }
+    if (beats.length === 0) throw new NotFoundException('No BEATS step found for this project');
     return beats;
   }
 }
@@ -53,7 +35,7 @@ export class BeatModificationController {
   updateWordCount(
     @Param('id') id: string,
     @Body() body: { wordCount: number },
-  ): Promise<BeatData> {
+  ) {
     return this.stepService.updateBeatWordCount(id, body.wordCount);
   }
 
@@ -61,7 +43,7 @@ export class BeatModificationController {
   updateStructure(
     @Param('id') id: string,
     @Body() plan: Record<string, unknown>,
-  ): Promise<BeatData> {
+  ) {
     return this.stepService.updateBeatStructure(id, plan);
   }
 }

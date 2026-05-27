@@ -128,7 +128,7 @@ describe('BeatsController', () => {
 
   describe('GET /projects/:projectId/steps/beats', () => {
     it('should delegate to stepService.getBeatsByProjectId', () => {
-      const result = controller.getBeats('proj-1');
+      const result = controller.getPhaseData('proj-1');
 
       expect(mockStepService.getBeatsByProjectId).toHaveBeenCalledWith('proj-1');
       expect(result).toHaveLength(1);
@@ -137,13 +137,13 @@ describe('BeatsController', () => {
     it('should throw NotFoundException when no beats exist', () => {
       mockStepService.getBeatsByProjectId.mockReturnValueOnce([]);
 
-      expect(() => controller.getBeats('empty-proj')).toThrow(
+      expect(() => controller.getPhaseData('empty-proj')).toThrow(
         NotFoundException,
       );
     });
 
     it('should return BeatData array on success', () => {
-      const result = controller.getBeats('proj-1');
+      const result = controller.getPhaseData('proj-1');
 
       expect(Array.isArray(result)).toBe(true);
       expect(result[0].projectId).toBe('proj-1');

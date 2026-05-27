@@ -10,6 +10,8 @@ import { AIGatewayService, AI_MODEL_TOKEN } from '../ai-gateway/ai-gateway.servi
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
+import { ReviewService } from './review.service';
 import { ChapterData } from './step.entity';
 
 // ─── Mock AI ─────────────────────────────────────────────────────
@@ -106,6 +108,8 @@ describe('ChangeAnalysisService', () => {
       providers: [
         ChangeAnalysisService,
         StepService,
+        ReviewService,
+        FactsheetService,
         ProjectService,
         AIGatewayService,
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },

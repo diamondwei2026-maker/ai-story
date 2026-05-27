@@ -1,24 +1,14 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  NotFoundException,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, Post, Body, Param, NotFoundException } from '@nestjs/common';
 import { StepService } from './step.service';
-import { StepData } from './step.entity';
+import { PhaseControllerBase } from './phase.controller.base';
 
 @Controller('projects/:projectId/steps/idea')
-export class IdeaController {
-  constructor(private readonly stepService: StepService) {}
+export class IdeaController extends PhaseControllerBase {
+  constructor(stepService: StepService) {
+    super(stepService);
+  }
 
-  @Post('generate')
-  generate(
-    @Param('projectId') projectId: string,
-    @Body() body: { idea?: string; feedback?: string },
-  ): Promise<StepData> {
+  protected doGenerate(projectId: string, body: any) {
     return this.stepService.generateIdea(projectId, body);
   }
 
@@ -26,31 +16,21 @@ export class IdeaController {
   summary(
     @Param('projectId') projectId: string,
     @Body() body: { selectedSellPoint?: number; customBrief?: string },
-  ): Promise<StepData> {
+  ) {
     return this.stepService.generateIdeaSummary(projectId, body);
   }
 
-  @Post('confirm')
-  @HttpCode(200)
-  confirm(
-    @Param('projectId') projectId: string,
-    @Body() body: { selectedSellPoint: number; customBrief?: string },
-  ): Promise<StepData> {
+  protected doConfirm(projectId: string, body: any) {
     return this.stepService.confirmIdea(projectId, body);
   }
 
-  @Post('reject')
-  @HttpCode(200)
-  reject(@Param('projectId') projectId: string): Promise<StepData> {
+  protected doReject(projectId: string) {
     return this.stepService.rejectIdea(projectId);
   }
 
-  @Get()
-  getIdea(@Param('projectId') projectId: string): StepData {
+  protected doGet(projectId: string) {
     const step = this.stepService.getIdeaByProjectId(projectId);
-    if (!step) {
-      throw new NotFoundException('No IDEA step found for this project');
-    }
+    if (!step) throw new NotFoundException('No IDEA step found for this project');
     return step;
   }
 }

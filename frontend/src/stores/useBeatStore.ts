@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { loadJSON, saveJSON } from './persist';
+import { createStorePersistence } from './persist';
+import { sortByChapter } from './sort';
 
 export interface Beat {
   id: string;
@@ -20,19 +21,9 @@ interface PersistedState {
   beats: Beat[];
 }
 
-const STORAGE_KEY = 'beatStore';
-
-const FALLBACK: PersistedState = {
+const storePersist = createStorePersistence<PersistedState>('beatStore', {
   beats: [],
-};
-
-function persist(beats: Beat[]) {
-  saveJSON(STORAGE_KEY, { beats });
-}
-
-function sortByChapter(beats: Beat[]): Beat[] {
-  return [...beats].sort((a, b) => a.chapterNumber - b.chapterNumber);
-}
+});
 
 function markStale(beat: Beat) {
   beat.status = 'STALE';
@@ -40,7 +31,7 @@ function markStale(beat: Beat) {
 }
 
 export const useBeatStore = defineStore('beatStore', () => {
-  const persisted = loadJSON(STORAGE_KEY, { ...FALLBACK });
+  const persisted = storePersist.load();
 
   const beats = ref<Beat[]>(persisted.beats);
   const loading = ref(false);
@@ -50,7 +41,7 @@ export const useBeatStore = defineStore('beatStore', () => {
 
   function setBeats(newBeats: Beat[]) {
     beats.value = sortByChapter(newBeats);
-    persist(beats.value);
+    storePersist.save({ beats: beats.value });
   }
 
   function updateBeatWordCount(beatId: string, wordCount: number) {
@@ -59,7 +50,7 @@ export const useBeatStore = defineStore('beatStore', () => {
 
     beat.targetWordCount = wordCount;
     markStale(beat);
-    persist(beats.value);
+    storePersist.save({ beats: beats.value });
   }
 
   function updateBeatStructure(beatId: string, plan: Record<string, unknown>) {
@@ -75,7 +66,7 @@ export const useBeatStore = defineStore('beatStore', () => {
     }
 
     markStale(beat);
-    persist(beats.value);
+    storePersist.save({ beats: beats.value });
   }
 
   return {

@@ -1,37 +1,15 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  NotFoundException,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, Post, Body, Param, NotFoundException, HttpCode } from '@nestjs/common';
 import { StepService } from './step.service';
-import { StepData } from './step.entity';
+import { PhaseControllerBase } from './phase.controller.base';
 
 @Controller('projects/:projectId/steps/outline')
-export class OutlineController {
-  constructor(private readonly stepService: StepService) {}
+export class OutlineController extends PhaseControllerBase {
+  constructor(stepService: StepService) {
+    super(stepService);
+  }
 
-  @Post('generate')
-  generate(
-    @Param('projectId') projectId: string,
-    @Body() body: { setting?: string; structure?: string; currentContent?: string },
-  ): Promise<StepData> {
+  protected doGenerate(projectId: string, body: any) {
     return this.stepService.generateOutline(projectId, body);
-  }
-
-  @Post('confirm')
-  @HttpCode(200)
-  confirm(@Param('projectId') projectId: string): Promise<StepData> {
-    return this.stepService.confirmOutline(projectId);
-  }
-
-  @Post('reject')
-  @HttpCode(200)
-  reject(@Param('projectId') projectId: string): Promise<StepData> {
-    return this.stepService.rejectOutline(projectId);
   }
 
   @Post('switch-structure')
@@ -39,16 +17,21 @@ export class OutlineController {
   switchStructure(
     @Param('projectId') projectId: string,
     @Body() body: { structure: string },
-  ): Promise<StepData> {
+  ) {
     return this.stepService.switchStructure(projectId, body.structure);
   }
 
-  @Get()
-  getOutline(@Param('projectId') projectId: string): StepData {
+  protected doConfirm(projectId: string) {
+    return this.stepService.confirmOutline(projectId);
+  }
+
+  protected doReject(projectId: string) {
+    return this.stepService.rejectOutline(projectId);
+  }
+
+  protected doGet(projectId: string) {
     const step = this.stepService.getOutlineByProjectId(projectId);
-    if (!step) {
-      throw new NotFoundException('No OUTLINE step found for this project');
-    }
+    if (!step) throw new NotFoundException('No OUTLINE step found for this project');
     return step;
   }
 }

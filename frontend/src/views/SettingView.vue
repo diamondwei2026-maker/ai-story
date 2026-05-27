@@ -83,7 +83,7 @@
 <script setup lang="ts">
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
-import type { SettingResponse } from '@/api/setting';
+import type { StepDataResponse } from '@/api/common';
 import WorldBuilder from '@/components/WorldBuilder.vue';
 import CharacterCard from '@/components/CharacterCard.vue';
 import RelationGraph from '@/components/RelationGraph.vue';
@@ -103,7 +103,7 @@ const {
   handleRegenerate,
   handleConfirm,
   handleReject,
-} = usePhaseWorkflow<SettingResponse>({
+} = usePhaseWorkflow<StepDataResponse>({
   projectId: props.projectId,
   phase: 'SETTING',
   nextPhase: 'OUTLINE',

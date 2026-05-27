@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
+import { FactsheetService } from './factsheet.service';
+import { ReviewService } from './review.service';
 import { FactsheetController } from './factsheet.controller';
 import { StepService } from './step.service';
 import { ProjectService } from '../project/project.service';
@@ -30,6 +32,8 @@ describe('FactsheetController', () => {
       controllers: [FactsheetController],
       providers: [
         FactsheetCompensationService,
+        FactsheetService,
+        ReviewService,
         ProjectService,
         StepService,
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
