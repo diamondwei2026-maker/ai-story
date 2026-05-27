@@ -2029,4 +2029,73 @@ describe('StepService', () => {
       expect(step!.aiMeta!.modelUsed).toBeTruthy();
     });
   });
+
+  describe('useR1 model routing during chapter generation', () => {
+    it('should use CRITICAL_CHAPTER task type when beat.useR1 is true', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const beats = service.getBeatsByProjectId(projectId);
+      const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
+      chapter1Beat!.useR1 = true;
+
+      const collectSpy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      const firstCall = collectSpy.mock.calls.find(
+        (call: [TaskType, string]) => call[0] === TaskType.CRITICAL_CHAPTER,
+      );
+      expect(firstCall).toBeDefined();
+      expect(firstCall![0]).toBe(TaskType.CRITICAL_CHAPTER);
+
+      collectSpy.mockRestore();
+    });
+
+    it('should use CHAPTER_GENERATION task type when beat.useR1 is false', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const beats = service.getBeatsByProjectId(projectId);
+      const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
+      chapter1Beat!.useR1 = false;
+
+      const collectSpy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+
+      const genCall = collectSpy.mock.calls.find(
+        (call: [TaskType, string]) => call[0] === TaskType.CHAPTER_GENERATION,
+      );
+      expect(genCall).toBeDefined();
+      expect(genCall![0]).toBe(TaskType.CHAPTER_GENERATION);
+
+      const criticalCall = collectSpy.mock.calls.find(
+        (call: [TaskType, string]) => call[0] === TaskType.CRITICAL_CHAPTER,
+      );
+      expect(criticalCall).toBeUndefined();
+
+      collectSpy.mockRestore();
+    });
+
+    it('should respect useR1 in continueChapterGeneration', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const beats = service.getBeatsByProjectId(projectId);
+      const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
+      chapter1Beat!.useR1 = true;
+
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+      service.pauseChapterGeneration(projectId, chapters[0].id);
+
+      const collectSpy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.continueChapterGeneration(projectId, chapters[0].id, {
+        currentContent: '已生成的前半部分内容',
+      });
+
+      const criticalCall = collectSpy.mock.calls.find(
+        (call: [TaskType, string]) => call[0] === TaskType.CRITICAL_CHAPTER,
+      );
+      expect(criticalCall).toBeDefined();
+      expect(criticalCall![0]).toBe(TaskType.CRITICAL_CHAPTER);
+
+      collectSpy.mockRestore();
+    });
+  });
 });

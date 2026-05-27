@@ -560,7 +560,7 @@ export class StepService {
     // Step 1: SSE streaming content generation
     chapter.status = 'DRAFT';
     const chResult = await this.collectAiOutput(
-      TaskType.CHAPTER_GENERATION,
+      this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
         mode: opts.mode,
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
@@ -621,7 +621,7 @@ export class StepService {
     chapter.content = opts.currentContent;
 
     const continuation = await this.collectAiOutput(
-      TaskType.CHAPTER_GENERATION,
+      this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
         mode: 'new-continue',
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
@@ -893,6 +893,16 @@ export class StepService {
       if (found) return found;
     }
     return null;
+  }
+
+  private resolveChapterTaskType(chapter: ChapterData): TaskType {
+    const beat = this.findBeatForChapter(chapter);
+    return beat?.useR1 ? TaskType.CRITICAL_CHAPTER : TaskType.CHAPTER_GENERATION;
+  }
+
+  private findBeatForChapter(chapter: ChapterData): BeatData | undefined {
+    const beats = this.beatsByProject.get(chapter.projectId) ?? [];
+    return beats.find((b) => b.chapterNumber === chapter.chapterNumber);
   }
 
   private findChapterForBeat(beat: BeatData): ChapterData | undefined {

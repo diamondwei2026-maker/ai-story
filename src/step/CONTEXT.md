@@ -52,6 +52,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
   - `updateBeatStructure()` — 改结构内容（冲突点/钩子/POV）：该 Beat 标记 STALE，对应 Chapter（如已生成）标记 STALE。上下游 Beat 不受影响
   - 两种修改均不触发跨 Phase 回退（Project.status 保持 DRAFTING）
   - `shouldUseR1()` — 关键章节双重判定（ADR-0007 Decision 3）：结构位置（开篇 1-3 章 / 结局最后 3 章）|| hookCount ≥ 3 || isClimax → 满足任一即标记 `useR1`。在 `confirmBeats()` 中批量计算并固化到 Beat 文档
+  - `resolveChapterTaskType()` — 生成管道读取 `Beat.useR1` 路由模型：useR1=true → `CRITICAL_CHAPTER`（deepseek-r1），false → `CHAPTER_GENERATION`（deepseek-v3）。`generateChapter()` 和 `continueChapterGeneration()` 均应用此路由
 - **正文迭代 (DRAFTING)**: `generateChapter()` → `confirmChapter()` / `disputeChapter()`；支持三种模式（new-continue / paragraph-rewrite / style-upgrade）
 
 ### Chapter 生命周期
