@@ -15,6 +15,7 @@ import { ContextBudgetService } from './context-budget.service';
       useFactory: () => {
         const { ChatOpenRouter } = require('@langchain/openrouter');
         return new ChatOpenRouter({
+          model: process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat-v3',
           apiKey: process.env.OPENROUTER_API_KEY ?? 'sk-placeholder',
         });
       },
