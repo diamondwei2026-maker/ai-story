@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { createStorePersistence } from './persist';
+import * as projectApi from '@/api/project';
 
 export interface Project {
   id: string;
@@ -42,5 +43,18 @@ export const useProjectStore = defineStore('projectStore', () => {
     storePersist.save({ projects: projects.value, currentProject: currentProject.value });
   }
 
-  return { projects, currentProject, setProjects, setCurrentProject, clearCurrentProject };
+  async function createProject(title: string): Promise<Project> {
+    const project = await projectApi.createProject(title);
+    projects.value.push(project);
+    storePersist.save({ projects: projects.value, currentProject: currentProject.value });
+    return project;
+  }
+
+  async function loadProjects(): Promise<void> {
+    const list = await projectApi.listProjects();
+    projects.value = list;
+    storePersist.save({ projects: projects.value, currentProject: currentProject.value });
+  }
+
+  return { projects, currentProject, setProjects, setCurrentProject, clearCurrentProject, createProject, loadProjects };
 });

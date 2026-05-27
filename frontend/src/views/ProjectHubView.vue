@@ -2,7 +2,7 @@
   <div class="project-hub">
     <h1 class="project-hub__title">我的项目</h1>
     <div class="project-hub__toolbar">
-      <button data-testid="create-project-btn" class="project-hub__create-btn">
+      <button data-testid="create-project-btn" class="project-hub__create-btn" @click="handleCreateProject">
         创建项目
       </button>
     </div>
@@ -15,6 +15,19 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { useProjectStore } from '@/stores/useProjectStore';
+
+const router = useRouter();
+const projectStore = useProjectStore();
+
+async function handleCreateProject() {
+  const title = window.prompt('请输入项目名称');
+  if (title === null || title.trim().length === 0) return;
+
+  const project = await projectStore.createProject(title.trim());
+  router.push({ name: 'workflow.idea', params: { id: project.id } });
+}
 </script>
 
 <style scoped>

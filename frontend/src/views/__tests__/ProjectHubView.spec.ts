@@ -1,10 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
+import { createRouter, createWebHistory } from 'vue-router';
 
 describe('ProjectHubView', () => {
+  const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+      { path: '/', name: 'home', component: { template: '<div></div>' } },
+      { path: '/project/:id/idea', name: 'workflow.idea', component: { template: '<div></div>' } },
+    ],
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+  });
+
   const mountView = async () => {
     const { default: ProjectHubView } = await import('@/views/ProjectHubView.vue');
-    return mount(ProjectHubView);
+    return mount(ProjectHubView, {
+      global: { plugins: [router] },
+    });
   };
 
   it('renders the dashboard title "我的项目"', async () => {
