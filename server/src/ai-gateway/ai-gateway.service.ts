@@ -185,15 +185,13 @@ export class AIGatewayService {
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error(`AI stream timeout for model ${model}`));
-      }, 120000);
+      }, 300000);
 
       (async () => {
         try {
           const stream = this.chatModel.stream(prompt, model);
           for await (const chunk of stream) {
-            if (chunk.content) {
-              subscriber.next({ content: chunk.content, done: false });
-            }
+            subscriber.next({ content: chunk.content, done: false });
           }
           clearTimeout(timeout);
           subscriber.next({ content: '', done: true, modelUsed, degraded });

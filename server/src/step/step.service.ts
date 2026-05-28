@@ -880,7 +880,10 @@ export class StepService {
       const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(taskType, prompt);
       const chunks = await lastValueFrom(chunks$.pipe(toArray()));
       const lastChunk = chunks[chunks.length - 1];
-      const content = chunks.map((c) => c.content).join('');
+      const content = chunks
+        .filter((c) => !c.done && c.content)
+        .map((c) => c.content)
+        .join('');
       const aiMeta: AiMeta = {
         modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
         degraded: lastChunk?.degraded ?? false,
