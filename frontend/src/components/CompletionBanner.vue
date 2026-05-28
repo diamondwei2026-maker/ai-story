@@ -1,7 +1,10 @@
 <template>
   <div v-if="visible" data-testid="completion-banner" class="completion-banner">
     <div class="completion-banner__content">
-      <span data-testid="completion-banner-text" class="completion-banner__text">
+      <span
+        data-testid="completion-banner-text"
+        class="completion-banner__text"
+      >
         所有章节已全部完成，可以确认完本了！
       </span>
       <button
@@ -18,10 +21,16 @@
       data-testid="completion-options-dialog"
       class="completion-options-dialog"
     >
-      <div class="completion-options-dialog__mask" @click="handleOption('cancel')" />
+      <div
+        class="completion-options-dialog__mask"
+        @click="handleOption('cancel')"
+      />
       <div class="completion-options-dialog__panel">
         <h3>事实簿存在待同步数据</h3>
-        <p data-testid="completion-queue-depth" class="completion-options-dialog__depth">
+        <p
+          data-testid="completion-queue-depth"
+          class="completion-options-dialog__depth"
+        >
           队列深度: {{ pendingUpdateCount }}
         </p>
         <div class="completion-options-dialog__options">
@@ -53,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from "vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -61,7 +70,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'confirm-completion': [payload: { action: string }];
+  "confirm-completion": [payload: { action: string }];
 }>();
 
 const showDialog = ref(false);
@@ -70,20 +79,19 @@ function handleConfirmClick() {
   if ((props.pendingUpdateCount ?? 0) > 0) {
     showDialog.value = true;
   } else {
-    emit('confirm-completion', { action: 'direct-complete' });
+    emit("confirm-completion", { action: "direct-complete" });
   }
 }
 
 function handleOption(action: string) {
   showDialog.value = false;
-  if (action !== 'cancel') {
-    emit('confirm-completion', { action });
+  if (action !== "cancel") {
+    emit("confirm-completion", { action });
   }
 }
 </script>
 
 <style scoped>
-
 .completion-banner {
   padding: 12px 20px;
   margin-bottom: 16px;

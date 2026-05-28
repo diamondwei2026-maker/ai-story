@@ -42,7 +42,7 @@ export interface DegradationLogEntry {
 export const AI_MODEL_TOKEN = 'AI_MODEL_TOKEN';
 
 export interface IChatModel {
-  stream(input: string): AsyncIterable<{ content: string }>;
+  stream(input: string, model?: string): AsyncIterable<{ content: string }>;
   getNumTokens(text: string): Promise<number>;
 }
 
@@ -189,7 +189,7 @@ export class AIGatewayService {
 
       (async () => {
         try {
-          const stream = this.chatModel.stream(prompt);
+          const stream = this.chatModel.stream(prompt, model);
           for await (const chunk of stream) {
             if (chunk.content) {
               subscriber.next({ content: chunk.content, done: false });

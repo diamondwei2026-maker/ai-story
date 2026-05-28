@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { BeatsController, BeatModificationController } from './beats.controller';
 import { StepService } from './step.service';
 import { BeatData, StepData } from './step.entity';
@@ -134,12 +133,11 @@ describe('BeatsController', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('should throw NotFoundException when no beats exist', () => {
+    it('should return empty array when no beats exist', () => {
       mockStepService.getBeatsByProjectId.mockReturnValueOnce([]);
 
-      expect(() => controller.getPhaseData('empty-proj')).toThrow(
-        NotFoundException,
-      );
+      const result = controller.getPhaseData('empty-proj');
+      expect(result).toEqual([]);
     });
 
     it('should return BeatData array on success', () => {

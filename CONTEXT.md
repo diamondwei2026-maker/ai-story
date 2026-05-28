@@ -134,7 +134,7 @@
 **技术栈已落地：**
 - 后端：NestJS 11 + TypeScript 5
 - 前端：Vue 3.5 + Vite 6 + Ant Design Vue v4 + Pinia 3 + Vue Router 4
-- AI 网关：LangChain（`@langchain/openrouter` + `@langchain/core` + `langchain`）→ OpenRouter → DeepSeek V3 / R1
+- AI 网关：OpenAI SDK (`openai`) 直连 DeepSeek API（`api.deepseek.com`）→ DeepSeek V3 (`deepseek-chat`) / R1 (`deepseek-reasoner`)；`IChatModel` 接口保留 OpenRouter 可扩展性
 - ORM：Prisma 6.19.3 + MongoDB（replica set `rs0` on `127.0.0.1:27018`）
 - 后端测试：Jest 30 + supertest + RxJS Observable
 - 前端测试：Vitest 2.1 + @vue/test-utils + happy-dom

@@ -147,10 +147,11 @@ describe('IdeaController', () => {
       expect(result).toEqual(mockStep);
     });
 
-    it('should throw NotFoundException when no IDEA step exists', () => {
+    it('should return null when no IDEA step exists', () => {
       mockStepService.getIdeaByProjectId.mockReturnValue(null);
 
-      expect(() => controller.getPhaseData('proj-1')).toThrow();
+      const result = controller.getPhaseData('proj-1');
+      expect(result).toBeNull();
     });
   });
 });
