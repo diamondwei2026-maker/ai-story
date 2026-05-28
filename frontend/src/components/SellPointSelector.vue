@@ -19,6 +19,7 @@
     </div>
 
     <div class="sellpoint-selector__feedback">
+      <label class="sellpoint-selector__feedback-label">补充反馈</label>
       <textarea
         data-testid="feedback-input"
         class="sellpoint-selector__feedback-input"
@@ -32,7 +33,7 @@
         :disabled="loading"
         @click="onRegenerate"
       >
-        {{ localFeedback.trim() ? '不满意？反馈并重新生成' : '驳回，重新生成' }}
+        重新生成卖点方案
       </button>
     </div>
 
@@ -116,6 +117,12 @@ function onRegenerate() {
   margin-top: 24px;
   padding-top: 24px;
   border-top: 1px solid var(--color-border);
+}
+
+.sellpoint-selector__feedback-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 .sellpoint-selector__feedback-input {
