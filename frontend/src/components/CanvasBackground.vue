@@ -2,7 +2,7 @@
   <canvas
     ref="canvasRef"
     class="canvas-background"
-    :style="{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, pointerEvents: 'none' }"
+    :style="{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1, pointerEvents: 'none', mixBlendMode: 'multiply', opacity: 0.6 }"
   />
 </template>
 

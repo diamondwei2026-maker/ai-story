@@ -1,32 +1,38 @@
 <template>
-  <a-card
-    hoverable
-    data-testid="market-analysis-card"
-    :class="{ 'card--selected': selected }"
-    @click="$emit('select')"
-  >
-    <template #title>
-      <span data-testid="sellpoint-title">{{ sellPoint.title }}</span>
-    </template>
-    <p class="market-card__sellpoint">{{ sellPoint.coreSellPoint }}</p>
+  <a-badge-ribbon :text="`方案 ${sellPoint.index + 1}`" color="teal">
+    <a-card
+      hoverable
+      data-testid="market-analysis-card"
+      :class="{ 'card--selected': selected }"
+      @click="$emit('select')"
+    >
+      <template #title>
+        <span data-testid="sellpoint-title">{{ sellPoint.title }}</span>
+      </template>
+      <p class="market-card__sellpoint body-text">{{ sellPoint.coreSellPoint }}</p>
 
-    <div class="market-card__metrics">
-      <a-tag data-testid="market-score" color="teal">
-        市场匹配度: {{ sellPoint.marketScore }}/10
-      </a-tag>
-    </div>
+      <div class="market-card__metrics">
+        <span class="market-card__score-label caption">市场匹配度</span>
+        <a-progress
+          :percent="sellPoint.marketScore * 10"
+          :show-info="true"
+          :stroke-color="{ '0%': '#0d9488', '100%': '#f59e0b' }"
+          size="small"
+        />
+      </div>
 
-    <div data-testid="hit-references" class="market-card__references">
-      <span class="market-card__ref-label">爆款参考:</span>
-      <a-tag v-for="(ref, i) in sellPoint.hitReferences" :key="i" class="market-card__ref-tag">
-        {{ ref }}
-      </a-tag>
-    </div>
+      <div data-testid="hit-references" class="market-card__references">
+        <span class="market-card__ref-label caption">爆款参考:</span>
+        <a-tag v-for="(ref, i) in sellPoint.hitReferences" :key="i" class="market-card__ref-tag">
+          {{ ref }}
+        </a-tag>
+      </div>
 
-    <p data-testid="differentiation" class="market-card__diff">
-      {{ sellPoint.differentiation }}
-    </p>
-  </a-card>
+      <p data-testid="differentiation" class="market-card__diff caption">
+        {{ sellPoint.differentiation }}
+      </p>
+    </a-card>
+  </a-badge-ribbon>
 </template>
 
 <script setup lang="ts">
@@ -51,14 +57,17 @@ defineEmits<{
 
 <style scoped>
 .market-card__sellpoint {
-  font-size: 14px;
-  color: var(--color-text-primary);
   margin: 0 0 12px 0;
-  line-height: 1.6;
+  color: var(--color-text-primary);
 }
 
 .market-card__metrics {
   margin-bottom: 10px;
+}
+
+.market-card__score-label {
+  display: block;
+  margin-bottom: 4px;
 }
 
 .market-card__references {
@@ -70,7 +79,6 @@ defineEmits<{
 }
 
 .market-card__ref-label {
-  font-size: 13px;
   color: var(--color-text-secondary);
 }
 
@@ -79,10 +87,9 @@ defineEmits<{
 }
 
 .market-card__diff {
-  font-size: 13px;
-  color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.5;
+  color: var(--color-text-secondary);
 }
 
 .card--selected {

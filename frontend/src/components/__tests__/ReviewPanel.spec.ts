@@ -67,7 +67,7 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       expect(buttons).toHaveLength(0);
     });
 
@@ -118,7 +118,7 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       const labels = buttons.map((b) => b.text());
       expect(labels).toEqual(
         expect.arrayContaining([expect.stringMatching(/采纳/i)]),
@@ -131,7 +131,7 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       const labels = buttons.map((b) => b.text());
       expect(labels).toEqual(
         expect.arrayContaining([expect.stringMatching(/忽略/i)]),
@@ -210,7 +210,7 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       expect(buttons).toHaveLength(3);
     });
 
@@ -303,7 +303,7 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       expect(buttons).toHaveLength(2);
     });
 
@@ -403,7 +403,7 @@ describe('ReviewPanel', () => {
         loading: true,
       });
 
-      const buttons = wrapper.findAll('.review-panel__action-btn');
+      const buttons = wrapper.findAll('[data-testid^="action-"]');
       for (const btn of buttons) {
         expect((btn.element as HTMLButtonElement).disabled).toBe(true);
       }
@@ -452,18 +452,12 @@ describe('ReviewPanel', () => {
         chapterStatus: 'REVIEWING',
       });
 
-      expect(
-        wrapper.find('[data-testid="dimension-POLITICAL_SAFETY"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-testid="dimension-SEXUAL_CONTENT"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-testid="dimension-VIOLENCE"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-testid="dimension-VALUES"]').exists(),
-      ).toBe(true);
+      // Dimensions rendered via <a-descriptions>, check by text content
+      expect(wrapper.text()).toContain('政治安全');
+      expect(wrapper.text()).toContain('色情尺度');
+      expect(wrapper.text()).toContain('暴力渲染');
+      expect(wrapper.text()).toContain('价值观');
+      expect(wrapper.text()).toContain('10');
     });
   });
 });

@@ -1,6 +1,15 @@
 <template>
   <div data-testid="idea-view" class="idea-view">
-    <h2 data-testid="idea-title" class="idea-view__title">灵感提取</h2>
+    <h2 data-testid="idea-title" class="idea-view__title section-title">灵感提取</h2>
+
+    <!-- Sub-step indicator -->
+    <div class="idea-view__substeps">
+      <a-steps :current="currentSubStep" size="small">
+        <a-step title="输入创意" />
+        <a-step title="选择卖点" />
+        <a-step title="审核简介" />
+      </a-steps>
+    </div>
 
     <a-alert
       v-if="reviewAnnotations"
@@ -32,18 +41,29 @@
           size="small"
           @click="handleGenerate"
         >
-          重试
+          Retry
         </a-button>
       </template>
     </a-alert>
 
-    <!-- Step 1: Idea Input (no data yet) -->
+    <!-- Step 0: Idea Input (no data yet) -->
     <div v-if="!ideaData && !loading" class="idea-view__empty">
       <IdeaInput
         v-model="ideaText"
         :disabled="false"
-        placeholder="输入你的小说创意，例如：一个医生重生到星际时代的故事..."
+        placeholder="Describe your story idea..."
       />
+      <div class="idea-view__prompts">
+        <span class="idea-view__prompts-label caption">试试这个灵感：</span>
+        <a-tag
+          v-for="prompt in suggestedPrompts"
+          :key="prompt"
+          class="idea-view__prompt-tag"
+          @click="ideaText = prompt"
+        >
+          {{ prompt }}
+        </a-tag>
+      </div>
       <div class="idea-view__empty-actions">
         <a-button
           type="primary"
@@ -56,7 +76,7 @@
       </div>
     </div>
 
-    <!-- Step 2: Sell Point Selection -->
+    <!-- Step 1: Sell Point Selection -->
     <template v-if="ideaData && !loading">
       <SellPointSelector
         v-if="!summaryGenerated"
@@ -70,7 +90,7 @@
         @generate-summary="handleGenerateSummary"
       />
 
-      <!-- Step 3: Summary Display -->
+      <!-- Step 2: Summary Display -->
       <SummaryCard
         v-if="summaryGenerated"
         :one-liner="summaryOneLiner"
@@ -96,6 +116,20 @@
           确认灵感，进入设定阶段
         </a-button>
       </div>
+
+      <!-- Confirmed state -->
+      <a-result
+        v-if="isConfirmed"
+        status="success"
+        title="灵感已确认"
+        sub-title="正在前往设定阶段..."
+      >
+        <template #extra>
+          <a-button type="primary" @click="store.setCurrentPhase('SETTING')">
+            前往设定集
+          </a-button>
+        </template>
+      </a-result>
     </template>
   </div>
 </template>
@@ -131,6 +165,12 @@ const loading = ref(false);
 const summaryLoading = ref(false);
 const error = ref<string | null>(null);
 
+const suggestedPrompts = [
+  '一个能预见未来5分钟的侦探',
+  '一个魔法是有限资源的王国',
+  '两个星际殖民地里互相竞争的厨师',
+];
+
 const output = computed(() => ideaData.value?.output);
 
 const isConfirmed = computed(() => {
@@ -151,6 +191,13 @@ const {
   oneLiner: summaryOneLiner,
   fullSummary: summaryFull,
 } = useIdeaParser(output);
+
+const currentSubStep = computed(() => {
+  if (isConfirmed.value) return 3;
+  if (summaryGenerated.value) return 2;
+  if (ideaData.value && !summaryGenerated.value) return 1;
+  return 0;
+});
 
 onMounted(async () => {
   try {
@@ -250,34 +297,53 @@ async function handleReject() {
 
 <style scoped>
 .idea-view {
-  padding: 16px 0;
+  padding: var(--space-md) 0;
 }
 
 .idea-view__title {
-  font-size: 20px;
-  color: var(--color-text-primary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
+}
+
+.idea-view__substeps {
+  margin-bottom: var(--space-xl);
 }
 
 .idea-view__loading {
   text-align: center;
-  padding: 32px;
+  padding: var(--space-xl);
 }
 
 .idea-view__error {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .idea-view__empty {
   text-align: center;
 }
 
+.idea-view__prompts {
+  padding: 0 var(--space-lg) var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+
+.idea-view__prompts-label {
+  color: var(--color-text-muted);
+}
+
+.idea-view__prompt-tag {
+  cursor: pointer;
+}
+
 .idea-view__empty-actions {
-  padding: 0 24px 24px;
+  padding: 0 var(--space-lg) var(--space-lg);
 }
 
 .idea-view__actions {
   text-align: center;
-  padding: 24px 0;
+  padding: var(--space-lg) 0;
 }
 </style>

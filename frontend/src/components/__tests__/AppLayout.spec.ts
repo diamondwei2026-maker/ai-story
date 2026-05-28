@@ -42,7 +42,7 @@ describe('AppLayout', () => {
     expect(wrapper.find('.app-layout__body').exists()).toBe(true);
   });
 
-  it('renders without footer when footer slot is not provided', async () => {
+  it('always renders the footer (has default content)', async () => {
     const { default: AppLayout } = await import('@/components/AppLayout.vue');
     const wrapper = mount(AppLayout, {
       slots: {
@@ -50,6 +50,7 @@ describe('AppLayout', () => {
       },
     });
 
-    expect(wrapper.find('.app-layout__footer').exists()).toBe(false);
+    // Footer now always renders with default editorial text
+    expect(wrapper.find('.app-layout__footer').exists()).toBe(true);
   });
 });

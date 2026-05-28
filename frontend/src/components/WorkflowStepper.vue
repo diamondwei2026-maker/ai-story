@@ -10,7 +10,7 @@
       }"
     >
       <span data-testid="factsheet-alert-text" class="factsheet-alert-banner__text">
-        事实簿同步延迟，建议暂停生成新章并手动触发同步
+        事实簿同步延迟，建议暂停生成新章
       </span>
       <span data-testid="factsheet-alert-depth" class="factsheet-alert-banner__depth">
         队列深度: {{ factsheetAlert?.depth ?? 0 }}
@@ -37,9 +37,11 @@
       <div class="readonly-overlay__badge">只读模式 · 已完本</div>
     </div>
 
-    <div class="stepper__counter">步骤 {{ currentIndex + 1 }}/{{ steps.length }}</div>
+    <div class="stepper__counter">
+      <a-tag>步骤 {{ currentIndex + 1 }} / {{ steps.length }}</a-tag>
+    </div>
 
-    <a-steps :current="currentIndex" size="small" @click="onStepsClick">
+    <a-steps :current="currentIndex" size="default" @click="onStepsClick">
       <a-step
         v-for="(step, index) in steps"
         :key="step.phase"
@@ -52,6 +54,9 @@
         </template>
         <template #description>
           <span data-testid="step-status">{{ statusLabel(step.status) }}</span>
+        </template>
+        <template #icon>
+          <component :is="phaseIcon(step.phase)" />
         </template>
       </a-step>
     </a-steps>
@@ -68,7 +73,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type Component } from 'vue';
+import {
+  BulbOutlined,
+  GlobalOutlined,
+  OrderedListOutlined,
+  PartitionOutlined,
+  EditOutlined,
+} from '@ant-design/icons-vue';
 import type { PhaseType, StepStatus } from '@/stores/useWorkflowStore';
 
 export interface StepInfo {
@@ -81,6 +93,14 @@ export interface FactsheetAlert {
   level: 'NORMAL' | 'PRIORITY' | 'WARNING' | 'CRITICAL';
   depth: number;
 }
+
+const PHASE_ICONS: Record<string, Component> = {
+  IDEA: BulbOutlined,
+  SETTING: GlobalOutlined,
+  OUTLINE: OrderedListOutlined,
+  BEATS: PartitionOutlined,
+  DRAFTING: EditOutlined,
+};
 
 const props = defineProps<{
   steps: StepInfo[];
@@ -114,6 +134,10 @@ const showCompletionBanner = computed(() => {
     props.allChaptersCompleted === true && props.projectStatus !== 'COMPLETED'
   );
 });
+
+function phaseIcon(phase: string): Component {
+  return PHASE_ICONS[phase] ?? BulbOutlined;
+}
 
 function mapStatus(status: StepStatus): 'wait' | 'process' | 'finish' | 'error' {
   const map: Record<StepStatus, 'wait' | 'process' | 'finish' | 'error'> = {
@@ -154,17 +178,13 @@ function onStepsClick(e: MouseEvent) {
 
 <style scoped>
 .workflow-stepper {
-  padding: 16px 0;
+  padding: var(--space-md) 0;
 }
 
 .stepper__counter {
   text-align: center;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
-
-/* ─── Factsheet Alert Banner ─── */
 
 .factsheet-alert-banner {
   display: flex;
@@ -173,7 +193,7 @@ function onStepsClick(e: MouseEvent) {
   gap: 16px;
   padding: 12px 20px;
   margin-bottom: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   flex-wrap: wrap;
 }
@@ -199,13 +219,9 @@ function onStepsClick(e: MouseEvent) {
   opacity: 0.85;
 }
 
-/* ─── Completion Banner Area ─── */
-
 .completion-banner-area {
   margin-bottom: 12px;
 }
-
-/* ─── Read-only Overlay ─── */
 
 .readonly-overlay {
   display: flex;
@@ -226,11 +242,9 @@ function onStepsClick(e: MouseEvent) {
   font-weight: 600;
 }
 
-/* ─── Reopen Button ─── */
-
 .stepper__reopen {
   display: flex;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: var(--space-md);
 }
 </style>

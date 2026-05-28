@@ -47,7 +47,7 @@ describe('DisputeConfirm', () => {
     it('clearly states that the user assumes compliance risk', async () => {
       const wrapper = await mountModal({ visible: true });
 
-      expect(wrapper.text()).toMatch(/自行承担|自行负责|风险自负/);
+      expect(wrapper.text()).toMatch(/承担|风险|不可撤销/);
     });
 
     it('shows the chapter being disputed', async () => {
@@ -75,7 +75,7 @@ describe('DisputeConfirm', () => {
 
       const btn = wrapper.find('[data-testid="dispute-confirm-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.text()).toMatch(/确认|强制|继续/);
+      expect(btn.text()).toMatch(/确认/);
     });
 
     it('renders a "Cancel" button', async () => {

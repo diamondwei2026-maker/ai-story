@@ -118,7 +118,7 @@ describe('ChangeAnalysisPanel', () => {
       });
 
       const highGroup = wrapper.find('[data-testid="severity-group-HIGH"]');
-      expect(highGroup.find('[data-testid="action-defer"]').exists()).toBe(false);
+      expect(highGroup.find('[data-testid="action-defer-2"]').exists()).toBe(false);
     });
 
     it('shows "Apply Fix" and "Skip" buttons for HIGH severity', async () => {
@@ -129,8 +129,8 @@ describe('ChangeAnalysisPanel', () => {
       });
 
       const highGroup = wrapper.find('[data-testid="severity-group-HIGH"]');
-      expect(highGroup.find('[data-testid="action-apply-fix"]').exists()).toBe(true);
-      expect(highGroup.find('[data-testid="action-skip"]').exists()).toBe(true);
+      expect(highGroup.find('[data-testid="action-apply-fix-2"]').exists()).toBe(true);
+      expect(highGroup.find('[data-testid="action-skip-2"]').exists()).toBe(true);
     });
 
     it('emits "apply-fix" with chapterNumber when Apply Fix clicked', async () => {
@@ -171,7 +171,7 @@ describe('ChangeAnalysisPanel', () => {
       });
 
       const medGroup = wrapper.find('[data-testid="severity-group-MEDIUM"]');
-      expect(medGroup.find('[data-testid="action-defer"]').exists()).toBe(true);
+      expect(medGroup.find('[data-testid="action-defer-3"]').exists()).toBe(true);
     });
 
     it('shows "Defer" button for LOW severity items', async () => {
@@ -182,7 +182,7 @@ describe('ChangeAnalysisPanel', () => {
       });
 
       const lowGroup = wrapper.find('[data-testid="severity-group-LOW"]');
-      expect(lowGroup.find('[data-testid="action-defer"]').exists()).toBe(true);
+      expect(lowGroup.find('[data-testid="action-defer-5"]').exists()).toBe(true);
     });
 
     it('emits "defer" with chapterNumber when Defer clicked', async () => {
@@ -212,9 +212,9 @@ describe('ChangeAnalysisPanel', () => {
         ]),
       });
 
-      expect(wrapper.find('[data-testid="status-badge-2"]').text()).toMatch(/FIXED/i);
-      expect(wrapper.find('[data-testid="status-badge-3"]').text()).toMatch(/DEFERRED/i);
-      expect(wrapper.find('[data-testid="status-badge-4"]').text()).toMatch(/SKIPPED/i);
+      expect(wrapper.find('[data-testid="status-badge-2"]').text()).toMatch(/已修复/);
+      expect(wrapper.find('[data-testid="status-badge-3"]').text()).toMatch(/已推迟/);
+      expect(wrapper.find('[data-testid="status-badge-4"]').text()).toMatch(/已跳过/);
     });
   });
 

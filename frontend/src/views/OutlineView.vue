@@ -1,6 +1,6 @@
 <template>
   <div data-testid="outline-view" class="outline-view">
-    <h2 data-testid="outline-title" class="outline-view__title">剧情大纲</h2>
+    <h2 data-testid="outline-title" class="outline-view__title section-title">剧情大纲</h2>
 
     <a-alert
       v-if="reviewAnnotations"
@@ -32,38 +32,40 @@
           size="small"
           @click="handleGenerate"
         >
-          重试
+          Retry
         </a-button>
       </template>
     </a-alert>
 
     <!-- Generate button (when no outline and not loading) -->
-    <div
+    <EmptyState
       v-if="!outlineData && !loading"
-      class="outline-view__empty"
+      description="选择叙事结构，让AI构建你的剧情大纲"
     >
-      <p class="outline-view__empty-text">选择叙事结构，点击生成按钮，AI 将基于设定构建剧情大纲</p>
-      <div
-        v-if="!isConfirmed"
-        data-testid="structure-switcher"
-        class="outline-view__structure-select"
-      >
-        <span class="outline-view__structure-select-label">叙事结构：</span>
-        <a-select
-          v-model:value="selectedStructure"
-          :options="structureOptions"
-          style="width: 200px"
-        />
-      </div>
-      <a-button
-        type="primary"
-        data-testid="generate-outline-btn"
-        :loading="loading"
-        @click="handleGenerate"
-      >
-        生成大纲
-      </a-button>
-    </div>
+      <template #action>
+        <div
+          v-if="!isConfirmed"
+          data-testid="structure-switcher"
+          class="outline-view__structure-select"
+        >
+          <span class="outline-view__structure-select-label">叙事结构：</span>
+          <a-segmented
+            v-model:value="selectedStructure"
+            :options="structureOptions"
+            block
+          />
+        </div>
+        <a-button
+          type="primary"
+          data-testid="generate-outline-btn"
+          :loading="loading"
+          class="outline-view__generate-btn"
+          @click="handleGenerate"
+        >
+          生成大纲
+        </a-button>
+      </template>
+    </EmptyState>
 
     <!-- Outline content -->
     <template v-if="outlineData && !loading">
@@ -73,21 +75,34 @@
         class="outline-view__structure-select"
       >
         <span class="outline-view__structure-select-label">叙事结构：</span>
-        <a-select
+        <a-segmented
           v-model:value="selectedStructure"
           :options="structureOptions"
-          style="width: 200px"
+          block
           @change="handleSwitchStructure"
         />
       </div>
+
       <div data-testid="outline-tree" class="outline-view__tree">
-        <pre>{{ outlineData.output }}</pre>
+        <a-timeline v-if="parsedOutline.length > 0">
+          <a-timeline-item
+            v-for="(item, i) in parsedOutline"
+            :key="i"
+            :color="item.color"
+          >
+            <h4 class="outline-item__title">{{ item.title }}</h4>
+            <p class="outline-item__body body-text">{{ item.body }}</p>
+          </a-timeline-item>
+        </a-timeline>
+        <pre v-else class="outline-view__fallback body-text">{{ outlineData.output }}</pre>
       </div>
-      <div data-testid="emotion-curve" class="outline-view__emotion">
+
+      <div data-testid="emotion-curve" class="outline-view__emotion-bar">
+        <span class="outline-view__emotion-label caption">情绪节点：</span>
         <a-tag
           v-for="label in emotionLabels"
           :key="label"
-          color="blue"
+          :color="emotionColor(label)"
         >
           {{ label }}
         </a-tag>
@@ -135,6 +150,7 @@ import {
   switchStructure,
 } from '@/api/outline';
 import type { StepDataResponse } from '@/api/common';
+import EmptyState from '@/components/EmptyState.vue';
 
 const props = defineProps<{
   projectId: string;
@@ -179,6 +195,59 @@ const emotionLabels = computed(() => {
   return labels;
 });
 
+function emotionColor(label: string): string {
+  const map: Record<string, string> = {
+    '爽点': 'green',
+    '虐点': 'red',
+    '悬念点': 'orange',
+  };
+  return map[label] ?? 'default';
+}
+
+interface OutlineItem {
+  title: string;
+  body: string;
+  color: string;
+}
+
+const COLORS = ['teal', 'blue', 'purple', 'orange', 'green', 'red', 'cyan'];
+
+const parsedOutline = computed<OutlineItem[]>(() => {
+  const output = outlineData.value?.output ?? '';
+  const items: OutlineItem[] = [];
+
+  const actMatch = output.match(/(?:^|\n)(第[一二三四五六七八九十]+幕|Act\s+\d+|第\d+章)[\s：:]*([\s\S]*?)(?=\n(?:第[一二三四五六七八九十]+幕|Act\s+\d+|第\d+章)|\n*$)/g);
+
+  if (actMatch && actMatch.length > 0) {
+    actMatch.forEach((block, i) => {
+      const lines = block.trim().split('\n').filter(Boolean);
+      const title = lines[0].trim();
+      const body = lines.slice(1).join('\n').trim();
+      items.push({
+        title: title || `Section ${i + 1}`,
+        body: body || block.trim(),
+        color: COLORS[i % COLORS.length],
+      });
+    });
+    return items;
+  }
+
+  const lines = output.split('\n').filter(Boolean);
+  if (lines.every((l) => /^(#{1,3}\s|第.+[幕章节])/.test(l.trim()))) {
+    lines.forEach((line, i) => {
+      const cleaned = line.replace(/^#{1,3}\s*/, '').trim();
+      items.push({
+        title: cleaned,
+        body: '',
+        color: COLORS[i % COLORS.length],
+      });
+    });
+    return items;
+  }
+
+  return items;
+});
+
 async function handleSwitchStructure() {
   if (
     !confirm('切换叙事结构将重新组织大纲，关键情节点保留但节点间衔接将被重写。确定继续吗？')
@@ -200,71 +269,80 @@ async function handleSwitchStructure() {
 
 <style scoped>
 .outline-view {
-  padding: 16px 0;
+  padding: var(--space-md) 0;
 }
 
 .outline-view__title {
-  font-size: 20px;
-  color: var(--color-text-primary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .outline-view__loading {
   text-align: center;
-  padding: 32px;
+  padding: var(--space-xl);
 }
 
 .outline-view__error {
-  margin-bottom: 16px;
-}
-
-.outline-view__empty {
-  text-align: center;
-  padding: 48px 16px;
-}
-
-.outline-view__empty-text {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-md);
 }
 
 .outline-view__structure-select {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-lg);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .outline-view__structure-select-label {
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
+  font-weight: 500;
+}
+
+.outline-view__generate-btn {
+  margin-top: var(--space-md);
 }
 
 .outline-view__tree {
-  background-color: var(--color-bg-secondary);
-  padding: 16px;
-  border-radius: var(--radius-md);
-  margin-bottom: 16px;
+  background-color: var(--color-surface-warm);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
   border: 1px solid var(--color-border);
 }
 
-.outline-view__tree pre {
-  white-space: pre-wrap;
-  font-family: inherit;
+.outline-item__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.outline-item__body {
   margin: 0;
 }
 
-.outline-view__emotion {
-  margin-bottom: 16px;
+.outline-view__fallback {
+  white-space: pre-wrap;
+  font-family: inherit;
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.outline-view__emotion-bar {
+  margin-bottom: var(--space-md);
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.outline-view__emotion-label {
+  color: var(--color-text-muted);
 }
 
 .outline-view__actions {
   text-align: center;
-  padding: 24px 0;
+  padding: var(--space-lg) 0;
   display: flex;
   gap: 12px;
   justify-content: center;

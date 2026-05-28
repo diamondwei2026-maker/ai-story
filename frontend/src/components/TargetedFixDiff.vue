@@ -33,41 +33,41 @@ const emit = defineEmits<{
     </div>
 
     <div class="targeted-fix-diff__actions">
-      <button
+      <a-button
         data-testid="diff-confirm"
-        class="targeted-fix-diff__btn targeted-fix-diff__btn--primary"
+        type="primary"
+        size="small"
         :disabled="loading"
         @click="emit('confirm')"
       >
         确认应用
-      </button>
-      <button
+      </a-button>
+      <a-button
         data-testid="diff-cancel"
-        class="targeted-fix-diff__btn"
+        size="small"
         :disabled="loading"
         @click="emit('cancel')"
       >
         取消
-      </button>
+      </a-button>
     </div>
   </div>
 </template>
 
 <style scoped>
-
 .targeted-fix-diff {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .targeted-fix-diff__panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .targeted-fix-diff__panel {
@@ -86,7 +86,7 @@ const emit = defineEmits<{
   flex: 1;
   padding: 10px;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -100,46 +100,16 @@ const emit = defineEmits<{
 }
 
 .targeted-fix-diff__content--source {
-  border-left: 3px solid #c0392b;
+  border-left: 3px solid #ef4444;
 }
 
 .targeted-fix-diff__content--patch {
-  border-left: 3px solid #2d7d2d;
+  border-left: 3px solid #10b981;
 }
 
 .targeted-fix-diff__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
   justify-content: flex-end;
-}
-
-.targeted-fix-diff__btn {
-  padding: 6px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  background: #fff;
-  color: var(--color-text-primary);
-  transition: background-color 0.2s;
-}
-
-.targeted-fix-diff__btn:hover:not(:disabled) {
-  background: var(--color-bg);
-}
-
-.targeted-fix-diff__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.targeted-fix-diff__btn--primary {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.targeted-fix-diff__btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-dark);
 }
 </style>

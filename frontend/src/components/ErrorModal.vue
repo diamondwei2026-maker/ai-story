@@ -10,19 +10,21 @@
       centered
       width="420px"
     >
-      <div style="text-align: center; padding: 16px 0;">
-        <p style="font-size: 14px; color: var(--color-text-secondary); margin-bottom: 20px;">
-          {{ message }}
-        </p>
-        <a-button
-          type="primary"
-          data-testid="retry-button"
-          @click="emit('retry')"
-          block
-        >
-          {{ retryLabel }}
-        </a-button>
-      </div>
+      <a-result
+        status="error"
+        title="服务暂不可用"
+        :sub-title="message"
+      >
+        <template #extra>
+          <a-button
+            type="primary"
+            data-testid="retry-button"
+            @click="emit('retry')"
+          >
+            {{ retryLabel }}
+          </a-button>
+        </template>
+      </a-result>
     </a-modal>
   </div>
 </template>

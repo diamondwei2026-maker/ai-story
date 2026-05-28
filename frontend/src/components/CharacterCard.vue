@@ -33,29 +33,37 @@
         class="character-card__char"
       >
         <div class="character-card__char-header">
-          <a-tag data-testid="char-role-label" color="teal">{{ char.label }}</a-tag>
-          <span v-if="char.name" class="character-card__char-name">{{ char.name }}</span>
+          <a-avatar
+            :size="48"
+            :style="{ backgroundColor: avatarColor(char.role), flexShrink: 0 }"
+            class="serif-accent"
+          >
+            {{ char.name ? char.name.charAt(0) : char.label.charAt(0) }}
+          </a-avatar>
+          <div>
+            <a-tag data-testid="char-role-label" :color="roleColor(char.role)">
+              {{ char.label }}
+            </a-tag>
+            <span v-if="char.name" class="character-card__char-name">{{ char.name }}</span>
+          </div>
         </div>
 
         <template v-if="!editing">
-          <div class="character-card__arcs">
-            <div data-testid="arc-desire" class="character-card__arc">
-              <span class="character-card__arc-label">欲望</span>
-              <p class="character-card__arc-text">{{ char.desire || '—' }}</p>
-            </div>
-            <div data-testid="arc-motivation" class="character-card__arc">
-              <span class="character-card__arc-label">动机</span>
-              <p class="character-card__arc-text">{{ char.motivation || '—' }}</p>
-            </div>
-            <div data-testid="arc-ending" class="character-card__arc">
-              <span class="character-card__arc-label">结局</span>
-              <p class="character-card__arc-text">{{ char.ending || '—' }}</p>
-            </div>
-          </div>
+          <a-descriptions :column="1" size="small" bordered class="character-card__arcs">
+            <a-descriptions-item label="欲望">
+              {{ char.desire || '—' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="动机">
+              {{ char.motivation || '—' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="结局">
+              {{ char.ending || '—' }}
+            </a-descriptions-item>
+          </a-descriptions>
         </template>
 
         <template v-else>
-          <div class="character-card__arcs">
+          <div class="character-card__edit-arcs">
             <div class="character-card__arc">
               <span class="character-card__arc-label">欲望</span>
               <a-textarea
@@ -106,6 +114,18 @@ const ROLE_CONFIGS: { role: string; label: string; sectionHeader: string }[] = [
   { role: 'supporting', label: '重要配角', sectionHeader: '重要配角' },
 ];
 
+const ROLE_COLORS: Record<string, string> = {
+  protagonist: '#0d9488',
+  villain: '#e11d48',
+  supporting: '#6366f1',
+};
+
+const TAG_COLORS: Record<string, string> = {
+  protagonist: 'teal',
+  villain: 'red',
+  supporting: 'purple',
+};
+
 const props = defineProps<{
   content?: string;
 }>();
@@ -125,6 +145,14 @@ function parseCharacterData(text: string): CharacterData {
     motivation: extract('动机'),
     ending: extract('结局'),
   };
+}
+
+function avatarColor(role: string): string {
+  return ROLE_COLORS[role] ?? '#64748b';
+}
+
+function roleColor(role: string): string {
+  return TAG_COLORS[role] ?? 'default';
 }
 
 const parsed = computed(() => parseSections(props.content ?? ''));
@@ -177,51 +205,50 @@ function save() {
 
 <style scoped>
 .character-card__char {
-  padding: 12px;
+  padding: var(--space-md);
   border: 1px solid var(--color-border-light);
-  border-radius: 4px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  background: var(--color-surface-warm);
 }
 
 .character-card__char-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 .character-card__char-name {
+  display: block;
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
+  margin-top: 4px;
 }
 
 .character-card__arcs {
+  margin-top: var(--space-sm);
+}
+
+.character-card__edit-arcs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .character-card__arc {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .character-card__arc-label {
   font-size: 12px;
   color: var(--color-primary);
-  min-width: 32px;
+  min-width: 60px;
   flex-shrink: 0;
-  padding-top: 2px;
+  padding-top: 6px;
   font-weight: 500;
-}
-
-.character-card__arc-text {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  margin: 0;
-  flex: 1;
 }
 </style>

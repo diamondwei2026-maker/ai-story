@@ -46,11 +46,28 @@ const severityLabels: Record<string, string> = {
   MEDIUM: '中影响',
   LOW: '低影响',
 };
+
+const severityColors: Record<string, string> = {
+  HIGH: 'red',
+  MEDIUM: 'orange',
+  LOW: 'blue',
+};
+
+const statusColors: Record<string, string> = {
+  FIXED: 'success',
+  SKIPPED: 'default',
+  DEFERRED: 'warning',
+};
+
+const statusLabels: Record<string, string> = {
+  FIXED: '已修复',
+  SKIPPED: '已跳过',
+  DEFERRED: '已推迟',
+};
 </script>
 
 <template>
   <div class="change-analysis-panel" data-testid="change-analysis-panel">
-    <!-- Loading indicator -->
     <div
       v-if="loading"
       data-testid="analysis-loading-indicator"
@@ -59,7 +76,6 @@ const severityLabels: Record<string, string> = {
       分析中...
     </div>
 
-    <!-- Empty state -->
     <div
       v-if="!loading && isEmpty"
       data-testid="analysis-empty"
@@ -68,7 +84,6 @@ const severityLabels: Record<string, string> = {
       无受影响的章节
     </div>
 
-    <!-- Severity groups -->
     <div
       v-for="group in severityGroups"
       :key="group.severity"
@@ -76,7 +91,9 @@ const severityLabels: Record<string, string> = {
       class="severity-group"
     >
       <h4 class="severity-group__title">
-        {{ severityLabels[group.severity] ?? group.severity }}
+        <a-tag :color="severityColors[group.severity]">
+          {{ severityLabels[group.severity] ?? group.severity }}
+        </a-tag>
       </h4>
 
       <div
@@ -89,50 +106,43 @@ const severityLabels: Record<string, string> = {
             第 {{ item.chapterNumber }} 章
           </span>
           <span class="severity-group__item-reason">{{ item.reason }}</span>
-          <span
+          <a-tag
             v-if="item.status !== 'PENDING'"
             :data-testid="`status-badge-${item.chapterNumber}`"
+            :color="statusColors[item.status] ?? 'default'"
             class="severity-group__item-status"
-            :class="`severity-group__item-status--${item.status.toLowerCase()}`"
           >
-            {{ item.status }}
-          </span>
+            {{ statusLabels[item.status] ?? item.status }}
+          </a-tag>
         </div>
 
         <div class="severity-group__item-actions">
-          <span data-testid="action-apply-fix">
-            <button
-              :data-testid="`action-apply-fix-${item.chapterNumber}`"
-              class="change-analysis-panel__btn change-analysis-panel__btn--primary"
-              :disabled="loading"
-              @click="emit('apply-fix', item.chapterNumber)"
-            >
-              应用修复
-            </button>
-          </span>
-          <span data-testid="action-skip">
-            <button
-              :data-testid="`action-skip-${item.chapterNumber}`"
-              class="change-analysis-panel__btn"
-              :disabled="loading"
-              @click="emit('skip', item.chapterNumber)"
-            >
-              跳过
-            </button>
-          </span>
-          <span
-            v-if="item.severity !== 'HIGH'"
-            data-testid="action-defer"
+          <a-button
+            :data-testid="`action-apply-fix-${item.chapterNumber}`"
+            type="primary"
+            size="small"
+            :disabled="loading"
+            @click="emit('apply-fix', item.chapterNumber)"
           >
-            <button
-              :data-testid="`action-defer-${item.chapterNumber}`"
-              class="change-analysis-panel__btn"
-              :disabled="loading"
-              @click="emit('defer', item.chapterNumber)"
-            >
-              推迟
-            </button>
-          </span>
+            应用修复
+          </a-button>
+          <a-button
+            :data-testid="`action-skip-${item.chapterNumber}`"
+            size="small"
+            :disabled="loading"
+            @click="emit('skip', item.chapterNumber)"
+          >
+            跳过
+          </a-button>
+          <a-button
+            v-if="item.severity !== 'HIGH'"
+            :data-testid="`action-defer-${item.chapterNumber}`"
+            size="small"
+            :disabled="loading"
+            @click="emit('defer', item.chapterNumber)"
+          >
+            推迟
+          </a-button>
         </div>
       </div>
     </div>
@@ -140,32 +150,28 @@ const severityLabels: Record<string, string> = {
 </template>
 
 <style scoped>
-
 .change-analysis-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .change-analysis-panel__loading,
 .change-analysis-panel__empty {
   text-align: center;
   color: var(--color-text-secondary);
-  padding: 12px;
+  padding: var(--space-sm);
   font-size: 13px;
 }
 
 .severity-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .severity-group__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-sm) 0;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--color-border);
 }
@@ -174,7 +180,7 @@ const severityLabels: Record<string, string> = {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -185,7 +191,7 @@ const severityLabels: Record<string, string> = {
 .severity-group__item-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
   flex: 1;
 }
 
@@ -203,59 +209,12 @@ const severityLabels: Record<string, string> = {
 
 .severity-group__item-status {
   font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 3px;
   white-space: nowrap;
-}
-
-.severity-group__item-status--fixed {
-  background: #e6f7e6;
-  color: #2d7d2d;
-}
-
-.severity-group__item-status--skipped {
-  background: #f0f0f0;
-  color: #666;
-}
-
-.severity-group__item-status--deferred {
-  background: #fff4e6;
-  color: #b8860b;
 }
 
 .severity-group__item-actions {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
-}
-
-.change-analysis-panel__btn {
-  padding: 4px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  background: #fff;
-  color: var(--color-text-primary);
-  transition: background-color 0.2s;
-}
-
-.change-analysis-panel__btn:hover:not(:disabled) {
-  background: var(--color-bg);
-}
-
-.change-analysis-panel__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.change-analysis-panel__btn--primary {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.change-analysis-panel__btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-dark);
 }
 </style>

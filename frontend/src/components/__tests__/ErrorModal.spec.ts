@@ -8,7 +8,7 @@ describe('ErrorModal', () => {
   };
 
   it('is visible when the visible prop is true', async () => {
-    const wrapper = await mountModal({ visible: true, message: 'AI 服务暂时不可用，请稍后重试' });
+    const wrapper = await mountModal({ visible: true, message: 'AI 服务暂时不可用，请稍后重试。' });
 
     const modal = wrapper.find('[data-testid="error-modal"]');
     expect(modal.exists()).toBe(true);
@@ -27,7 +27,7 @@ describe('ErrorModal', () => {
   });
 
   it('displays the provided error message', async () => {
-    const message = 'AI 服务暂时不可用，请稍后重试';
+    const message = 'AI 服务暂时不可用，请稍后重试。';
     const wrapper = await mountModal({ visible: true, message });
 
     expect(wrapper.text()).toContain(message);
@@ -39,7 +39,7 @@ describe('ErrorModal', () => {
     expect(wrapper.text()).toContain('AI 服务暂时不可用');
   });
 
-  it('renders a "手动重试" button', async () => {
+  it('renders a "Retry" button', async () => {
     const wrapper = await mountModal({ visible: true });
 
     const retryBtn = wrapper.find('[data-testid="retry-button"]');

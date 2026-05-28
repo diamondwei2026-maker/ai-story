@@ -21,15 +21,16 @@
     </template>
 
     <template v-if="!editing">
-      <div
-        v-for="dim in dimensions"
-        :key="dim.key"
-        :data-testid="`dimension-${dim.key}`"
-        class="world-builder__dimension"
-      >
-        <h4 class="edit-card__section-label">{{ dim.label }}</h4>
-        <p class="edit-card__section-text">{{ dim.value }}</p>
-      </div>
+      <a-collapse v-model:activeKey="activePanels">
+        <a-collapse-panel
+          v-for="dim in dimensions"
+          :key="dim.key"
+          :header="dim.label"
+          :data-testid="`dimension-${dim.key}`"
+        >
+          <p class="world-builder__text body-text">{{ dim.value || '尚未生成。' }}</p>
+        </a-collapse-panel>
+      </a-collapse>
     </template>
 
     <template v-else>
@@ -39,7 +40,7 @@
         :data-testid="`dimension-${dim.key}`"
         class="world-builder__dimension"
       >
-        <h4 class="edit-card__section-label">{{ dim.label }}</h4>
+        <h4 class="world-builder__label">{{ dim.label }}</h4>
         <a-textarea
           v-model:value="edits[dim.key]"
           :rows="4"
@@ -72,6 +73,7 @@ const props = defineProps<{
 }>();
 
 const editing = ref(false);
+const activePanels = ref<string[]>(DIMENSIONS.map((d) => d.key));
 const savedEdits = ref<Record<string, string>>({});
 
 const parsed = computed(() => parseSections(props.content ?? ''));
@@ -102,21 +104,19 @@ function save() {
 
 <style scoped>
 .world-builder__dimension {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
-.edit-card__section-label {
+.world-builder__label {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0 0 4px 0;
 }
 
-.edit-card__section-text {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
+.world-builder__text {
   margin: 0;
+  color: var(--color-text-secondary);
   white-space: pre-wrap;
 }
 </style>

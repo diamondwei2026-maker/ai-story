@@ -1,6 +1,6 @@
 <template>
   <div data-testid="setting-view" class="setting-view">
-    <h2 data-testid="setting-title" class="setting-view__title">设定集</h2>
+    <h2 data-testid="setting-title" class="setting-view__title section-title">设定集</h2>
 
     <a-alert
       v-if="reviewAnnotations"
@@ -32,32 +32,41 @@
           size="small"
           @click="handleGenerate"
         >
-          重试
+          Retry
         </a-button>
       </template>
     </a-alert>
 
     <!-- Generate button (when no setting and not loading) -->
-    <div
+    <EmptyState
       v-if="!settingData && !loading"
-      class="setting-view__empty"
+      description="还没有设定，AI将基于已确认的灵感创建设定集"
     >
-      <p class="setting-view__empty-text">点击生成按钮，AI 将基于灵感创建设定集</p>
-      <a-button
-        type="primary"
-        data-testid="generate-setting-btn"
-        :loading="loading"
-        @click="handleGenerate"
-      >
-        生成设定
-      </a-button>
-    </div>
+      <template #action>
+        <a-button
+          type="primary"
+          data-testid="generate-setting-btn"
+          :loading="loading"
+          @click="handleGenerate"
+        >
+          生成设定
+        </a-button>
+      </template>
+    </EmptyState>
 
     <!-- Setting content -->
     <template v-if="settingData && !loading">
-      <WorldBuilder :content="settingData.output" />
-      <CharacterCard :content="settingData.output" />
-      <RelationGraph :content="settingData.output" />
+      <a-tabs v-model:activeKey="activeTab" type="card" size="large" class="setting-view__tabs">
+        <a-tab-pane key="world" tab="世界观">
+          <WorldBuilder :content="settingData.output" />
+        </a-tab-pane>
+        <a-tab-pane key="characters" tab="角色">
+          <CharacterCard :content="settingData.output" />
+        </a-tab-pane>
+        <a-tab-pane key="relationships" tab="关系">
+          <RelationGraph :content="settingData.output" />
+        </a-tab-pane>
+      </a-tabs>
 
       <div
         v-if="!isConfirmed"
@@ -91,16 +100,20 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
 import type { StepDataResponse } from '@/api/common';
 import WorldBuilder from '@/components/WorldBuilder.vue';
 import CharacterCard from '@/components/CharacterCard.vue';
 import RelationGraph from '@/components/RelationGraph.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const props = defineProps<{
   projectId: string;
 }>();
+
+const activeTab = ref('world');
 
 const {
   data: settingData,
@@ -127,38 +140,29 @@ const {
 
 <style scoped>
 .setting-view {
-  padding: 16px 0;
+  padding: var(--space-md) 0;
 }
 
 .setting-view__title {
-  font-size: 20px;
-  color: var(--color-text-primary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .setting-view__loading {
   text-align: center;
-  padding: 32px;
+  padding: var(--space-xl);
 }
 
 .setting-view__error {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
-.setting-view__empty {
-  text-align: center;
-  padding: 48px 16px;
-}
-
-.setting-view__empty-text {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  margin-bottom: 20px;
+.setting-view__tabs {
+  margin-bottom: var(--space-lg);
 }
 
 .setting-view__actions {
   text-align: center;
-  padding: 24px 0;
+  padding: var(--space-lg) 0;
   display: flex;
   gap: 12px;
   justify-content: center;

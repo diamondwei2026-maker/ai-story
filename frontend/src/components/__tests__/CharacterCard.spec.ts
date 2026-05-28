@@ -80,13 +80,14 @@ describe('CharacterCard', () => {
       expect(villain.text()).toContain('魂飞魄散');
     });
 
-    it('shows arc labels with data-testid per arc', async () => {
+    it('shows arc labels per arc', async () => {
       const wrapper = await mountComponent({ content: CHARACTER_OUTPUT });
 
       const protagonist = wrapper.find('[data-testid="char-protagonist"]');
-      expect(protagonist.find('[data-testid="arc-desire"]').exists()).toBe(true);
-      expect(protagonist.find('[data-testid="arc-motivation"]').exists()).toBe(true);
-      expect(protagonist.find('[data-testid="arc-ending"]').exists()).toBe(true);
+      // Arcs rendered via <a-descriptions>, check text content
+      expect(protagonist.text()).toContain('欲望');
+      expect(protagonist.text()).toContain('动机');
+      expect(protagonist.text()).toContain('结局');
     });
   });
 
@@ -146,9 +147,9 @@ describe('CharacterCard', () => {
       const protagonist = wrapper.find('[data-testid="char-protagonist"]');
       expect(protagonist.text()).toContain('无名');
       // Missing arcs should still render labels
-      expect(protagonist.find('[data-testid="arc-desire"]').exists()).toBe(true);
-      expect(protagonist.find('[data-testid="arc-motivation"]').exists()).toBe(true);
-      expect(protagonist.find('[data-testid="arc-ending"]').exists()).toBe(true);
+      expect(protagonist.text()).toContain('欲望');
+      expect(protagonist.text()).toContain('动机');
+      expect(protagonist.text()).toContain('结局');
     });
 
     it('handles only protagonist without villain or supporting', async () => {

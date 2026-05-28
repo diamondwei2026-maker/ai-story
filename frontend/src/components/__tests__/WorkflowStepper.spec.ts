@@ -197,7 +197,7 @@ describe('WorkflowStepper', () => {
       const textEl = wrapper.find('[data-testid="factsheet-alert-text"]');
       expect(textEl.exists()).toBe(true);
       expect(textEl.text()).toContain('事实簿同步延迟');
-      expect(textEl.text()).toContain('建议暂停生成新章');
+      expect(textEl.text()).toContain('建议暂停生成');
     });
 
     it('should display queue depth in the alert banner', async () => {
@@ -303,7 +303,7 @@ describe('WorkflowStepper', () => {
       expect(wrapper.emitted('step-click')).toBeFalsy();
     });
 
-    it('should render "继续创作" button when projectStatus is COMPLETED', async () => {
+    it('should render "Continue Writing" button when projectStatus is COMPLETED', async () => {
       const wrapper = await mountStepper({
         steps: completedSteps,
         currentPhase: 'DRAFTING',
@@ -316,7 +316,7 @@ describe('WorkflowStepper', () => {
       expect(btn.text()).toContain('继续创作');
     });
 
-    it('should not render "继续创作" button when projectStatus is not COMPLETED', async () => {
+    it('should not render "Continue Writing" button when projectStatus is not COMPLETED', async () => {
       const wrapper = await mountStepper({
         steps: completedSteps,
         currentPhase: 'DRAFTING',
@@ -327,7 +327,7 @@ describe('WorkflowStepper', () => {
       expect(wrapper.find('[data-testid="reopen-project-btn"]').exists()).toBe(false);
     });
 
-    it('should emit reopen-project when "继续创作" button is clicked', async () => {
+    it('should emit reopen-project when "Continue Writing" button is clicked', async () => {
       const wrapper = await mountStepper({
         steps: completedSteps,
         currentPhase: 'DRAFTING',

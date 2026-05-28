@@ -46,6 +46,32 @@
   /* ===== Transitions ===== */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
+
+  /* ===== Typography ===== */
+  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Georgia', serif;
+  --font-size-display: 32px;
+  --font-size-heading: 24px;
+  --font-size-section: 18px;
+  --font-size-body: 15px;
+  --font-size-caption: 12px;
+
+  /* ===== Editorial Surface ===== */
+  --color-surface-warm: #fefcf8;
+  --color-ink: #1a1a2e;
+  --color-rule: #d1cbc0;
+
+  /* ===== Spacing Scale ===== */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* ===== Transition Curves ===== */
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-custom: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ===== Amber accent button overrides for ant-design-vue ===== */

@@ -14,10 +14,14 @@
         <template v-if="originalVerdict"> · {{ originalVerdict }}</template>
       </div>
 
-      <div data-testid="risk-warning" class="dispute-modal__warning">
-        <p>审核结论维持不变。选择强制标记 DISPUTED 将跳过本次审核要求，自行承担合规风险。</p>
-        <p>确认后此章节将标记为 DISPUTED，下一章将解锁。此操作不可撤销。</p>
-      </div>
+      <a-alert
+        data-testid="risk-warning"
+        type="error"
+        message="合规风险警告"
+        description="审核结论维持不变。选择强制标记 DISPUTED 将跳过本次审核要求，自行承担合规风险。确认后此章节将标记为 DISPUTED，下一章将解锁。此操作不可撤销。"
+        banner
+        class="dispute-modal__warning"
+      />
 
       <template #footer>
         <a-button data-testid="dispute-cancel-btn" @click="emit('cancel')">
@@ -53,25 +57,10 @@ const emit = defineEmits<{
 .dispute-modal__info {
   font-size: 13px;
   color: var(--color-text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 .dispute-modal__warning {
-  font-size: 13px;
-  line-height: 1.7;
-  color: #a71d2a;
-  padding: 12px 14px;
-  background: #fef5f5;
-  border-radius: 6px;
-  border-left: 4px solid #a71d2a;
-  margin-bottom: 8px;
-}
-
-.dispute-modal__warning p {
-  margin: 0 0 8px 0;
-}
-
-.dispute-modal__warning p:last-child {
-  margin-bottom: 0;
+  margin-bottom: var(--space-sm);
 }
 </style>

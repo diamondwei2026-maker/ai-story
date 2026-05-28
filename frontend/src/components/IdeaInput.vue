@@ -1,13 +1,14 @@
 <template>
   <div data-testid="idea-input" class="idea-input">
-    <h3 data-testid="idea-input-title" class="idea-input__title">输入你的创意灵感</h3>
+    <h3 data-testid="idea-input-title" class="idea-input__title subsection-title">输入你的创意灵感</h3>
     <a-textarea
       data-testid="idea-textarea"
       :value="modelValue"
       :disabled="disabled"
       :placeholder="placeholder || defaultPlaceholder"
-      :rows="5"
+      :rows="8"
       show-count
+      :maxlength="2000"
       @update:value="$emit('update:modelValue', $event)"
     />
   </div>
@@ -24,20 +25,18 @@ defineEmits<{
   'update:modelValue': [value: string];
 }>();
 
-const defaultPlaceholder = '输入你的小说创意，例如：一个医生重生到星际时代的故事...';
+const defaultPlaceholder = '描述你的故事创意，例如：一个重生到星际时代的医生...';
 </script>
 
 <style scoped>
 .idea-input {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 24px;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
 }
 
 .idea-input__title {
-  font-size: 18px;
-  color: var(--color-text-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-sm) 0;
 }
 </style>

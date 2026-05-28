@@ -17,8 +17,12 @@ function barHeight(hookCount: number): string {
 </script>
 
 <template>
-  <div data-testid="hook-density-chart" class="chart-container">
-    <div v-if="beats.length === 0" data-testid="hook-density-empty">
+  <a-card data-testid="hook-density-chart" title="钩子密度分布" size="small">
+    <template #extra>
+      <a-tag color="teal">R1 阈值: {{ threshold }}</a-tag>
+    </template>
+
+    <div v-if="beats.length === 0" data-testid="hook-density-empty" class="chart-empty">
       暂无数据
     </div>
     <template v-else>
@@ -54,40 +58,42 @@ function barHeight(hookCount: number): string {
         data-testid="hook-density-threshold"
         class="threshold-line"
         :style="{ bottom: barHeight(threshold) }"
-      >
-        <span class="threshold-label">R1 阈值 ({{ threshold }})</span>
-      </div>
+      />
     </template>
-  </div>
+  </a-card>
 </template>
 
 <style scoped>
-.chart-container {
-  padding: 16px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 8px;
-  background: #fff;
-  position: relative;
+.chart-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-lg);
+  font-size: 13px;
 }
+
 .chart-area {
   display: flex;
   height: 200px;
   align-items: flex-end;
   gap: 2px;
+  position: relative;
 }
+
 .y-axis {
   display: flex;
   flex-direction: column-reverse;
   justify-content: space-between;
   height: 100%;
-  padding-right: 8px;
+  padding-right: var(--space-sm);
   min-width: 24px;
 }
+
 .y-tick {
   font-size: 11px;
   color: var(--color-text-secondary);
   text-align: right;
 }
+
 .bars-area {
   display: flex;
   align-items: flex-end;
@@ -95,6 +101,7 @@ function barHeight(hookCount: number): string {
   height: 100%;
   flex: 1;
 }
+
 .bar-col {
   flex: 1;
   display: flex;
@@ -103,36 +110,34 @@ function barHeight(hookCount: number): string {
   height: 100%;
   justify-content: flex-end;
 }
+
 .bar-col > div:first-child {
   width: 100%;
   max-width: 48px;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   min-height: 4px;
   transition: height 0.3s;
 }
+
 .bar-normal {
   background: var(--color-bg-tertiary);
 }
+
 .bar-high {
   background: var(--color-primary);
 }
+
 .bar-label {
   font-size: 10px;
   color: var(--color-text-secondary);
   margin-top: 4px;
   white-space: nowrap;
 }
+
 .threshold-line {
   position: absolute;
-  left: 48px;
+  left: 40px;
   right: 8px;
   border-top: 1px dashed var(--color-primary);
-}
-.threshold-label {
-  font-size: 10px;
-  color: var(--color-primary-dark);
-  position: absolute;
-  top: -14px;
-  right: 0;
 }
 </style>

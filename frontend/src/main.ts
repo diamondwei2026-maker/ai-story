@@ -4,6 +4,7 @@ import Antd from 'ant-design-vue';
 import App from './App.vue';
 import router from './router';
 import './styles/css-variables.css';
+import './styles/typography.css';
 import 'ant-design-vue/dist/reset.css';
 
 const app = createApp(App);

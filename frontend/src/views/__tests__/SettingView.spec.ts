@@ -137,7 +137,7 @@ describe('SettingView', () => {
       expect(worldBuilder.exists()).toBe(true);
     });
 
-    it('displays CharacterCard after successful generation', async () => {
+    it('displays CharacterCard after switching to Characters tab', async () => {
       mockGetSetting.mockResolvedValue(null);
       mockGenerateSetting.mockResolvedValue({
         id: 'step-1',
@@ -156,6 +156,14 @@ describe('SettingView', () => {
       await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
+
+      // Switch to Characters tab
+      const tabs = wrapper.findAll('.ant-tabs-tab');
+      const charactersTab = tabs.find(el => el.text() === '角色');
+      if (charactersTab) {
+        await charactersTab.trigger('click');
+        await wrapper.vm.$nextTick();
+      }
 
       const characterCard = wrapper.find('[data-testid="character-card"]');
       expect(characterCard.exists()).toBe(true);

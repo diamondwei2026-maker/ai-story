@@ -14,9 +14,13 @@
         <template v-if="chapterTitle"> · {{ chapterTitle }}</template>
       </p>
 
-      <div data-testid="appeal-once-notice" class="appeal-modal__notice">
-        上诉仅一次机会。请详细说明你的异议理由。
-      </div>
+      <a-alert
+        data-testid="appeal-once-notice"
+        type="warning"
+        message="上诉仅一次机会。请详细说明你的异议理由。"
+        banner
+        class="appeal-modal__notice"
+      />
 
       <a-textarea
         v-model:value="reason"
@@ -78,16 +82,10 @@ function handleSubmit() {
 .appeal-modal__verdict-info {
   font-size: 13px;
   color: var(--color-text-secondary);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--space-sm) 0;
 }
 
 .appeal-modal__notice {
-  font-size: 12px;
-  color: #b8860b;
-  margin-bottom: 12px;
-  padding: 6px 10px;
-  background: #fff9f0;
-  border-radius: 4px;
-  border-left: 3px solid #b8860b;
+  margin-bottom: var(--space-sm);
 }
 </style>
