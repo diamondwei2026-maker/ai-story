@@ -427,7 +427,7 @@ describe('IdeaView', () => {
   });
 
   describe('reject idea flow', () => {
-    it('shows reject button after generation', async () => {
+    it('shows regenerate button after generation', async () => {
       mockGetIdea.mockResolvedValue(null);
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
@@ -443,21 +443,16 @@ describe('IdeaView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      expect(wrapper.find('[data-testid="reject-idea-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="regenerate-sellpoints-btn"]').exists()).toBe(true);
     });
 
-    it('calls rejectIdea API on reject click', async () => {
+    it('regenerates via generateIdea when clicking regenerate without feedback', async () => {
       mockGetIdea.mockResolvedValue(null);
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
         review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
       });
-      mockRejectIdea.mockResolvedValue({
-        id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
-        status: 'REJECTED',
-      });
-
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
@@ -466,11 +461,15 @@ describe('IdeaView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      await wrapper.find('[data-testid="reject-idea-btn"]').trigger('click');
+      mockGenerateIdea.mockClear();
+      await wrapper.find('[data-testid="regenerate-sellpoints-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      expect(mockRejectIdea).toHaveBeenCalledWith('test-project-1');
+      expect(mockGenerateIdea).toHaveBeenCalledWith(
+        'test-project-1',
+        { idea: '', feedback: '' },
+      );
     });
   });
 

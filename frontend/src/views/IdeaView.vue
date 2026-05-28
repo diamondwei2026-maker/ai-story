@@ -77,13 +77,6 @@
         class="idea-view__actions"
       >
         <button
-          data-testid="reject-idea-btn"
-          class="idea-view__reject-btn"
-          @click="handleReject"
-        >
-          驳回，重新生成
-        </button>
-        <button
           v-if="summaryGenerated"
           data-testid="confirm-idea-btn"
           class="idea-view__confirm-btn"

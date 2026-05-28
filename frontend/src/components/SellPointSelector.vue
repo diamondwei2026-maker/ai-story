@@ -32,7 +32,7 @@
         :disabled="loading"
         @click="onRegenerate"
       >
-        不满意？反馈并重新生成
+        {{ localFeedback.trim() ? '不满意？反馈并重新生成' : '驳回，重新生成' }}
       </button>
     </div>
 

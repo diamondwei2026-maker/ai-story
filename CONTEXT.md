@@ -104,7 +104,7 @@
 
 ## 实施状态
 
-> 最后更新：2026-05-27（设计系统刷新：teal 绿/琥珀橙 健康积极配色 + 全局 CSS 变量 + Inter/Noto Sans SC 字体 + 构建修复：scoped import → main.ts 全局导入）
+> 最后更新：2026-05-28（IdeaView 按钮合并：SellPointSelector 反馈输入+重新生成 与 IdeaView "驳回" 合并为单按钮，根据 feedback 是否有内容动态切换文案和行为，消除冗余 rejectIdea 调用路径）
 
 | 模块 | 状态 | 已实现接口 | 备注 |
 |------|------|-----------|------|
