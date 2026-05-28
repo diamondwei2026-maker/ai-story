@@ -146,14 +146,7 @@ export class AIGatewayService {
     logDegradation: boolean,
   ): Promise<void> {
     try {
-      const stream = this.chatModel.stream(prompt);
-      for await (const chunk of stream) {
-        if (chunk.content) {
-          subscriber.next({ content: chunk.content, done: false });
-        }
-      }
-      subscriber.next({ content: '', done: true, modelUsed, degraded });
-      subscriber.complete();
+      await this.safeStreamIteration(subscriber, modelUsed, degraded, model, prompt);
     } catch (err) {
       const failureReason = err instanceof Error ? err.message : String(err);
       const fallback = this.getFallbackModel(model);
@@ -180,6 +173,38 @@ export class AIGatewayService {
       }
       this.handleBothModelsFailed(taskType, modelUsed, subscriber);
     }
+  }
+
+  private async safeStreamIteration(
+    subscriber: Subscriber<AIGenerateChunk>,
+    modelUsed: string,
+    degraded: boolean,
+    model: string,
+    prompt: string,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`AI stream timeout for model ${model}`));
+      }, 120000);
+
+      (async () => {
+        try {
+          const stream = this.chatModel.stream(prompt);
+          for await (const chunk of stream) {
+            if (chunk.content) {
+              subscriber.next({ content: chunk.content, done: false });
+            }
+          }
+          clearTimeout(timeout);
+          subscriber.next({ content: '', done: true, modelUsed, degraded });
+          subscriber.complete();
+          resolve();
+        } catch (err) {
+          clearTimeout(timeout);
+          reject(err);
+        }
+      })();
+    });
   }
 
   private handleBothModelsFailed(

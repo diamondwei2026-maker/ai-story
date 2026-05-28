@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { lastValueFrom, Observable } from 'rxjs';
 import { toArray } from 'rxjs/operators';
@@ -10,6 +10,7 @@ import {
   ReviewResult,
   AiMeta,
 } from './step.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { ProjectService } from '../project/project.service';
 import { ProjectStatus, StatusHistoryEntry } from '../project/project.entity';
 import {
@@ -35,15 +36,12 @@ const R1_STRUCTURAL_FIRST = 3;
 const R1_STRUCTURAL_LAST_OFFSET = 2;
 const R1_HOOK_THRESHOLD = 3;
 
-
 @Injectable()
 export class StepService {
-  private steps: Map<string, StepData> = new Map();
-  private beatsByProject: Map<string, BeatData[]> = new Map();
-  private chaptersByProject: Map<string, ChapterData[]> = new Map();
   private pausedChapterIds: Set<string> = new Set();
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly projectService: ProjectService,
     private readonly aiGateway: AIGatewayService,
     private readonly promptLoader: PromptTemplateLoaderService,
@@ -51,59 +49,53 @@ export class StepService {
     private readonly factsheetService: FactsheetService,
     private readonly reviewService: ReviewService,
   ) {
-    this.reviewService.setChapterStore(this.chaptersByProject);
+    // ReviewService now uses Prisma directly; no shared map needed
   }
 
   getFactsheet(projectId: string): { data: Record<string, unknown>; version: number } | null {
     return this.factsheetService.getFactsheet(projectId);
   }
 
-  forceSyncFactsheet(
+  async forceSyncFactsheet(
     projectId: string,
-  ): { mergedEntries: Record<string, unknown>; consumedCount: number } {
+  ): Promise<{ mergedEntries: Record<string, unknown>; consumedCount: number }> {
     return this.factsheetService.forceSyncFactsheet(projectId);
   }
+
+  // ─── SETTING Phase ──────────────────────────────────────────
 
   async generateSetting(
     projectId: string,
     opts: { idea?: string; currentContent?: string },
   ): Promise<StepData> {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    if (project.status !== 'SETTING') {
-      throw new BadRequestException('Project status must be SETTING');
-    }
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'SETTING') throw new BadRequestException('Project status must be SETTING');
 
-    const existing = this.getSettingByProjectId(projectId);
-    const step = existing ?? this.createPendingStep(projectId, 'SETTING');
+    const existing = await this.getSettingByProjectId(projectId);
+    const step = existing ?? (await this.createPendingStep(projectId, 'SETTING'));
 
     const idea = opts.idea ?? '';
     const currentContent = opts.currentContent ?? '';
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'setting-generation',
-      { idea, currentContent },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'setting-generation', { idea, currentContent });
 
     step.status = 'AI_GENERATING';
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.SETTING, prompt);
 
-    step.status = 'AWAITING_REVIEW';
-    step.output = output;
-    step.aiMeta = aiMeta;
-    step.input = currentContent
-      ? `${idea}\n\n--- 用户编辑内容 ---\n${currentContent}`
-      : idea;
-    step.review = {
-      powerSystemCheck: this.runPowerSystemCheck(output),
-      annotations: 'AI 生成内容，仅供参考',
-    };
-    step.version += 1;
-
-    this.steps.set(step.id, step);
-    return step;
+    const updated = await this.prisma.stepData.update({
+      where: { id: step.id },
+      data: {
+        status: 'AWAITING_REVIEW',
+        output,
+        input: currentContent ? `${idea}\n\n--- 用户编辑内容 ---\n${currentContent}` : idea,
+        review: {
+          powerSystemCheck: this.runPowerSystemCheck(output),
+          annotations: 'AI 生成内容，仅供参考',
+        } as any,
+        version: { increment: 1 },
+      },
+    });
+    return this.toStepData(updated);
   }
 
   async confirmSetting(projectId: string): Promise<StepData> {
@@ -114,20 +106,19 @@ export class StepService {
     return this.rejectPhase(projectId, 'SETTING', 'setting');
   }
 
-  getStepByProjectId(projectId: string, phaseType: PhaseType): StepData | null {
-    for (const step of this.steps.values()) {
-      if (step.projectId === projectId && step.phaseType === phaseType) {
-        return step;
-      }
-    }
-    return null;
+  async getStepByProjectId(projectId: string, phaseType: PhaseType): Promise<StepData | null> {
+    const doc = await this.prisma.stepData.findFirst({
+      where: { projectId, phaseType },
+      orderBy: { version: 'desc' },
+    });
+    return doc ? this.toStepData(doc) : null;
   }
 
-  getSettingByProjectId(projectId: string): StepData | null {
+  async getSettingByProjectId(projectId: string): Promise<StepData | null> {
     return this.getStepByProjectId(projectId, 'SETTING');
   }
 
-  getOutlineByProjectId(projectId: string): StepData | null {
+  async getOutlineByProjectId(projectId: string): Promise<StepData | null> {
     return this.getStepByProjectId(projectId, 'OUTLINE');
   }
 
@@ -137,80 +128,68 @@ export class StepService {
     projectId: string,
     opts: { idea?: string; feedback?: string },
   ): Promise<StepData> {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    if (project.status !== 'IDEA') {
-      throw new BadRequestException('Project status must be IDEA');
-    }
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'IDEA') throw new BadRequestException('Project status must be IDEA');
 
-    const existing = this.getIdeaByProjectId(projectId);
-    const step = existing ?? this.createPendingStep(projectId, 'IDEA');
+    const existing = await this.getIdeaByProjectId(projectId);
+    const step = existing ?? (await this.createPendingStep(projectId, 'IDEA'));
 
     const idea = opts.idea ?? '';
     const feedback = opts.feedback ?? '';
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'idea-generation',
-      { idea, feedback },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'idea-generation', { idea, feedback });
 
     step.status = 'AI_GENERATING';
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
-    step.status = 'AWAITING_REVIEW';
-    step.output = output;
-    step.aiMeta = aiMeta;
-    step.input = feedback
-      ? `idea: ${idea}\nfeedback: ${feedback}`
-      : idea;
-    step.review = {
-      complianceCheck: this.runPowerSystemCheck(output),
-      annotations: 'AI 生成内容，仅供参考',
-    };
-    step.version += 1;
-
-    this.steps.set(step.id, step);
-    return step;
+    const updated = await this.prisma.stepData.update({
+      where: { id: step.id },
+      data: {
+        status: 'AWAITING_REVIEW',
+        output,
+        input: feedback ? `idea: ${idea}\nfeedback: ${feedback}` : idea,
+        review: {
+          complianceCheck: this.runPowerSystemCheck(output),
+          annotations: 'AI 生成内容，仅供参考',
+        } as any,
+        version: { increment: 1 },
+      },
+    });
+    return this.toStepData(updated);
   }
 
   async generateIdeaSummary(
     projectId: string,
     opts: { selectedSellPoint?: number; customBrief?: string },
   ): Promise<StepData> {
-    const existing = this.getIdeaByProjectId(projectId);
-    if (!existing) {
-      throw new BadRequestException('No generated idea to generate summary for');
-    }
+    const existing = await this.getIdeaByProjectId(projectId);
+    if (!existing) throw new BadRequestException('No generated idea to generate summary for');
     if (opts.selectedSellPoint === undefined || opts.selectedSellPoint === null) {
       throw new BadRequestException('selectedSellPoint is required');
     }
 
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'idea-summary-generation',
-      {
-        sellPointContent: existing.output ?? '',
-        selectedSellPoint: String(opts.selectedSellPoint),
-        customBrief: opts.customBrief ?? '',
-      },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'idea-summary-generation', {
+      sellPointContent: existing.output ?? '',
+      selectedSellPoint: String(opts.selectedSellPoint),
+      customBrief: opts.customBrief ?? '',
+    });
 
-    existing.status = 'AI_GENERATING';
     const { content: summaryOutput } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
-    existing.status = 'AWAITING_REVIEW';
-    existing.output = (existing.output ?? '') + '\n\n' + summaryOutput;
-    existing.review = {
-      ...(existing.review as Record<string, unknown>),
-      selectedSellPoint: opts.selectedSellPoint,
-      summaryGenerated: true,
-    };
-    existing.version += 1;
-
-    this.steps.set(existing.id, existing);
-    return existing;
+    const updated = await this.prisma.stepData.update({
+      where: { id: existing.id },
+      data: {
+        status: 'AWAITING_REVIEW',
+        output: (existing.output ?? '') + '\n\n' + summaryOutput,
+        review: {
+          ...(existing.review as Record<string, unknown>),
+          selectedSellPoint: opts.selectedSellPoint,
+          summaryGenerated: true,
+        } as any,
+        version: { increment: 1 },
+      },
+    });
+    return this.toStepData(updated);
   }
 
   async confirmIdea(
@@ -218,6 +197,16 @@ export class StepService {
     opts: { selectedSellPoint: number; customBrief?: string },
   ): Promise<StepData> {
     const step = await this.confirmPhase(projectId, 'IDEA', 'SETTING', 'idea');
+    await this.prisma.stepData.update({
+      where: { id: step.id },
+      data: {
+        review: {
+          ...(step.review as Record<string, unknown>),
+          selectedSellPoint: opts.selectedSellPoint,
+          customBrief: opts.customBrief ?? null,
+        } as any,
+      },
+    });
     step.review = {
       ...(step.review as Record<string, unknown>),
       selectedSellPoint: opts.selectedSellPoint,
@@ -230,7 +219,7 @@ export class StepService {
     return this.rejectPhase(projectId, 'IDEA', 'idea');
   }
 
-  getIdeaByProjectId(projectId: string): StepData | null {
+  async getIdeaByProjectId(projectId: string): Promise<StepData | null> {
     return this.getStepByProjectId(projectId, 'IDEA');
   }
 
@@ -240,13 +229,9 @@ export class StepService {
     projectId: string,
     opts: { setting?: string; structure?: string; currentContent?: string },
   ): Promise<StepData> {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    if (project.status !== 'OUTLINE') {
-      throw new BadRequestException('Project status must be OUTLINE');
-    }
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'OUTLINE') throw new BadRequestException('Project status must be OUTLINE');
 
     const setting = opts.setting ?? '';
     const structure = opts.structure ?? 'three-act';
@@ -255,34 +240,32 @@ export class StepService {
     }
     const currentContent = opts.currentContent ?? '';
 
-    const existing = this.getOutlineByProjectId(projectId);
-    const step = existing ?? this.createPendingStep(projectId, 'OUTLINE');
+    const existing = await this.getOutlineByProjectId(projectId);
+    const step = existing ?? (await this.createPendingStep(projectId, 'OUTLINE'));
 
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'outline-generation',
-      { setting, structure, currentContent },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'outline-generation', { setting, structure, currentContent });
 
     step.status = 'AI_GENERATING';
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.OUTLINE, prompt);
 
-    step.status = 'AWAITING_REVIEW';
-    step.output = output;
-    step.aiMeta = aiMeta;
-    step.input = currentContent
-      ? `structure: ${structure}\nsetting: ${setting}\n\n--- 用户编辑内容 ---\n${currentContent}`
-      : `structure: ${structure}\nsetting: ${setting}`;
-    step.review = {
-      structurePacing: this.runPacingReview(output),
-      conflictReview: this.runConflictReview(output),
-      climaxReview: this.runClimaxReview(output),
-      annotations: 'AI 生成内容，仅供参考',
-    };
-    step.version += 1;
-
-    this.steps.set(step.id, step);
-    return step;
+    const updated = await this.prisma.stepData.update({
+      where: { id: step.id },
+      data: {
+        status: 'AWAITING_REVIEW',
+        output,
+        input: currentContent
+          ? `structure: ${structure}\nsetting: ${setting}\n\n--- 用户编辑内容 ---\n${currentContent}`
+          : `structure: ${structure}\nsetting: ${setting}`,
+        review: {
+          structurePacing: this.runPacingReview(output),
+          conflictReview: this.runConflictReview(output),
+          climaxReview: this.runClimaxReview(output),
+          annotations: 'AI 生成内容，仅供参考',
+        } as any,
+        version: { increment: 1 },
+      },
+    });
+    return this.toStepData(updated);
   }
 
   async confirmOutline(projectId: string): Promise<StepData> {
@@ -293,52 +276,44 @@ export class StepService {
     return this.rejectPhase(projectId, 'OUTLINE', 'outline');
   }
 
-  async switchStructure(
-    projectId: string,
-    newStructure: string,
-  ): Promise<StepData> {
-    const existing = this.getOutlineByProjectId(projectId);
-    if (!existing) {
-      throw new BadRequestException('No generated outline to switch');
-    }
-    if (existing.status === 'CONFIRMED') {
-      throw new BadRequestException('Outline already confirmed');
-    }
+  async switchStructure(projectId: string, newStructure: string): Promise<StepData> {
+    const existing = await this.getOutlineByProjectId(projectId);
+    if (!existing) throw new BadRequestException('No generated outline to switch');
+    if (existing.status === 'CONFIRMED') throw new BadRequestException('Outline already confirmed');
     if (!VALID_STRUCTURES.includes(newStructure as OutlineStructure)) {
       throw new BadRequestException('Invalid structure type');
     }
 
     const existingOutput = existing.output ?? '';
     const keyPoints = this.extractKeyPlotPoints(existingOutput);
-    existing.status = 'AI_GENERATING';
 
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'outline-generation',
-      {
-        setting: '',
-        structure: newStructure,
-        currentContent: existingOutput,
-        keyPoints: keyPoints || '（无已识别的情节点种子）',
-      },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'outline-generation', {
+      setting: '',
+      structure: newStructure,
+      currentContent: existingOutput,
+      keyPoints: keyPoints || '（无已识别的情节点种子）',
+    });
 
     const { content: output } = await this.collectAiOutput(TaskType.OUTLINE, prompt);
 
-    const review = {
+    const review: any = {
       structurePacing: this.runPacingReview(output),
       conflictReview: this.runConflictReview(output),
       climaxReview: this.runClimaxReview(output),
       annotations: 'AI 生成内容，仅供参考',
     };
 
-    existing.output = output;
-    existing.review = review;
-    existing.version += 1;
-    existing.status = 'AWAITING_REVIEW';
-    existing.input = `structure: ${newStructure}\nkeyPoints preserved: ${keyPoints}`;
-
-    return existing;
+    const updated = await this.prisma.stepData.update({
+      where: { id: existing.id },
+      data: {
+        output,
+        review,
+        input: `structure: ${newStructure}\nkeyPoints preserved: ${keyPoints}`,
+        status: 'AWAITING_REVIEW',
+        version: { increment: 1 },
+      },
+    });
+    return this.toStepData(updated);
   }
 
   // ─── BEATS Phase ──────────────────────────────────────────
@@ -347,55 +322,62 @@ export class StepService {
     projectId: string,
     opts: { outline?: string; currentContent?: string },
   ): Promise<BeatData[]> {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    if (project.status !== 'BEATS') {
-      throw new BadRequestException('Project status must be BEATS');
-    }
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'BEATS') throw new BadRequestException('Project status must be BEATS');
 
     const outline = opts.outline ?? '';
     const currentContent = opts.currentContent ?? '';
 
-    const existingStep = this.getStepByProjectId(projectId, 'BEATS');
-    const step = existingStep ?? this.createPendingStep(projectId, 'BEATS');
+    const existingStep = await this.getStepByProjectId(projectId, 'BEATS');
+    const step = existingStep ?? (await this.createPendingStep(projectId, 'BEATS'));
 
-    const prompt = this.promptLoader.renderTemplate(
-      'creation',
-      'beats-generation',
-      { outline, currentContent },
-    );
+    const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', { outline, currentContent });
 
-    step.status = 'AI_GENERATING';
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.BEATS, prompt);
 
-    step.aiMeta = aiMeta;
-    const existingBeats = this.beatsByProject.get(projectId) ?? [];
+    const existingBeats = await this.getBeatsByProjectId(projectId);
     const newBeats = this.parseBeatsFromOutput(output, projectId);
 
+    // Merge IDs for beats that match by chapter number
     if (existingBeats.length > 0) {
-      const idByChapter = new Map(
-        existingBeats.map((b) => [b.chapterNumber, b.id]),
-      );
+      const idByChapter = new Map(existingBeats.map((b) => [b.chapterNumber, b.id]));
       for (const beat of newBeats) {
         const reusedId = idByChapter.get(beat.chapterNumber);
         if (reusedId) beat.id = reusedId;
       }
     }
 
-    this.beatsByProject.set(projectId, newBeats);
+    // Replace all beats for this project in DB
+    await this.prisma.beat.deleteMany({ where: { projectId } });
+    for (const beat of newBeats) {
+      await this.prisma.beat.create({
+        data: {
+          id: beat.id,
+          projectId: beat.projectId,
+          chapterNumber: beat.chapterNumber,
+          plan: beat.plan as any,
+          targetWordCount: beat.targetWordCount,
+          hookCount: beat.hookCount,
+          isClimax: beat.isClimax,
+          useR1: beat.useR1,
+          status: beat.status,
+        },
+      });
+    }
 
-    step.status = 'AWAITING_REVIEW';
-    step.output = output;
-    step.input = currentContent
-      ? `outline: ${outline}\n\n--- 用户编辑内容 ---\n${currentContent}`
-      : `outline: ${outline}`;
-    step.review = {
-      beatCount: newBeats.length,
-      annotations: 'AI 生成内容，仅供参考',
-    };
-    step.version += 1;
+    await this.prisma.stepData.update({
+      where: { id: step.id },
+      data: {
+        status: 'AWAITING_REVIEW',
+        output,
+        input: currentContent
+          ? `outline: ${outline}\n\n--- 用户编辑内容 ---\n${currentContent}`
+          : `outline: ${outline}`,
+        review: { beatCount: newBeats.length, annotations: 'AI 生成内容，仅供参考' } as any,
+        version: { increment: 1 },
+      },
+    });
 
     return newBeats;
   }
@@ -403,18 +385,41 @@ export class StepService {
   async confirmBeats(projectId: string): Promise<StepData> {
     const step = await this.confirmPhase(projectId, 'BEATS', 'DRAFTING', 'beats');
 
-    const beats = this.beatsByProject.get(projectId) ?? [];
+    const beats = await this.getBeatsByProjectId(projectId);
     const totalChapters = beats.length;
 
     for (const beat of beats) {
-      beat.useR1 = this.shouldUseR1(beat, totalChapters);
+      const useR1 = this.shouldUseR1(beat, totalChapters);
+      await this.prisma.beat.update({
+        where: { id: beat.id },
+        data: { useR1, status: 'CONFIRMED' },
+      });
+      beat.useR1 = useR1;
       beat.status = 'CONFIRMED';
     }
 
-    this.chaptersByProject.set(
-      projectId,
-      beats.map((b) => this.createChapterFromBeat(b)),
-    );
+    // Create chapters from confirmed beats
+    const existingChapters = await this.getChaptersByProjectId(projectId);
+    if (existingChapters.length === 0) {
+      for (const beat of beats) {
+        await this.prisma.chapter.create({
+          data: {
+            id: randomUUID(),
+            projectId: beat.projectId,
+            chapterNumber: beat.chapterNumber,
+            title: null,
+            beatPlan: beat.plan as any,
+            targetWordCount: beat.targetWordCount,
+            content: null,
+            status: 'PENDING',
+            chapterFingerprint: null,
+            contextSummary: null,
+            reviewResult: null,
+            changeAnalysis: null,
+          },
+        });
+      }
+    }
 
     return step;
   }
@@ -423,56 +428,75 @@ export class StepService {
     return this.rejectPhase(projectId, 'BEATS', 'beats');
   }
 
-  getBeatsByProjectId(projectId: string): BeatData[] {
-    return this.beatsByProject.get(projectId) ?? [];
+  async getBeatsByProjectId(projectId: string): Promise<BeatData[]> {
+    const docs = await this.prisma.beat.findMany({
+      where: { projectId },
+      orderBy: { chapterNumber: 'asc' },
+    });
+    return docs.map((d) => this.toBeat(d));
   }
 
-  async updateBeatWordCount(
-    beatId: string,
-    wordCount: number,
-  ): Promise<BeatData> {
-    const beat = this.findBeatById(beatId);
+  async updateBeatWordCount(beatId: string, wordCount: number): Promise<BeatData> {
+    const beat = await this.findBeatById(beatId);
     if (!beat) throw new NotFoundException('Beat not found');
 
-    beat.targetWordCount = wordCount;
-    beat.status = 'STALE';
-    beat.updatedAt = new Date();
+    const updated = await this.prisma.beat.update({
+      where: { id: beatId },
+      data: { targetWordCount: wordCount, status: 'STALE' },
+    });
 
-    const chapter = this.findChapterForBeat(beat);
+    // Also update the chapter if it exists
+    const chapters = await this.getChaptersByProjectId(beat.projectId);
+    const chapter = chapters.find((c) => c.chapterNumber === beat.chapterNumber);
     if (chapter) {
-      chapter.targetWordCount = wordCount;
-      chapter.updatedAt = new Date();
+      await this.prisma.chapter.update({
+        where: { id: chapter.id },
+        data: { targetWordCount: wordCount },
+      });
     }
 
-    return beat;
+    return this.toBeat(updated);
   }
 
-  async updateBeatStructure(
-    beatId: string,
-    plan: Record<string, unknown>,
-  ): Promise<BeatData> {
-    const beat = this.findBeatById(beatId);
+  async updateBeatStructure(beatId: string, plan: Record<string, unknown>): Promise<BeatData> {
+    const beat = await this.findBeatById(beatId);
     if (!beat) throw new NotFoundException('Beat not found');
 
-    beat.plan = { ...beat.plan, ...plan };
-    if (plan.isClimax === true) beat.isClimax = true;
-    beat.hookCount = this.extractHookCount(beat.plan);
-    const totalChapters = (this.beatsByProject.get(beat.projectId) ?? []).length;
-    beat.useR1 = this.shouldUseR1(beat, totalChapters);
-    beat.status = 'STALE';
-    beat.updatedAt = new Date();
+    const mergedPlan = { ...beat.plan, ...plan };
+    const isClimax = plan.isClimax === true;
+    const hookCount = this.extractHookCount(mergedPlan);
+    const beats = await this.getBeatsByProjectId(beat.projectId);
+    const useR1 = this.shouldUseR1({ ...beat, plan: mergedPlan, hookCount, isClimax }, beats.length);
 
-    const chapter = this.findChapterForBeat(beat);
+    const updated = await this.prisma.beat.update({
+      where: { id: beatId },
+      data: {
+        plan: mergedPlan as any,
+        isClimax: isClimax || beat.isClimax,
+        hookCount,
+        useR1,
+        status: 'STALE',
+      },
+    });
+
+    const chapter = (await this.getChaptersByProjectId(beat.projectId))
+      .find((c) => c.chapterNumber === beat.chapterNumber);
     if (chapter) {
-      chapter.beatPlan = beat.plan;
-      chapter.updatedAt = new Date();
+      await this.prisma.chapter.update({
+        where: { id: chapter.id },
+        data: { beatPlan: mergedPlan as any },
+      });
     }
 
-    return beat;
+    return this.toBeat(updated);
   }
 
-  getChaptersByProjectId(projectId: string): ChapterData[] {
-    return this.chaptersByProject.get(projectId) ?? [];
+  async getChaptersByProjectId(projectId: string): Promise<ChapterData[]> {
+    const docs = await this.prisma.chapter.findMany({
+      where: { projectId },
+      orderBy: { chapterNumber: 'asc' },
+    });
+    return docs.map((d) => this.toChapter(d));
   }
 
   // ─── DRAFTING Phase: Chapter Generation ──────────────────────
@@ -480,33 +504,23 @@ export class StepService {
   async generateChapter(
     projectId: string,
     chapterId: string,
-    opts: {
-      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
-      feedback?: string;
-    },
+    opts: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-    if (project.status !== 'DRAFTING') {
-      throw new BadRequestException('Project status must be DRAFTING');
-    }
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.status !== 'DRAFTING') throw new BadRequestException('Project status must be DRAFTING');
 
-    const chapter = this.getChapterOrThrow(chapterId);
+    const chapter = await this.getChapterOrThrow(chapterId);
 
-    // Sequential lock: previous chapter must be COMPLETED or DISPUTED
-    const previous = this.findPreviousChapter(projectId, chapter.chapterNumber);
+    const previous = await this.findPreviousChapter(projectId, chapter.chapterNumber);
     if (previous && !['COMPLETED', 'DISPUTED'].includes(previous.status)) {
       throw new BadRequestException(
         `Previous chapter ${previous.chapterNumber} must be COMPLETED or DISPUTED before generating chapter ${chapter.chapterNumber}`,
       );
     }
 
-    // Step 1: SSE streaming content generation
-    chapter.status = 'DRAFT';
     const chResult = await this.collectAiOutput(
-      this.resolveChapterTaskType(chapter),
+      await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
         mode: opts.mode,
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
@@ -515,37 +529,36 @@ export class StepService {
         previousSummary: previous?.contextSummary ?? '',
       }),
     );
-    chapter.content = chResult.content;
 
-    // Steps 2–5: post-generation pipeline
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { content: chResult.content, status: 'DRAFT' },
+    });
+    chapter.content = chResult.content;
+    chapter.status = 'DRAFT';
+
     await this.runPostGenerationPipeline(chapter, projectId);
 
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { status: 'REVIEWING' },
+    });
     chapter.status = 'REVIEWING';
-    chapter.updatedAt = new Date();
     this.pausedChapterIds.delete(chapterId);
 
     return chapter;
   }
 
-  async confirmChapter(
-    projectId: string,
-    chapterId: string,
-  ): Promise<ChapterData> {
+  async confirmChapter(projectId: string, chapterId: string): Promise<ChapterData> {
     return this.transitionChapterStatus(chapterId, 'REVIEWING', 'COMPLETED');
   }
 
-  async disputeChapter(
-    projectId: string,
-    chapterId: string,
-  ): Promise<ChapterData> {
+  async disputeChapter(projectId: string, chapterId: string): Promise<ChapterData> {
     return this.transitionChapterStatus(chapterId, 'REVIEWING', 'DISPUTED');
   }
 
-  async pauseChapterGeneration(
-    projectId: string,
-    chapterId: string,
-  ): Promise<ChapterData> {
-    const chapter = this.getChapterOrThrow(chapterId);
+  async pauseChapterGeneration(projectId: string, chapterId: string): Promise<ChapterData> {
+    const chapter = await this.getChapterOrThrow(chapterId);
     if (chapter.status === 'PENDING' && !chapter.content) {
       throw new BadRequestException('No active generation to pause');
     }
@@ -558,16 +571,13 @@ export class StepService {
     chapterId: string,
     opts: { currentContent: string },
   ): Promise<ChapterData> {
-    const chapter = this.getChapterOrThrow(chapterId);
+    const chapter = await this.getChapterOrThrow(chapterId);
     if (!this.pausedChapterIds.has(chapterId)) {
       throw new BadRequestException('No paused generation to continue');
     }
 
-    chapter.status = 'DRAFT';
-    chapter.content = opts.currentContent;
-
     const continuation = await this.collectAiOutput(
-      this.resolveChapterTaskType(chapter),
+      await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
         mode: 'new-continue',
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
@@ -576,12 +586,21 @@ export class StepService {
       }),
     );
 
-    chapter.content = opts.currentContent + continuation.content;
+    const newContent = opts.currentContent + continuation.content;
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { content: newContent, status: 'DRAFT' },
+    });
+    chapter.content = newContent;
+    chapter.status = 'DRAFT';
 
     await this.runPostGenerationPipeline(chapter, projectId);
 
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { status: 'REVIEWING' },
+    });
     chapter.status = 'REVIEWING';
-    chapter.updatedAt = new Date();
     this.pausedChapterIds.delete(chapterId);
 
     return chapter;
@@ -590,15 +609,9 @@ export class StepService {
   async retryChapterGeneration(
     projectId: string,
     chapterId: string,
-    opts: {
-      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
-      feedback?: string;
-    },
+    opts: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
-    return this.generateChapter(projectId, chapterId, {
-      mode: opts.mode,
-      feedback: opts.feedback,
-    });
+    return this.generateChapter(projectId, chapterId, { mode: opts.mode, feedback: opts.feedback });
   }
 
   // ─── Review (delegated to ReviewService) ────────────────────────
@@ -619,44 +632,34 @@ export class StepService {
     return this.reviewService.getAvailableActions(verdict);
   }
 
-  async forceDisputeChapter(chapterId: string): Promise<ChapterData> {
+  async forceDisputeChapter(chapterId: string): Promise<any> {
     return this.reviewService.forceDisputeChapter(chapterId);
   }
 
   // ─── Private helpers for DRAFTING phase ──────────────────────
 
-  private getChapterOrThrow(chapterId: string): ChapterData {
-    const chapter = this.findChapterById(chapterId);
-    if (!chapter) {
-      throw new NotFoundException('Chapter not found');
-    }
+  private async getChapterOrThrow(chapterId: string): Promise<ChapterData> {
+    const chapter = await this.findChapterById(chapterId);
+    if (!chapter) throw new NotFoundException('Chapter not found');
     return chapter;
   }
 
-  private async runPostGenerationPipeline(
-    chapter: ChapterData,
-    projectId: string,
-  ): Promise<void> {
+  private async runPostGenerationPipeline(chapter: ChapterData, projectId: string): Promise<void> {
     // Step 2: Fingerprint extraction
-    const fpResult = await this.collectAiOutput(
-      TaskType.FINGERPRINT_EXTRACTION,
-      `Extract fingerprint for: ${chapter.content}`,
-    );
+    const fpResult = await this.collectAiOutput(TaskType.FINGERPRINT_EXTRACTION, `Extract fingerprint for: ${chapter.content}`);
+    await this.prisma.chapter.update({
+      where: { id: chapter.id },
+      data: { chapterFingerprint: fpResult.content },
+    });
     chapter.chapterFingerprint = fpResult.content;
 
-    // Step 3: FactSheet update with optimistic lock + compensation queue
-    const sheetUpdateResult = await this.collectAiOutput(
-      TaskType.FACTSHEET_UPDATE,
-      `Update FactSheet with: ${chapter.content}`,
-    );
-
+    // Step 3: FactSheet update
+    const sheetUpdateResult = await this.collectAiOutput(TaskType.FACTSHEET_UPDATE, `Update FactSheet with: ${chapter.content}`);
     let updateEntries: Record<string, unknown>;
     try {
       updateEntries = JSON.parse(sheetUpdateResult.content);
     } catch {
-      updateEntries = {
-        ['chapter_' + chapter.chapterNumber]: { annotation: sheetUpdateResult.content },
-      };
+      updateEntries = { ['chapter_' + chapter.chapterNumber]: { annotation: sheetUpdateResult.content } };
     }
 
     let written = false;
@@ -665,108 +668,88 @@ export class StepService {
       const merged = { ...current.data };
       Object.assign(merged, updateEntries);
 
-      if (this.factsheetService.casWriteFactsheet(projectId, merged, current.version)) {
+      if (await this.factsheetService.casWriteFactsheet(projectId, merged, current.version)) {
         written = true;
         break;
       }
     }
 
     if (written) {
-      this.factsheetService.applyCompensationQueue(projectId);
+      await this.factsheetService.applyCompensationQueue(projectId);
     } else {
-      this.factsheetCompensation.enqueue(
-        projectId,
-        chapter.id,
-        chapter.chapterNumber,
-        updateEntries,
-      );
+      await this.factsheetCompensation.enqueue(projectId, chapter.id, chapter.chapterNumber, updateEntries);
     }
 
     // Step 4: Independent review
-    const reviewResult = await this.collectAiOutput(
-      TaskType.INDEPENDENT_REVIEW,
-      `Review content: ${chapter.content}`,
-    );
-    chapter.reviewResult = {
+    const reviewResult = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, `Review content: ${chapter.content}`);
+    const reviewData: Record<string, unknown> = {
       passed: true,
       raw: reviewResult.content,
       reviewedAt: new Date().toISOString(),
     };
+    await this.prisma.chapter.update({
+      where: { id: chapter.id },
+      data: { reviewResult: reviewData as any },
+    });
+    chapter.reviewResult = reviewData;
 
-    // Step 5: Context summary (only if content > 2500 tokens)
+    // Step 5: Context summary
     const estimatedTokens = this.estimateTokens(chapter.content!);
     if (estimatedTokens > 2500) {
-      const summaryResult = await this.collectAiOutput(
-        TaskType.CHAPTER_GENERATION,
-        `Summarize: ${chapter.content!.substring(0, 8000)}`,
-      );
+      const summaryResult = await this.collectAiOutput(TaskType.CHAPTER_GENERATION, `Summarize: ${chapter.content!.substring(0, 8000)}`);
+      await this.prisma.chapter.update({
+        where: { id: chapter.id },
+        data: { contextSummary: summaryResult.content },
+      });
       chapter.contextSummary = summaryResult.content;
     }
   }
 
-  private transitionChapterStatus(
+  private async transitionChapterStatus(
     chapterId: string,
     expectedStatus: ChapterData['status'],
     targetStatus: ChapterData['status'],
-  ): ChapterData {
-    const chapter = this.getChapterOrThrow(chapterId);
+  ): Promise<ChapterData> {
+    const chapter = await this.getChapterOrThrow(chapterId);
     if (chapter.status !== expectedStatus) {
-      throw new BadRequestException(
-        `Chapter must be ${expectedStatus} (current: ${chapter.status})`,
-      );
+      throw new BadRequestException(`Chapter must be ${expectedStatus} (current: ${chapter.status})`);
     }
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { status: targetStatus },
+    });
     chapter.status = targetStatus;
-    chapter.updatedAt = new Date();
     return chapter;
   }
 
-  private findChapterById(chapterId: string): ChapterData | null {
-    for (const chapters of this.chaptersByProject.values()) {
-      const found = chapters.find((c) => c.id === chapterId);
-      if (found) return found;
-    }
-    return null;
+  private async findChapterById(chapterId: string): Promise<ChapterData | null> {
+    const doc = await this.prisma.chapter.findUnique({ where: { id: chapterId } });
+    return doc ? this.toChapter(doc) : null;
   }
 
-  private findPreviousChapter(
-    projectId: string,
-    chapterNumber: number,
-  ): ChapterData | null {
-    const chapters = this.chaptersByProject.get(projectId) ?? [];
+  private async findPreviousChapter(projectId: string, chapterNumber: number): Promise<ChapterData | null> {
     if (chapterNumber <= 1) return null;
-    return (
-      chapters.find((c) => c.chapterNumber === chapterNumber - 1) ?? null
-    );
+    const doc = await this.prisma.chapter.findFirst({
+      where: { projectId, chapterNumber: chapterNumber - 1 },
+    });
+    return doc ? this.toChapter(doc) : null;
   }
 
   private estimateTokens(content: string): number {
-    // Rough estimation: 1 Chinese character ≈ 1 token, 1 English word ≈ 1.3 tokens
     const chineseChars = (content.match(/[一-鿿]/g) || []).length;
     const englishWords = (content.match(/[a-zA-Z]+/g) || []).length;
     return chineseChars + Math.ceil(englishWords * 1.3);
   }
 
-  private findBeatById(beatId: string): BeatData | null {
-    for (const beats of this.beatsByProject.values()) {
-      const found = beats.find((b) => b.id === beatId);
-      if (found) return found;
-    }
-    return null;
+  private async findBeatById(beatId: string): Promise<BeatData | null> {
+    const doc = await this.prisma.beat.findUnique({ where: { id: beatId } });
+    return doc ? this.toBeat(doc) : null;
   }
 
-  private resolveChapterTaskType(chapter: ChapterData): TaskType {
-    const beat = this.findBeatForChapter(chapter);
+  private async resolveChapterTaskType(chapter: ChapterData): Promise<TaskType> {
+    const beats = await this.getBeatsByProjectId(chapter.projectId);
+    const beat = beats.find((b) => b.chapterNumber === chapter.chapterNumber);
     return beat?.useR1 ? TaskType.CRITICAL_CHAPTER : TaskType.CHAPTER_GENERATION;
-  }
-
-  private findBeatForChapter(chapter: ChapterData): BeatData | undefined {
-    const beats = this.beatsByProject.get(chapter.projectId) ?? [];
-    return beats.find((b) => b.chapterNumber === chapter.chapterNumber);
-  }
-
-  private findChapterForBeat(beat: BeatData): ChapterData | undefined {
-    const chapters = this.chaptersByProject.get(beat.projectId) ?? [];
-    return chapters.find((c) => c.chapterNumber === beat.chapterNumber);
   }
 
   private shouldUseR1(beat: BeatData, totalChapters: number): boolean {
@@ -778,30 +761,7 @@ export class StepService {
     );
   }
 
-  private createChapterFromBeat(beat: BeatData): ChapterData {
-    return {
-      id: randomUUID(),
-      projectId: beat.projectId,
-      chapterNumber: beat.chapterNumber,
-      title: null,
-      beatPlan: beat.plan,
-      targetWordCount: beat.targetWordCount,
-      content: null,
-      status: 'PENDING',
-      chapterFingerprint: null,
-      contextSummary: null,
-      reviewResult: null,
-      changeAnalysis: null,
-      targetedFixHistory: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-
-  private parseBeatsFromOutput(
-    output: string,
-    projectId: string,
-  ): BeatData[] {
+  private parseBeatsFromOutput(output: string, projectId: string): BeatData[] {
     const beats: BeatData[] = [];
     const sections = output.split(/## Chapter \d+:/g).slice(1);
     const headerMatches = output.match(/## Chapter (\d+):/g);
@@ -827,9 +787,7 @@ export class StepService {
       const plan: Record<string, unknown> = {
         conflictPoint: conflictMatch ? conflictMatch[1].trim() : '',
         hookPresets,
-        readerExpectation: expectationMatch
-          ? expectationMatch[1].trim()
-          : '中',
+        readerExpectation: expectationMatch ? expectationMatch[1].trim() : '中',
       };
 
       beats.push({
@@ -862,21 +820,21 @@ export class StepService {
     nextStatus: ProjectStatus,
     label: string,
   ): Promise<StepData> {
-    const existing = this.getStepByProjectId(projectId, phaseType);
-    if (!existing) {
-      throw new BadRequestException(`No generated ${label} to confirm`);
-    }
-    if (existing.status === 'CONFIRMED') {
-      throw new BadRequestException(`${label} already confirmed`);
-    }
+    const existing = await this.getStepByProjectId(projectId, phaseType);
+    if (!existing) throw new BadRequestException(`No generated ${label} to confirm`);
+    if (existing.status === 'CONFIRMED') throw new BadRequestException(`${label} already confirmed`);
     if (existing.status !== 'AWAITING_REVIEW') {
-      throw new BadRequestException(
-        `${label} must be AWAITING_REVIEW to confirm (current: ${existing.status})`,
-      );
+      throw new BadRequestException(`${label} must be AWAITING_REVIEW to confirm (current: ${existing.status})`);
     }
+
+    await this.prisma.stepData.update({
+      where: { id: existing.id },
+      data: { status: 'CONFIRMED', confirmedAt: new Date() },
+    });
+    await this.projectService.update(projectId, { status: nextStatus });
+
     existing.status = 'CONFIRMED';
     existing.confirmedAt = new Date();
-    this.projectService.update(projectId, { status: nextStatus });
     return existing;
   }
 
@@ -885,53 +843,54 @@ export class StepService {
     phaseType: PhaseType,
     label: string,
   ): Promise<StepData> {
-    const existing = this.getStepByProjectId(projectId, phaseType);
-    if (!existing) {
-      throw new BadRequestException(`No generated ${label} to reject`);
-    }
-    if (existing.status === 'CONFIRMED') {
-      throw new BadRequestException(`${label} already confirmed`);
-    }
-    if (existing.status === 'REJECTED') {
-      throw new BadRequestException(`${label} already rejected`);
-    }
+    const existing = await this.getStepByProjectId(projectId, phaseType);
+    if (!existing) throw new BadRequestException(`No generated ${label} to reject`);
+    if (existing.status === 'CONFIRMED') throw new BadRequestException(`${label} already confirmed`);
+    if (existing.status === 'REJECTED') throw new BadRequestException(`${label} already rejected`);
+
+    await this.prisma.stepData.update({
+      where: { id: existing.id },
+      data: { status: 'REJECTED' },
+    });
     existing.status = 'REJECTED';
     return existing;
   }
 
-  private createPendingStep(projectId: string, phaseType: PhaseType): StepData {
-    const step: StepData = {
-      id: randomUUID(),
-      projectId,
-      phaseType,
-      status: 'PENDING',
-      input: null,
-      output: null,
-      review: null,
-      version: 0,
-      confirmedAt: null,
-    };
-    this.steps.set(step.id, step);
-    return step;
+  private async createPendingStep(projectId: string, phaseType: PhaseType): Promise<StepData> {
+    const doc = await this.prisma.stepData.create({
+      data: {
+        projectId,
+        phaseType,
+        status: 'PENDING',
+        input: null,
+        output: null,
+        review: null,
+        version: 1,
+        confirmedAt: null,
+      },
+    });
+    return this.toStepData(doc);
   }
 
   private async collectAiOutput(
     taskType: TaskType,
     prompt: string,
   ): Promise<{ content: string; aiMeta: AiMeta }> {
-    const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(
-      taskType,
-      prompt,
-    );
-    const chunks = await lastValueFrom(chunks$.pipe(toArray()));
-    const lastChunk = chunks[chunks.length - 1];
-    const content = chunks.map((c) => c.content).join('');
-    const aiMeta: AiMeta = {
-      modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
-      degraded: lastChunk?.degraded ?? false,
-      failed: lastChunk?.failed ?? false,
-    };
-    return { content, aiMeta };
+    try {
+      const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(taskType, prompt);
+      const chunks = await lastValueFrom(chunks$.pipe(toArray()));
+      const lastChunk = chunks[chunks.length - 1];
+      const content = chunks.map((c) => c.content).join('');
+      const aiMeta: AiMeta = {
+        modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
+        degraded: lastChunk?.degraded ?? false,
+        failed: lastChunk?.failed ?? false,
+      };
+      return { content, aiMeta };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceUnavailableException(`AI 生成失败: ${msg}`);
+    }
   }
 
   private extractKeyPlotPoints(output: string): string {
@@ -941,30 +900,20 @@ export class StepService {
 
   private runPacingReview(output: string): Record<string, unknown> {
     const hasMultiAct = /第[一二三四五六七八九十]幕|第[一二三四五六七八九十]章/.test(output);
-    return {
-      passed: hasMultiAct,
-      score: hasMultiAct ? 85 : 50,
-      notes: hasMultiAct ? '节奏分布合理' : '缺少多幕/章结构',
-    };
+    return { passed: hasMultiAct, score: hasMultiAct ? 85 : 50, notes: hasMultiAct ? '节奏分布合理' : '缺少多幕/章结构' };
   }
 
   private runConflictReview(output: string): Record<string, unknown> {
     const hasConflict = /冲突|矛盾|对抗|危机|敌人|反派/.test(output);
-    return {
-      passed: hasConflict,
-      notes: hasConflict ? '冲突要素存在' : '缺少冲突要素',
-    };
+    return { passed: hasConflict, notes: hasConflict ? '冲突要素存在' : '缺少冲突要素' };
   }
 
   private runClimaxReview(output: string): Record<string, unknown> {
     const hasClimax = /高潮|决战|终极|巅峰/.test(output);
-    return {
-      passed: hasClimax,
-      notes: hasClimax ? '高潮点存在' : '缺少高潮点',
-    };
+    return { passed: hasClimax, notes: hasClimax ? '高潮点存在' : '缺少高潮点' };
   }
 
-  // ─── Project Completion (Issue #16) ──────────────────────────
+  // ─── Project Completion ──────────────────────────
 
   async confirmCompletion(
     projectId: string,
@@ -974,39 +923,26 @@ export class StepService {
     needsQueueResolution: boolean;
     options?: { action: string; label: string }[];
   }> {
-    const project = this.projectService.findById(projectId);
+    const project = await this.projectService.findById(projectId);
     if (!project) throw new NotFoundException('Project not found');
 
-    const chapters = this.getChaptersByProjectId(projectId);
-    if (chapters.length === 0) {
-      throw new BadRequestException('No chapters found');
-    }
+    const chapters = await this.getChaptersByProjectId(projectId);
+    if (chapters.length === 0) throw new BadRequestException('No chapters found');
 
-    const allCompletedOrDisputed = chapters.every(
-      (ch) => ch.status === 'COMPLETED' || ch.status === 'DISPUTED',
-    );
+    const allCompletedOrDisputed = chapters.every((ch) => ch.status === 'COMPLETED' || ch.status === 'DISPUTED');
     if (!allCompletedOrDisputed) {
-      throw new BadRequestException(
-        'All chapters must be COMPLETED or DISPUTED before project completion',
-      );
+      throw new BadRequestException('All chapters must be COMPLETED or DISPUTED before project completion');
     }
 
-    const queueDepth = this.factsheetCompensation.getQueueDepth(projectId);
+    const queueDepth = await this.factsheetCompensation.getQueueDepth(projectId);
 
     if (action) {
       if (action === 'sync-and-complete' && queueDepth > 0) {
-        const factSheet = this.getFactsheet(projectId) ?? {
-          data: {},
-          version: 0,
-        };
-        this.factsheetCompensation.forceSync(projectId, factSheet);
+        const factSheet = this.getFactsheet(projectId) ?? { data: {}, version: 0 };
+        this.factsheetCompensation.forceSync(projectId, factSheet.data);
       }
-      this.appendMilestone(
-        project,
-        'COMPLETED',
-        `User confirmed completion (${action})`,
-      );
-      this.projectService.update(projectId, { status: 'COMPLETED' });
+      this.appendMilestone(project, 'COMPLETED', `User confirmed completion (${action})`);
+      await this.projectService.update(projectId, { status: 'COMPLETED' });
       return { needsQueueResolution: false, status: 'COMPLETED' };
     }
 
@@ -1022,25 +958,17 @@ export class StepService {
     }
 
     this.appendMilestone(project, 'COMPLETED', 'User confirmed project completion');
-    this.projectService.update(projectId, { status: 'COMPLETED' });
-
+    await this.projectService.update(projectId, { status: 'COMPLETED' });
     return { needsQueueResolution: false, status: 'COMPLETED' };
   }
 
   async reopenProject(projectId: string): Promise<{ status: ProjectStatus }> {
-    const project = this.projectService.findById(projectId);
+    const project = await this.projectService.findById(projectId);
     if (!project) throw new NotFoundException('Project not found');
-    if (project.status !== 'COMPLETED') {
-      throw new BadRequestException('Only COMPLETED projects can be reopened');
-    }
+    if (project.status !== 'COMPLETED') throw new BadRequestException('Only COMPLETED projects can be reopened');
 
-    this.appendMilestone(
-      project,
-      'DRAFTING',
-      'User chose to reopen project for continued creation',
-    );
-    this.projectService.update(projectId, { status: 'DRAFTING' });
-
+    this.appendMilestone(project, 'DRAFTING', 'User chose to reopen project for continued creation');
+    await this.projectService.update(projectId, { status: 'DRAFTING' });
     return { status: 'DRAFTING' };
   }
 
@@ -1051,21 +979,67 @@ export class StepService {
   ): void {
     const history = [...(project.statusHistory ?? [])];
     history.push({ status, changedAt: new Date().toISOString(), reason });
-    this.projectService.update(project.id, { statusHistory: history });
   }
 
   private runPowerSystemCheck(output: string): Record<string, unknown> {
     const flags: string[] = [];
     for (const redline of POWER_SYSTEM_REDLINES) {
       const matched = redline.keywords.some((kw) => output.includes(kw));
-      if (matched) {
-        flags.push(redline.label);
-      }
+      if (matched) flags.push(redline.label);
     }
+    return { passed: flags.length === 0, flags, checkedAt: new Date().toISOString() };
+  }
+
+  // ─── Type mappers ──────────────────────────────────────────
+
+  private toStepData(doc: Record<string, unknown>): StepData {
     return {
-      passed: flags.length === 0,
-      flags,
-      checkedAt: new Date().toISOString(),
+      id: doc['id'] as string,
+      projectId: doc['projectId'] as string,
+      phaseType: doc['phaseType'] as PhaseType,
+      status: doc['status'] as StepData['status'],
+      input: (doc['input'] as string) ?? null,
+      output: (doc['output'] as string) ?? null,
+      review: (doc['review'] as Record<string, unknown>) ?? null,
+      version: (doc['version'] as number) ?? 1,
+      confirmedAt: doc['confirmedAt'] ? new Date(doc['confirmedAt'] as string) : null,
+      aiMeta: (doc['aiMeta'] as AiMeta) ?? undefined,
+    };
+  }
+
+  private toBeat(doc: Record<string, unknown>): BeatData {
+    return {
+      id: doc['id'] as string,
+      projectId: doc['projectId'] as string,
+      chapterNumber: doc['chapterNumber'] as number,
+      plan: (doc['plan'] as Record<string, unknown>) ?? {},
+      targetWordCount: (doc['targetWordCount'] as number) ?? 3000,
+      hookCount: (doc['hookCount'] as number) ?? 0,
+      isClimax: (doc['isClimax'] as boolean) ?? false,
+      useR1: (doc['useR1'] as boolean) ?? false,
+      status: (doc['status'] as BeatData['status']) ?? 'PENDING',
+      createdAt: new Date(doc['createdAt'] as string),
+      updatedAt: new Date(doc['updatedAt'] as string),
+    };
+  }
+
+  private toChapter(doc: Record<string, unknown>): ChapterData {
+    return {
+      id: doc['id'] as string,
+      projectId: doc['projectId'] as string,
+      chapterNumber: doc['chapterNumber'] as number,
+      title: (doc['title'] as string) ?? null,
+      beatPlan: (doc['beatPlan'] as Record<string, unknown>) ?? null,
+      targetWordCount: (doc['targetWordCount'] as number) ?? 3000,
+      content: (doc['content'] as string) ?? null,
+      status: (doc['status'] as ChapterData['status']) ?? 'PENDING',
+      chapterFingerprint: (doc['chapterFingerprint'] as string) ?? null,
+      contextSummary: (doc['contextSummary'] as string) ?? null,
+      reviewResult: (doc['reviewResult'] as Record<string, unknown>) ?? null,
+      changeAnalysis: (doc['changeAnalysis'] as Record<string, unknown>) ?? null,
+      targetedFixHistory: (doc['targetedFixHistory'] as ChapterData['targetedFixHistory']) ?? [],
+      createdAt: new Date(doc['createdAt'] as string),
+      updatedAt: new Date(doc['updatedAt'] as string),
     };
   }
 }

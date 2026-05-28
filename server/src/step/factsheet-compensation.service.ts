@@ -39,37 +39,36 @@ export class FactsheetCompensationService {
   private static readonly WARNING_THRESHOLD = 10;
   private static readonly CRITICAL_THRESHOLD = 50;
 
+  // In-memory cache to reduce DB round-trips during batch operations
+  private queueCache: Map<string, PendingFactUpdate[]> = new Map();
+
   constructor(private readonly projectService: ProjectService) {}
 
-  private getProjectOrThrow(projectId: string) {
-    const project = this.projectService.findById(projectId);
-    if (!project) {
-      throw new NotFoundException(`Project ${projectId} not found`);
-    }
-    return project;
+  private async loadQueue(projectId: string): Promise<PendingFactUpdate[]> {
+    const project = await this.projectService.findById(projectId);
+    if (!project) throw new NotFoundException(`Project ${projectId} not found`);
+    const queue = [...(project.pendingFactUpdates ?? [])];
+    this.queueCache.set(projectId, queue);
+    return queue;
   }
 
-  private ensureQueue(projectId: string): PendingFactUpdate[] {
-    const project = this.getProjectOrThrow(projectId);
-    if (!project.pendingFactUpdates) {
-      project.pendingFactUpdates = [];
-    }
-    return project.pendingFactUpdates;
+  private async saveQueue(projectId: string, queue: PendingFactUpdate[]): Promise<void> {
+    await this.projectService.update(projectId, { pendingFactUpdates: queue });
+    this.queueCache.set(projectId, queue);
   }
 
-  enqueue(
+  async enqueue(
     projectId: string,
     chapterId: string,
     chapterNumber: number,
     entries: Record<string, unknown>,
-  ): PendingFactUpdate {
-    const queue = this.ensureQueue(projectId);
+  ): Promise<PendingFactUpdate> {
+    const queue = await this.loadQueue(projectId);
 
-    // Dedup by chapterId: if same chapter re-enqueues (e.g. concurrent CAS failures),
-    // merge entries into its existing queue entry (latest-wins for same keys).
     const existing = queue.find((e) => e.chapterId === chapterId);
     if (existing) {
       Object.assign(existing.entries, entries);
+      await this.saveQueue(projectId, queue);
       return existing;
     }
 
@@ -86,16 +85,17 @@ export class FactsheetCompensationService {
     };
 
     queue.push(entry);
+    await this.saveQueue(projectId, queue);
     return entry;
   }
 
-  getQueueDepth(projectId: string): number {
-    const project = this.getProjectOrThrow(projectId);
-    return project.pendingFactUpdates?.length ?? 0;
+  async getQueueDepth(projectId: string): Promise<number> {
+    const queue = await this.loadQueue(projectId);
+    return queue.length;
   }
 
-  getAlertLevel(projectId: string): QueueAlert {
-    const depth = this.getQueueDepth(projectId);
+  async getAlertLevel(projectId: string): Promise<QueueAlert> {
+    const depth = await this.getQueueDepth(projectId);
 
     let level: AlertLevel;
     if (depth >= FactsheetCompensationService.CRITICAL_THRESHOLD) {
@@ -115,18 +115,19 @@ export class FactsheetCompensationService {
     projectId: string,
     _currentFactSheet: Record<string, unknown>,
   ): ConsumeResult {
-    return this.drainQueue(projectId);
+    // Synchronous drain from cache — caller should have loaded the queue first
+    return this.drainQueueFromCache(projectId);
   }
 
   forceSync(
     projectId: string,
     _currentFactSheet: Record<string, unknown>,
   ): ConsumeResult {
-    return this.drainQueue(projectId);
+    return this.drainQueueFromCache(projectId);
   }
 
-  private drainQueue(projectId: string): ConsumeResult {
-    const queue = this.ensureQueue(projectId);
+  private drainQueueFromCache(projectId: string): ConsumeResult {
+    const queue = this.queueCache.get(projectId) ?? [];
 
     if (queue.length === 0) {
       return { mergedEntries: {}, consumedCount: 0, conflicts: [] };
@@ -137,14 +138,12 @@ export class FactsheetCompensationService {
     );
 
     const merged: Record<string, unknown> = {};
-    const keySources = new Map<string, string[]>(); // key → ids that set it
+    const keySources = new Map<string, string[]>();
     const entryById = new Map(sorted.map((e) => [e.id, e]));
 
     for (const entry of sorted) {
       for (const key of Object.keys(entry.entries)) {
-        if (!keySources.has(key)) {
-          keySources.set(key, []);
-        }
+        if (!keySources.has(key)) keySources.set(key, []);
         keySources.get(key)!.push(entry.id);
         merged[key] = entry.entries[key];
       }
@@ -165,7 +164,8 @@ export class FactsheetCompensationService {
     }
 
     const consumedCount = queue.length;
-    queue.length = 0;
+    // Clear from cache; caller must persist via ProjectService.update
+    this.queueCache.delete(projectId);
 
     return { mergedEntries: merged, consumedCount, conflicts };
   }

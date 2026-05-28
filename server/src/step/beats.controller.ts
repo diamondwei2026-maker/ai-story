@@ -1,4 +1,4 @@
-import { Controller, Patch, Body, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Patch, Body, Param } from '@nestjs/common';
 import { StepService } from './step.service';
 import { PhaseControllerBase } from './phase.controller.base';
 
@@ -8,22 +8,20 @@ export class BeatsController extends PhaseControllerBase {
     super(stepService);
   }
 
-  protected doGenerate(projectId: string, body: any) {
+  protected async doGenerate(projectId: string, body: any) {
     return this.stepService.generateBeats(projectId, body);
   }
 
-  protected doConfirm(projectId: string) {
+  protected async doConfirm(projectId: string) {
     return this.stepService.confirmBeats(projectId);
   }
 
-  protected doReject(projectId: string) {
+  protected async doReject(projectId: string) {
     return this.stepService.rejectBeats(projectId);
   }
 
-  protected doGet(projectId: string) {
-    const beats = this.stepService.getBeatsByProjectId(projectId);
-    if (beats.length === 0) throw new NotFoundException('No BEATS step found for this project');
-    return beats;
+  protected async doGet(projectId: string) {
+    return this.stepService.getBeatsByProjectId(projectId);
   }
 }
 
@@ -32,7 +30,7 @@ export class BeatModificationController {
   constructor(private readonly stepService: StepService) {}
 
   @Patch(':id/wordcount')
-  updateWordCount(
+  async updateWordCount(
     @Param('id') id: string,
     @Body() body: { wordCount: number },
   ) {
@@ -40,7 +38,7 @@ export class BeatModificationController {
   }
 
   @Patch(':id/structure')
-  updateStructure(
+  async updateStructure(
     @Param('id') id: string,
     @Body() plan: Record<string, unknown>,
   ) {

@@ -1,4 +1,4 @@
-import { Controller, NotFoundException } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { StepService } from './step.service';
 import { PhaseControllerBase } from './phase.controller.base';
 
@@ -8,21 +8,19 @@ export class SettingController extends PhaseControllerBase {
     super(stepService);
   }
 
-  protected doGenerate(projectId: string, body: any) {
+  protected async doGenerate(projectId: string, body: any) {
     return this.stepService.generateSetting(projectId, body);
   }
 
-  protected doConfirm(projectId: string) {
+  protected async doConfirm(projectId: string) {
     return this.stepService.confirmSetting(projectId);
   }
 
-  protected doReject(projectId: string) {
+  protected async doReject(projectId: string) {
     return this.stepService.rejectSetting(projectId);
   }
 
-  protected doGet(projectId: string) {
-    const step = this.stepService.getSettingByProjectId(projectId);
-    if (!step) throw new NotFoundException('No SETTING step found for this project');
-    return step;
+  protected async doGet(projectId: string) {
+    return this.stepService.getSettingByProjectId(projectId) ?? null;
   }
 }

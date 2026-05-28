@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, NotFoundException, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, Param, HttpCode } from '@nestjs/common';
 import { StepService } from './step.service';
 import { PhaseControllerBase } from './phase.controller.base';
 
@@ -8,30 +8,28 @@ export class OutlineController extends PhaseControllerBase {
     super(stepService);
   }
 
-  protected doGenerate(projectId: string, body: any) {
+  protected async doGenerate(projectId: string, body: any) {
     return this.stepService.generateOutline(projectId, body);
   }
 
   @Post('switch-structure')
   @HttpCode(200)
-  switchStructure(
+  async switchStructure(
     @Param('projectId') projectId: string,
     @Body() body: { structure: string },
   ) {
     return this.stepService.switchStructure(projectId, body.structure);
   }
 
-  protected doConfirm(projectId: string) {
+  protected async doConfirm(projectId: string) {
     return this.stepService.confirmOutline(projectId);
   }
 
-  protected doReject(projectId: string) {
+  protected async doReject(projectId: string) {
     return this.stepService.rejectOutline(projectId);
   }
 
-  protected doGet(projectId: string) {
-    const step = this.stepService.getOutlineByProjectId(projectId);
-    if (!step) throw new NotFoundException('No OUTLINE step found for this project');
-    return step;
+  protected async doGet(projectId: string) {
+    return this.stepService.getOutlineByProjectId(projectId) ?? null;
   }
 }

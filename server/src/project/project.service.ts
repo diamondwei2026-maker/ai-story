@@ -1,44 +1,46 @@
 import { Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
 import { Project, ProjectStatus, PendingFactUpdate, StatusHistoryEntry } from './project.entity';
 
 @Injectable()
 export class ProjectService {
-  private projects: Map<string, Project> = new Map();
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(data: { title: string; config?: Project['config'] }): Project {
+  async create(data: { title: string; config?: Project['config'] }): Promise<Project> {
     const now = new Date();
-    const project: Project = {
-      id: randomUUID(),
-      title: data.title.trim(),
-      status: 'IDEA' as ProjectStatus,
-      config: data.config ?? {},
-      pendingFactUpdates: [],
-      statusHistory: [
-        {
-          status: 'IDEA' as ProjectStatus,
-          changedAt: now.toISOString(),
-          reason: 'Project created',
-        },
-      ],
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.projects.set(project.id, project);
-    return project;
+    const doc = await this.prisma.project.create({
+      data: {
+        title: data.title.trim(),
+        status: 'IDEA',
+        currentPhase: 'IDEA',
+        config: (data.config ?? {}) as any,
+        pendingFactUpdates: [],
+        statusHistory: [
+          {
+            status: 'IDEA',
+            changedAt: now.toISOString(),
+            reason: 'Project created',
+          },
+        ],
+      },
+    });
+    return this.toProject(doc);
   }
 
-  findAll(): Project[] {
-    return Array.from(this.projects.values()).filter(
-      (p) => p.status !== 'ARCHIVED',
-    );
+  async findAll(): Promise<Project[]> {
+    const docs = await this.prisma.project.findMany({
+      where: { status: { not: 'ARCHIVED' } },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return docs.map((d) => this.toProject(d));
   }
 
-  findById(id: string): Project | null {
-    return this.projects.get(id) ?? null;
+  async findById(id: string): Promise<Project | null> {
+    const doc = await this.prisma.project.findUnique({ where: { id } });
+    return doc ? this.toProject(doc) : null;
   }
 
-  update(
+  async update(
     id: string,
     data: {
       title?: string;
@@ -47,45 +49,65 @@ export class ProjectService {
       pendingFactUpdates?: PendingFactUpdate[];
       statusHistory?: StatusHistoryEntry[];
     },
-  ): Project | null {
-    const project = this.projects.get(id);
-    if (!project) return null;
-    if (data.title !== undefined) {
-      project.title = data.title.trim();
-    }
-    if (data.config !== undefined) {
-      project.config = data.config;
-    }
-    if (data.status !== undefined) {
-      project.status = data.status;
-    }
-    if (data.pendingFactUpdates !== undefined) {
-      project.pendingFactUpdates = data.pendingFactUpdates;
-    }
-    if (data.statusHistory !== undefined) {
-      project.statusHistory = data.statusHistory;
-    }
-    project.updatedAt = new Date();
-    return project;
+  ): Promise<Project | null> {
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    if (!existing) return null;
+
+    const updateData: Record<string, unknown> = {};
+    if (data.title !== undefined) updateData['title'] = data.title.trim();
+    if (data.config !== undefined) updateData['config'] = data.config;
+    if (data.status !== undefined) updateData['status'] = data.status;
+    if (data.pendingFactUpdates !== undefined) updateData['pendingFactUpdates'] = data.pendingFactUpdates;
+    if (data.statusHistory !== undefined) updateData['statusHistory'] = data.statusHistory;
+
+    const doc = await this.prisma.project.update({
+      where: { id },
+      data: updateData,
+    });
+    return this.toProject(doc);
   }
 
-  delete(id: string): boolean {
-    return this.projects.delete(id);
+  async delete(id: string): Promise<boolean> {
+    try {
+      await this.prisma.project.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  archive(id: string): Project | null {
-    const project = this.projects.get(id);
-    if (!project) return null;
-    project.status = 'ARCHIVED' as ProjectStatus;
-    project.updatedAt = new Date();
-    return project;
+  async archive(id: string): Promise<Project | null> {
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    if (!existing) return null;
+
+    const doc = await this.prisma.project.update({
+      where: { id },
+      data: { status: 'ARCHIVED' },
+    });
+    return this.toProject(doc);
   }
 
-  restore(id: string): Project | null {
-    const project = this.projects.get(id);
-    if (!project || project.status !== 'ARCHIVED') return null;
-    project.status = 'DRAFTING' as ProjectStatus;
-    project.updatedAt = new Date();
-    return project;
+  async restore(id: string): Promise<Project | null> {
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    if (!existing || existing.status !== 'ARCHIVED') return null;
+
+    const doc = await this.prisma.project.update({
+      where: { id },
+      data: { status: 'DRAFTING' },
+    });
+    return this.toProject(doc);
+  }
+
+  private toProject(doc: Record<string, unknown>): Project {
+    return {
+      id: doc['id'] as string,
+      title: doc['title'] as string,
+      status: doc['status'] as ProjectStatus,
+      config: (doc['config'] ?? {}) as Project['config'],
+      pendingFactUpdates: (doc['pendingFactUpdates'] ?? []) as PendingFactUpdate[],
+      statusHistory: (doc['statusHistory'] ?? []) as StatusHistoryEntry[],
+      createdAt: new Date(doc['createdAt'] as string),
+      updatedAt: new Date(doc['updatedAt'] as string),
+    };
   }
 }

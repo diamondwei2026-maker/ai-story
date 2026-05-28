@@ -18,7 +18,7 @@ export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Post()
-  create(@Body() body: { title?: string; config?: Project['config'] }): Project {
+  async create(@Body() body: { title?: string; config?: Project['config'] }): Promise<Project> {
     const { title, config } = body;
 
     if (title === undefined || title === null) {
@@ -33,13 +33,13 @@ export class ProjectController {
   }
 
   @Get()
-  findAll(): Project[] {
+  async findAll(): Promise<Project[]> {
     return this.projectService.findAll();
   }
 
   @Get(':id')
-  findById(@Param('id') id: string): Project {
-    const project = this.projectService.findById(id);
+  async findById(@Param('id') id: string): Promise<Project> {
+    const project = await this.projectService.findById(id);
     if (!project) {
       throw new NotFoundException('Project not found');
     }
@@ -47,11 +47,11 @@ export class ProjectController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: { title?: string; config?: Project['config']; status?: Project['status'] },
-  ): Project {
-    const project = this.projectService.update(id, body);
+  ): Promise<Project> {
+    const project = await this.projectService.update(id, body);
     if (!project) {
       throw new NotFoundException('Project not found');
     }
@@ -60,8 +60,8 @@ export class ProjectController {
 
   @Delete(':id')
   @HttpCode(200)
-  delete(@Param('id') id: string): void {
-    const deleted = this.projectService.delete(id);
+  async delete(@Param('id') id: string): Promise<void> {
+    const deleted = await this.projectService.delete(id);
     if (!deleted) {
       throw new NotFoundException('Project not found');
     }
@@ -69,8 +69,8 @@ export class ProjectController {
 
   @Post(':id/archive')
   @HttpCode(200)
-  archive(@Param('id') id: string): Project {
-    const project = this.projectService.archive(id);
+  async archive(@Param('id') id: string): Promise<Project> {
+    const project = await this.projectService.archive(id);
     if (!project) {
       throw new NotFoundException('Project not found');
     }
@@ -79,10 +79,10 @@ export class ProjectController {
 
   @Post(':id/restore')
   @HttpCode(200)
-  restore(@Param('id') id: string): Project {
-    const project = this.projectService.restore(id);
+  async restore(@Param('id') id: string): Promise<Project> {
+    const project = await this.projectService.restore(id);
     if (!project) {
-      const existing = this.projectService.findById(id);
+      const existing = await this.projectService.findById(id);
       if (!existing) {
         throw new NotFoundException('Project not found');
       }

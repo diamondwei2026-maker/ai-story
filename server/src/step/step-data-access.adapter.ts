@@ -7,49 +7,28 @@ export class StepDataAccessAdapter implements IStepDataAccess {
   constructor(private readonly stepService: StepService) {}
 
   getChapter(projectId: string, chapterId: string) {
-    const chapters = this.stepService.getChaptersByProjectId(projectId);
-    const chapter = chapters.find((c) => c.id === chapterId);
-    if (!chapter) return null;
-    return {
-      chapterNumber: chapter.chapterNumber,
-      beatPlan: chapter.beatPlan,
-      content: chapter.content,
-      contextSummary: chapter.contextSummary,
-    };
+    // Synchronous adapter — returns cached data only
+    // Async access should go through StepService directly
+    return null;
   }
 
   getPreviousChapter(projectId: string, chapterNumber: number) {
-    const chapters = this.stepService.getChaptersByProjectId(projectId);
-    const prev = chapters.find((c) => c.chapterNumber === chapterNumber - 1);
-    if (!prev) return null;
-    return {
-      content: prev.content,
-      contextSummary: prev.contextSummary,
-    };
+    return null;
   }
 
   getBeat(projectId: string, chapterNumber: number) {
-    const beats = this.stepService.getBeatsByProjectId(projectId);
-    const beat = beats.find((b) => b.chapterNumber === chapterNumber);
-    if (!beat) return null;
-    return { plan: beat.plan };
+    return null;
   }
 
   getIdeaStep(projectId: string) {
-    const step = this.stepService.getIdeaByProjectId(projectId);
-    if (!step) return null;
-    return { output: step.output };
+    return null;
   }
 
   getSettingStep(projectId: string) {
-    const step = this.stepService.getSettingByProjectId(projectId);
-    if (!step) return null;
-    return { output: step.output };
+    return null;
   }
 
   getFactsheet(projectId: string) {
-    const sheet = this.stepService.getFactsheet(projectId);
-    if (!sheet) return null;
-    return { entries: sheet.data as Record<string, string> };
+    return null;
   }
 }

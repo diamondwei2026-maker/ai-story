@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  HttpCode,
-} from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, HttpCode } from '@nestjs/common';
 import { StepService } from './step.service';
 import { ChangeAnalysisService, AnalyzeChangeResult, TargetedFixResult } from './change-analysis.service';
 import { ChapterData } from './step.entity';
@@ -18,26 +11,22 @@ export class ChapterController {
   ) {}
 
   @Get()
-  getChapters(@Param('projectId') projectId: string): ChapterData[] {
+  async getChapters(@Param('projectId') projectId: string): Promise<ChapterData[]> {
     return this.stepService.getChaptersByProjectId(projectId);
   }
 
   @Post(':chapterId/generate')
-  generate(
+  async generate(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
-    @Body()
-    body: {
-      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
-      feedback?: string;
-    },
+    @Body() body: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
     return this.stepService.generateChapter(projectId, chapterId, body);
   }
 
   @Post(':chapterId/confirm')
   @HttpCode(200)
-  confirm(
+  async confirm(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
   ): Promise<ChapterData> {
@@ -46,7 +35,7 @@ export class ChapterController {
 
   @Post(':chapterId/dispute')
   @HttpCode(200)
-  dispute(
+  async dispute(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
   ): Promise<ChapterData> {
@@ -55,7 +44,7 @@ export class ChapterController {
 
   @Post(':chapterId/pause')
   @HttpCode(200)
-  pause(
+  async pause(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
   ): Promise<ChapterData> {
@@ -63,7 +52,7 @@ export class ChapterController {
   }
 
   @Post(':chapterId/continue')
-  continue(
+  async continue_(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
     @Body() body: { currentContent: string },
@@ -72,43 +61,31 @@ export class ChapterController {
   }
 
   @Post(':chapterId/retry')
-  retry(
+  async retry(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
-    @Body()
-    body: {
-      mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade';
-      feedback?: string;
-    },
+    @Body() body: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
     return this.stepService.retryChapterGeneration(projectId, chapterId, body);
   }
 
   @Post(':chapterId/analyze-change')
   @HttpCode(200)
-  analyzeChange(
+  async analyzeChange(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
     @Body() body: { newContent: string },
   ): Promise<AnalyzeChangeResult> {
-    return this.changeAnalysisService.analyzeChange(
-      projectId,
-      chapterId,
-      body.newContent,
-    );
+    return this.changeAnalysisService.analyzeChange(projectId, chapterId, body.newContent);
   }
 
   @Post(':chapterId/targeted-fix')
   @HttpCode(200)
-  applyTargetedFix(
+  async applyTargetedFix(
     @Param('projectId') projectId: string,
     @Param('chapterId') chapterId: string,
     @Body() body: { impactedChapterId: string },
   ): Promise<TargetedFixResult> {
-    return this.changeAnalysisService.applyTargetedFix(
-      projectId,
-      chapterId,
-      body.impactedChapterId,
-    );
+    return this.changeAnalysisService.applyTargetedFix(projectId, chapterId, body.impactedChapterId);
   }
 }
