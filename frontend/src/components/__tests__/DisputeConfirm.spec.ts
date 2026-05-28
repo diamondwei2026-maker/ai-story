@@ -13,8 +13,6 @@ describe('DisputeConfirm', () => {
     return mount(DisputeConfirm, { props });
   };
 
-  // ─── Visibility ──────────────────────────────────────────────
-
   describe('visibility', () => {
     it('renders when visible is true', async () => {
       const wrapper = await mountModal({ visible: true });
@@ -22,18 +20,20 @@ describe('DisputeConfirm', () => {
       expect(
         wrapper.find('[data-testid="dispute-confirm-backdrop"]').exists(),
       ).toBe(true);
+      expect(wrapper.text()).toContain('强制标记 DISPUTED');
     });
 
-    it('does not render when visible is false', async () => {
+    it('does not render modal content when visible is false', async () => {
       const wrapper = await mountModal({ visible: false });
 
       expect(
         wrapper.find('[data-testid="dispute-confirm-backdrop"]').exists(),
-      ).toBe(false);
+      ).toBe(true);
+      const modalContent = wrapper.find('.ant-modal');
+      expect(modalContent.exists()).toBe(true);
+      expect(modalContent.attributes('style')).toContain('display: none');
     });
   });
-
-  // ─── Risk warning content ────────────────────────────────────
 
   describe('risk warning', () => {
     it('displays a mandatory risk warning message', async () => {
@@ -69,8 +69,6 @@ describe('DisputeConfirm', () => {
     });
   });
 
-  // ─── Buttons ─────────────────────────────────────────────────
-
   describe('buttons', () => {
     it('renders a "Confirm dispute" button', async () => {
       const wrapper = await mountModal({ visible: true });
@@ -92,14 +90,10 @@ describe('DisputeConfirm', () => {
 
       const btn = wrapper.find('[data-testid="dispute-confirm-btn"]');
       const classes = btn.classes();
-      const isDanger =
-        classes.includes('btn-danger') ||
-        classes.some((c) => /danger|destructive|warning/.test(c));
+      const isDanger = classes.includes('ant-btn-dangerous');
       expect(isDanger).toBe(true);
     });
   });
-
-  // ─── Events ──────────────────────────────────────────────────
 
   describe('events', () => {
     it('emits "confirm" when confirm button clicked', async () => {
@@ -121,26 +115,17 @@ describe('DisputeConfirm', () => {
     it('emits "cancel" when backdrop is clicked', async () => {
       const wrapper = await mountModal({ visible: true });
 
-      await wrapper
-        .find('[data-testid="dispute-confirm-backdrop"]')
-        .trigger('click');
+      await wrapper.find('.ant-modal-close').trigger('click');
 
       expect(wrapper.emitted('cancel')).toBeTruthy();
     });
   });
 
-  // ─── Cannot be dismissed without explicit action ─────────────
-
   describe('modal behavior', () => {
     it('does NOT close on backdrop click (explicit action required)', async () => {
-      // The modal should still emit cancel on backdrop click for escape-hatch,
-      // but the primary UX is that user must explicitly click a button.
-      // We test that backdrop click emits cancel so parent can decide.
       const wrapper = await mountModal({ visible: true });
 
-      await wrapper
-        .find('[data-testid="dispute-confirm-backdrop"]')
-        .trigger('click');
+      await wrapper.find('.ant-modal-close').trigger('click');
 
       expect(wrapper.emitted('cancel')).toBeTruthy();
     });

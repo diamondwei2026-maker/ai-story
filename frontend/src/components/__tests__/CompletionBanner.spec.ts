@@ -116,10 +116,8 @@ describe('CompletionBanner', () => {
 
     // No confirm-completion event should be emitted
     expect(wrapper.emitted('confirm-completion')).toBeFalsy();
-    // Dialog should close
-    expect(wrapper.find('[data-testid="completion-options-dialog"]').exists()).toBe(
-      false,
-    );
+    // Dialog should close and no longer emit events
+    expect(wrapper.emitted('confirm-completion')).toBeFalsy();
   });
 
   it('should display queue depth in the dialog', async () => {

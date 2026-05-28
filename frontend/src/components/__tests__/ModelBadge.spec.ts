@@ -13,19 +13,19 @@ describe('ModelBadge', () => {
     expect(wrapper.text()).toContain('DeepSeek-V3');
   });
 
-  it('shows a regular badge when not degraded', async () => {
+  it('shows a regular success badge when not degraded', async () => {
     const wrapper = await mountBadge({ modelName: 'DeepSeek-V3', degraded: false });
 
     const badge = wrapper.find('[data-testid="model-badge"]');
     expect(badge.exists()).toBe(true);
-    expect(badge.classes()).not.toContain('badge--degraded');
+    expect(badge.classes()).toContain('ant-tag-success');
   });
 
-  it('shows a yellow warning badge when degraded', async () => {
+  it('shows a warning badge when degraded', async () => {
     const wrapper = await mountBadge({ modelName: 'DeepSeek-R1', degraded: true });
 
     const badge = wrapper.find('[data-testid="model-badge"]');
-    expect(badge.classes()).toContain('badge--degraded');
+    expect(badge.classes()).toContain('ant-tag-warning');
   });
 
   it('displays "已降级至" text when degraded', async () => {

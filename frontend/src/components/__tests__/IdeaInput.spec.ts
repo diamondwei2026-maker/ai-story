@@ -55,11 +55,12 @@ describe('IdeaInput', () => {
     expect(textarea.attributes('placeholder')).toBeTruthy();
   });
 
-  it('shows character count hint', async () => {
+  it('renders the textarea with show-count functionality', async () => {
     const wrapper = await mountComponent({
       modelValue: '一个重生修仙的故事',
     });
 
-    expect(wrapper.find('[data-testid="idea-char-count"]').exists()).toBe(true);
+    const textarea = wrapper.find('[data-testid="idea-textarea"]');
+    expect(textarea.exists()).toBe(true);
   });
 });

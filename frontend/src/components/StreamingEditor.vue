@@ -1,20 +1,17 @@
 <template>
   <div class="streaming-editor" data-testid="streaming-editor">
-    <div
+    <a-empty
       v-if="!content"
       data-testid="editor-placeholder"
-      class="editor-placeholder"
-    >
-      点击生成按钮开始创作...
-    </div>
+      description="点击生成按钮开始创作..."
+    />
 
-    <div
+    <a-spin
       v-if="content && isStreaming"
       data-testid="streaming-indicator"
-      class="streaming-indicator"
-    >
-      正在生成中...
-    </div>
+      tip="正在生成中..."
+      :spinning="true"
+    />
 
     <div
       data-testid="editor-content"
@@ -23,13 +20,12 @@
       {{ content }}
     </div>
 
-    <textarea
+    <a-textarea
       v-if="content"
       data-testid="editor-textarea"
       :value="content"
       :readonly="!isEditable"
-      class="editor-textarea"
-      @input="$emit('update:content', ($event.target as HTMLTextAreaElement).value)"
+      @update:value="$emit('update:content', $event)"
     />
   </div>
 </template>

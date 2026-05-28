@@ -1,24 +1,27 @@
 <template>
-  <div data-testid="relation-graph" class="relation-graph edit-card">
-    <div class="relation-graph__header edit-card__header">
-      <h3 data-testid="relation-graph-title" class="edit-card__title">角色关系图</h3>
-      <button
+  <a-card data-testid="relation-graph">
+    <template #title>
+      <span data-testid="relation-graph-title">角色关系图</span>
+    </template>
+    <template #extra>
+      <a-button
         v-if="!editing && hasContent"
+        size="small"
         data-testid="edit-relation-btn"
-        class="edit-card__edit-btn"
         @click="enterEditMode"
       >
         编辑
-      </button>
-      <button
+      </a-button>
+      <a-button
         v-if="editing"
+        size="small"
+        type="primary"
         data-testid="save-relation-btn"
-        class="edit-card__save-btn"
         @click="save"
       >
         保存
-      </button>
-    </div>
+      </a-button>
+    </template>
 
     <template v-if="!editing">
       <div data-testid="relation-conflicts" class="relation-graph__section">
@@ -34,22 +37,20 @@
     <template v-else>
       <div data-testid="relation-conflicts" class="relation-graph__section">
         <h4 class="edit-card__section-label">冲突关系</h4>
-        <textarea
-          v-model="edits.conflicts"
-          class="edit-card__section-textarea"
-          rows="4"
+        <a-textarea
+          v-model:value="edits.conflicts"
+          :rows="4"
         />
       </div>
       <div data-testid="relation-bonds" class="relation-graph__section">
         <h4 class="edit-card__section-label">情感纽带</h4>
-        <textarea
-          v-model="edits.bonds"
-          class="edit-card__section-textarea"
-          rows="4"
+        <a-textarea
+          v-model:value="edits.bonds"
+          :rows="4"
         />
       </div>
     </template>
-  </div>
+  </a-card>
 </template>
 
 <script setup lang="ts">
@@ -99,9 +100,22 @@ function save() {
 </script>
 
 <style scoped>
-@import url('@/styles/edit-card.css');
-
 .relation-graph__section {
   margin-bottom: 16px;
+}
+
+.edit-card__section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.edit-card__section-text {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
 }
 </style>

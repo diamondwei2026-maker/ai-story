@@ -7,56 +7,60 @@
       >
         所有章节已全部完成，可以确认完本了！
       </span>
-      <button
+      <a-button
+        type="primary"
         data-testid="confirm-completion-btn"
-        class="completion-banner__confirm-btn"
         @click="handleConfirmClick"
       >
         确认完本
-      </button>
+      </a-button>
     </div>
 
-    <div
-      v-if="showDialog"
-      data-testid="completion-options-dialog"
-      class="completion-options-dialog"
-    >
-      <div
-        class="completion-options-dialog__mask"
-        @click="handleOption('cancel')"
-      />
-      <div class="completion-options-dialog__panel">
-        <h3>事实簿存在待同步数据</h3>
+    <div data-testid="completion-options-dialog">
+      <a-modal
+        :open="showDialog"
+        title="事实簿存在待同步数据"
+        :mask-closable="true"
+        :get-container="false"
+        @cancel="handleOption('cancel')"
+        centered
+        width="400px"
+      >
         <p
           data-testid="completion-queue-depth"
           class="completion-options-dialog__depth"
         >
           队列深度: {{ pendingUpdateCount }}
         </p>
-        <div class="completion-options-dialog__options">
-          <button
-            data-testid="completion-option-sync"
-            class="completion-options-dialog__option"
-            @click="handleOption('sync-and-complete')"
-          >
-            立即同步并完本
-          </button>
-          <button
-            data-testid="completion-option-skip"
-            class="completion-options-dialog__option"
-            @click="handleOption('skip-and-complete')"
-          >
-            跳过并完本（队列保留）
-          </button>
-          <button
-            data-testid="completion-option-cancel"
-            class="completion-options-dialog__option completion-options-dialog__option--cancel"
-            @click="handleOption('cancel')"
-          >
-            取消
-          </button>
-        </div>
-      </div>
+        <template #footer>
+          <div class="completion-options-dialog__options">
+            <a-button
+              data-testid="completion-option-sync"
+              type="primary"
+              block
+              @click="handleOption('sync-and-complete')"
+              style="margin-bottom: 8px"
+            >
+              立即同步并完本
+            </a-button>
+            <a-button
+              data-testid="completion-option-skip"
+              block
+              @click="handleOption('skip-and-complete')"
+              style="margin-bottom: 8px"
+            >
+              跳过并完本（队列保留）
+            </a-button>
+            <a-button
+              data-testid="completion-option-cancel"
+              block
+              @click="handleOption('cancel')"
+            >
+              取消
+            </a-button>
+          </div>
+        </template>
+      </a-modal>
     </div>
   </div>
 </template>
@@ -114,74 +118,15 @@ function handleOption(action: string) {
   color: #92400e;
 }
 
-.completion-banner__confirm-btn {
-  padding: 8px 24px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity var(--transition-fast);
-}
-
-.completion-banner__confirm-btn:hover {
-  opacity: 0.85;
-}
-
-.completion-options-dialog {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.completion-options-dialog__mask {
-  position: absolute;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-}
-
-.completion-options-dialog__panel {
-  position: relative;
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px 32px;
-  min-width: 360px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  text-align: center;
-}
-
 .completion-options-dialog__depth {
   font-size: 14px;
-  color: var(--color-text-secondary, #666);
-  margin-bottom: 20px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
 }
 
 .completion-options-dialog__options {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.completion-options-dialog__option {
-  padding: 10px 20px;
-  border: 1px solid var(--color-border-light, #ddd);
-  border-radius: 6px;
-  background-color: #f9f9f9;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.completion-options-dialog__option:hover {
-  background-color: #eee;
-}
-
-.completion-options-dialog__option--cancel {
-  color: #999;
+  width: 100%;
 }
 </style>

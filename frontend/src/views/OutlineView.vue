@@ -2,30 +2,40 @@
   <div data-testid="outline-view" class="outline-view">
     <h2 data-testid="outline-title" class="outline-view__title">剧情大纲</h2>
 
-    <div
+    <a-alert
       v-if="reviewAnnotations"
       data-testid="review-annotations"
-      class="outline-view__review-banner"
-    >
-      {{ reviewAnnotations }}
-    </div>
+      type="warning"
+      :message="reviewAnnotations"
+      banner
+      show-icon
+    />
 
     <!-- Loading -->
     <div v-if="loading" data-testid="outline-loading" class="outline-view__loading">
-      大纲生成中，请稍候...
+      <a-spin tip="大纲生成中，请稍候..." />
     </div>
 
     <!-- Error -->
-    <div v-if="error" data-testid="outline-error" class="outline-view__error">
-      <p>{{ error }}</p>
-      <button
-        data-testid="outline-retry-btn"
-        class="outline-view__retry-btn"
-        @click="handleGenerate"
-      >
-        重试
-      </button>
-    </div>
+    <a-alert
+      v-if="error"
+      data-testid="outline-error"
+      type="error"
+      :message="error"
+      closable
+      @close="error = null"
+      class="outline-view__error"
+    >
+      <template #action>
+        <a-button
+          data-testid="outline-retry-btn"
+          size="small"
+          @click="handleGenerate"
+        >
+          重试
+        </a-button>
+      </template>
+    </a-alert>
 
     <!-- Generate button (when no outline and not loading) -->
     <div
@@ -38,21 +48,21 @@
         data-testid="structure-switcher"
         class="outline-view__structure-select"
       >
-        <label>叙事结构：</label>
-        <select v-model="selectedStructure">
-          <option value="three-act">三幕式</option>
-          <option value="web-novel-ten">网文十章</option>
-          <option value="four-act-eight">四幕八段</option>
-        </select>
+        <span class="outline-view__structure-select-label">叙事结构：</span>
+        <a-select
+          v-model:value="selectedStructure"
+          :options="structureOptions"
+          style="width: 200px"
+        />
       </div>
-      <button
+      <a-button
+        type="primary"
         data-testid="generate-outline-btn"
-        class="outline-view__generate-btn"
-        :disabled="loading"
+        :loading="loading"
         @click="handleGenerate"
       >
         生成大纲
-      </button>
+      </a-button>
     </div>
 
     <!-- Outline content -->
@@ -62,52 +72,53 @@
         data-testid="structure-switcher"
         class="outline-view__structure-select"
       >
-        <label>叙事结构：</label>
-        <select v-model="selectedStructure" @change="handleSwitchStructure">
-          <option value="three-act">三幕式</option>
-          <option value="web-novel-ten">网文十章</option>
-          <option value="four-act-eight">四幕八段</option>
-        </select>
+        <span class="outline-view__structure-select-label">叙事结构：</span>
+        <a-select
+          v-model:value="selectedStructure"
+          :options="structureOptions"
+          style="width: 200px"
+          @change="handleSwitchStructure"
+        />
       </div>
       <div data-testid="outline-tree" class="outline-view__tree">
         <pre>{{ outlineData.output }}</pre>
       </div>
       <div data-testid="emotion-curve" class="outline-view__emotion">
-        <span
+        <a-tag
           v-for="label in emotionLabels"
           :key="label"
-          class="outline-view__emotion-tag"
+          color="blue"
         >
           {{ label }}
-        </span>
+        </a-tag>
       </div>
 
       <div
         v-if="!isConfirmed"
         class="outline-view__actions"
       >
-        <button
+        <a-button
           data-testid="regenerate-outline-btn"
-          class="outline-view__regenerate-btn"
-          :disabled="regenerating"
+          :loading="regenerating"
           @click="handleRegenerate"
         >
           {{ regenerating ? '刷新中...' : '刷新关联内容' }}
-        </button>
-        <button
+        </a-button>
+        <a-button
+          danger
           data-testid="reject-outline-btn"
-          class="outline-view__reject-btn"
           @click="handleReject"
         >
           驳回，重新生成
-        </button>
-        <button
+        </a-button>
+        <a-button
+          type="primary"
           data-testid="confirm-outline-btn"
-          class="outline-view__confirm-btn"
+          class="amber-btn"
           @click="handleConfirm"
         >
           确认大纲，进入分节阶段
-        </button>
+        </a-button>
       </div>
     </template>
   </div>
@@ -130,6 +141,12 @@ const props = defineProps<{
 }>();
 
 const selectedStructure = ref('three-act');
+
+const structureOptions = [
+  { value: 'three-act', label: '三幕式' },
+  { value: 'web-novel-ten', label: '网文十章' },
+  { value: 'four-act-eight', label: '四幕八段' },
+];
 
 const {
   data: outlineData,
@@ -192,47 +209,13 @@ async function handleSwitchStructure() {
   margin-bottom: 16px;
 }
 
-.outline-view__review-banner {
-  background-color: var(--color-accent-light);
-  color: var(--color-accent-dark);
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 16px;
-  border-left: 3px solid var(--color-accent);
-}
-
 .outline-view__loading {
   text-align: center;
   padding: 32px;
-  color: var(--color-text-secondary);
-  font-size: 14px;
 }
 
 .outline-view__error {
-  background-color: var(--color-error-light);
-  color: var(--color-error);
-  padding: 16px;
-  border-radius: var(--radius-md);
-  text-align: center;
   margin-bottom: 16px;
-}
-
-.outline-view__retry-btn {
-  margin-top: 8px;
-  padding: 6px 20px;
-  background-color: var(--color-error);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: opacity var(--transition-fast);
-}
-
-.outline-view__retry-btn:hover {
-  opacity: 0.9;
 }
 
 .outline-view__empty {
@@ -248,45 +231,15 @@ async function handleSwitchStructure() {
 
 .outline-view__structure-select {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.outline-view__structure-select label {
-  margin-right: 8px;
+.outline-view__structure-select-label {
   color: var(--color-text-secondary);
-}
-
-.outline-view__structure-select select {
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
   font-size: 14px;
-}
-
-.outline-view__generate-btn {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #fff;
-  border: none;
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-.outline-view__generate-btn:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.outline-view__generate-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .outline-view__tree {
@@ -305,80 +258,16 @@ async function handleSwitchStructure() {
 
 .outline-view__emotion {
   margin-bottom: 16px;
-}
-
-.outline-view__emotion-tag {
-  display: inline-block;
-  padding: 2px 10px;
-  margin-right: 8px;
-  background-color: var(--color-info-light);
-  color: var(--color-info);
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
+  display: flex;
+  gap: 8px;
 }
 
 .outline-view__actions {
   text-align: center;
   padding: 24px 0;
-}
-
-.outline-view__regenerate-btn {
-  background: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-right: 16px;
-  transition: all var(--transition-fast);
-}
-
-.outline-view__regenerate-btn:hover:not(:disabled) {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.outline-view__regenerate-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.outline-view__reject-btn {
-  background: transparent;
-  color: var(--color-error);
-  border: 1px solid var(--color-error);
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-right: 16px;
-  transition: all var(--transition-fast);
-}
-
-.outline-view__reject-btn:hover {
-  background: var(--color-error);
-  color: #fff;
-}
-
-.outline-view__confirm-btn {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
-  color: #fff;
-  border: none;
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-.outline-view__confirm-btn:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 </style>

@@ -1,40 +1,37 @@
 <template>
   <div class="text-toolbar" data-testid="text-toolbar">
-    <button
+    <a-button
       v-if="isGenerating && !isPaused"
       data-testid="btn-pause"
-      class="toolbar-btn btn-pause"
       @click="$emit('pause')"
     >
       暂停
-    </button>
+    </a-button>
 
-    <button
+    <a-button
       v-if="isPaused"
+      type="primary"
       data-testid="btn-continue"
-      class="toolbar-btn btn-continue"
       @click="$emit('continue')"
     >
       继续
-    </button>
+    </a-button>
 
     <template v-if="showRetryFeedback">
-      <input
+      <a-input
         data-testid="retry-feedback-input"
-        v-model="feedback"
-        class="feedback-input"
+        v-model:value="feedback"
         placeholder="输入反馈意见（仅本次生效）"
       />
     </template>
 
-    <button
+    <a-button
       v-if="!isGenerating"
       data-testid="btn-retry"
-      class="toolbar-btn btn-retry"
       @click="$emit('retry', feedback)"
     >
       重试
-    </button>
+    </a-button>
   </div>
 </template>
 

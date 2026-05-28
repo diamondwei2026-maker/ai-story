@@ -2,30 +2,40 @@
   <div data-testid="idea-view" class="idea-view">
     <h2 data-testid="idea-title" class="idea-view__title">灵感提取</h2>
 
-    <div
+    <a-alert
       v-if="reviewAnnotations"
       data-testid="review-annotations"
-      class="idea-view__review-banner"
-    >
-      {{ reviewAnnotations }}
-    </div>
+      type="warning"
+      :message="reviewAnnotations"
+      banner
+      show-icon
+    />
 
     <!-- Loading -->
     <div v-if="loading" data-testid="idea-loading" class="idea-view__loading">
-      卖点方案生成中，请稍候...
+      <a-spin tip="卖点方案生成中，请稍候..." />
     </div>
 
     <!-- Error -->
-    <div v-if="error" data-testid="idea-error" class="idea-view__error">
-      <p>{{ error }}</p>
-      <button
-        data-testid="idea-retry-btn"
-        class="idea-view__retry-btn"
-        @click="handleGenerate"
-      >
-        重试
-      </button>
-    </div>
+    <a-alert
+      v-if="error"
+      data-testid="idea-error"
+      type="error"
+      :message="error"
+      closable
+      @close="error = null"
+      class="idea-view__error"
+    >
+      <template #action>
+        <a-button
+          data-testid="idea-retry-btn"
+          size="small"
+          @click="handleGenerate"
+        >
+          重试
+        </a-button>
+      </template>
+    </a-alert>
 
     <!-- Step 1: Idea Input (no data yet) -->
     <div v-if="!ideaData && !loading" class="idea-view__empty">
@@ -35,14 +45,14 @@
         placeholder="输入你的小说创意，例如：一个医生重生到星际时代的故事..."
       />
       <div class="idea-view__empty-actions">
-        <button
+        <a-button
+          type="primary"
           data-testid="generate-idea-btn"
-          class="idea-view__generate-btn"
-          :disabled="loading"
+          :loading="loading"
           @click="handleGenerate"
         >
           分析创意，生成卖点方案
-        </button>
+        </a-button>
       </div>
     </div>
 
@@ -76,14 +86,15 @@
         v-if="!isConfirmed"
         class="idea-view__actions"
       >
-        <button
+        <a-button
           v-if="summaryGenerated"
+          type="primary"
           data-testid="confirm-idea-btn"
-          class="idea-view__confirm-btn"
+          class="amber-btn"
           @click="handleConfirm"
         >
           确认灵感，进入设定阶段
-        </button>
+        </a-button>
       </div>
     </template>
   </div>
@@ -248,47 +259,13 @@ async function handleReject() {
   margin-bottom: 16px;
 }
 
-.idea-view__review-banner {
-  background-color: var(--color-accent-light);
-  color: var(--color-accent-dark);
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 16px;
-  border-left: 3px solid var(--color-accent);
-}
-
 .idea-view__loading {
   text-align: center;
   padding: 32px;
-  color: var(--color-text-secondary);
-  font-size: 14px;
 }
 
 .idea-view__error {
-  background-color: var(--color-error-light);
-  color: var(--color-error);
-  padding: 16px;
-  border-radius: var(--radius-md);
-  text-align: center;
   margin-bottom: 16px;
-}
-
-.idea-view__retry-btn {
-  margin-top: 8px;
-  padding: 6px 20px;
-  background-color: var(--color-error);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: opacity var(--transition-fast);
-}
-
-.idea-view__retry-btn:hover {
-  opacity: 0.9;
 }
 
 .idea-view__empty {
@@ -299,69 +276,8 @@ async function handleReject() {
   padding: 0 24px 24px;
 }
 
-.idea-view__generate-btn {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #fff;
-  border: none;
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-.idea-view__generate-btn:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.idea-view__generate-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
 .idea-view__actions {
   text-align: center;
   padding: 24px 0;
-}
-
-.idea-view__reject-btn {
-  background: transparent;
-  color: var(--color-error);
-  border: 1px solid var(--color-error);
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-right: 16px;
-  transition: all var(--transition-fast);
-}
-
-.idea-view__reject-btn:hover {
-  background: var(--color-error);
-  color: #fff;
-}
-
-.idea-view__confirm-btn {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
-  color: #fff;
-  border: none;
-  padding: 10px 32px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-.idea-view__confirm-btn:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
 }
 </style>

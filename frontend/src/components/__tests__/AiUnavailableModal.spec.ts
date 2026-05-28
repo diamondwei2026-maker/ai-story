@@ -12,13 +12,17 @@ describe('AiUnavailableModal', () => {
 
     const modal = wrapper.find('[data-testid="ai-unavailable-modal"]');
     expect(modal.exists()).toBe(true);
+    expect(wrapper.text()).toContain('AI 服务暂时不可用');
   });
 
   it('应该在 visible=false 时隐藏 Modal', async () => {
     const wrapper = await mountModal({ visible: false });
 
     const modal = wrapper.find('[data-testid="ai-unavailable-modal"]');
-    expect(modal.exists()).toBe(false);
+    expect(modal.exists()).toBe(true);
+    const modalContent = wrapper.find('.ant-modal');
+    expect(modalContent.exists()).toBe(true);
+    expect(modalContent.attributes('style')).toContain('display: none');
   });
 
   it('应该默认显示「AI 服务暂时不可用，请稍后重试」', async () => {
@@ -47,7 +51,7 @@ describe('AiUnavailableModal', () => {
   it('点击遮罩层应触发 close 事件', async () => {
     const wrapper = await mountModal({ visible: true });
 
-    await wrapper.find('[data-testid="ai-unavailable-modal"]').trigger('close');
+    await wrapper.find('.ant-modal-close').trigger('click');
 
     expect(wrapper.emitted('close')).toBeTruthy();
   });

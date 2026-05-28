@@ -17,7 +17,7 @@ describe('ModeSwitcher', () => {
   it('highlights the active mode', async () => {
     const wrapper = await mountSwitcher({ mode: 'paragraph-rewrite' });
 
-    const active = wrapper.find('[data-testid="mode-option"].active');
+    const active = wrapper.find('.ant-radio-button-wrapper-checked');
     expect(active.exists()).toBe(true);
     expect(active.text()).toContain('段落改写');
   });
@@ -26,10 +26,9 @@ describe('ModeSwitcher', () => {
     const wrapper = await mountSwitcher({ mode: 'new-continue' });
 
     const options = wrapper.findAll('[data-testid="mode-option"]');
-    const rewriteOption = options.find((o) => o.text().includes('段落改写'));
-    if (rewriteOption) {
-      await rewriteOption.trigger('click');
-    }
+    // Click the "段落改写" radio button
+    const rewriteBtn = options[1];
+    await rewriteBtn.trigger('click');
 
     expect(wrapper.emitted('update:mode')).toBeTruthy();
     expect(wrapper.emitted('update:mode')![0]).toEqual(['paragraph-rewrite']);

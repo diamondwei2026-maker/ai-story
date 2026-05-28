@@ -62,7 +62,7 @@ describe('WorkflowStepper', () => {
       phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
     });
 
-    const activeStep = wrapper.find('[data-testid="step-item"].step--active');
+    const activeStep = wrapper.find('[data-testid="step-item"].ant-steps-item-active');
     expect(activeStep.exists()).toBe(true);
     expect(activeStep.find('[data-testid="step-label"]').text()).toBe('剧情大纲');
   });

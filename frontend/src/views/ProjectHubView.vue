@@ -2,14 +2,19 @@
   <div class="project-hub">
     <h1 class="project-hub__title">我的项目</h1>
     <div class="project-hub__toolbar">
-      <button data-testid="create-project-btn" class="project-hub__create-btn" @click="handleCreateProject">
+      <a-button
+        type="primary"
+        data-testid="create-project-btn"
+        @click="handleCreateProject"
+      >
         创建项目
-      </button>
+      </a-button>
     </div>
     <div data-testid="project-list" class="project-hub__list">
-      <div data-testid="empty-state" class="project-hub__empty">
-        暂无项目，点击上方按钮开始创作
-      </div>
+      <a-empty
+        data-testid="empty-state"
+        description="暂无项目，点击上方按钮开始创作"
+      />
     </div>
   </div>
 </template>
@@ -31,7 +36,6 @@ async function handleCreateProject() {
 </script>
 
 <style scoped>
-
 .project-hub {
   max-width: 900px;
   margin: 0 auto;
@@ -52,33 +56,10 @@ async function handleCreateProject() {
   margin-bottom: 16px;
 }
 
-.project-hub__create-btn {
-  padding: 10px 24px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-.project-hub__create-btn:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.project-hub__create-btn:active {
-  transform: translateY(0);
-}
-
-.project-hub__empty {
-  text-align: center;
-  color: var(--color-text-muted);
+.project-hub__list {
+  display: flex;
+  justify-content: center;
   padding: 64px 0;
-  font-size: 15px;
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 2px dashed var(--color-border);

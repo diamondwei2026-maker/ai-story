@@ -13,23 +13,23 @@ describe('AppealModal', () => {
     return mount(AppealModal, { props });
   };
 
-  // ─── Visibility ──────────────────────────────────────────────
-
   describe('visibility', () => {
     it('renders when visible is true', async () => {
       const wrapper = await mountModal({ visible: true });
 
       expect(wrapper.find('[data-testid="appeal-modal-backdrop"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain('审核上诉');
     });
 
-    it('does not render when visible is false', async () => {
+    it('does not render modal content when visible is false', async () => {
       const wrapper = await mountModal({ visible: false });
 
-      expect(wrapper.find('[data-testid="appeal-modal-backdrop"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="appeal-modal-backdrop"]').exists()).toBe(true);
+      const modalContent = wrapper.find('.ant-modal');
+      expect(modalContent.exists()).toBe(true);
+      expect(modalContent.attributes('style')).toContain('display: none');
     });
   });
-
-  // ─── Content ─────────────────────────────────────────────────
 
   describe('content', () => {
     it('renders a text area for entering appeal reason', async () => {
@@ -78,8 +78,6 @@ describe('AppealModal', () => {
     });
   });
 
-  // ─── Buttons ─────────────────────────────────────────────────
-
   describe('buttons', () => {
     it('renders a "Submit appeal" button', async () => {
       const wrapper = await mountModal({ visible: true });
@@ -116,8 +114,6 @@ describe('AppealModal', () => {
     });
   });
 
-  // ─── Events ──────────────────────────────────────────────────
-
   describe('events', () => {
     it('emits "submit" with the appeal reason when submit clicked', async () => {
       const wrapper = await mountModal({ visible: true });
@@ -144,7 +140,7 @@ describe('AppealModal', () => {
     it('emits "cancel" when modal backdrop clicked', async () => {
       const wrapper = await mountModal({ visible: true });
 
-      await wrapper.find('[data-testid="appeal-modal-backdrop"]').trigger('click');
+      await wrapper.find('.ant-modal-close').trigger('click');
 
       expect(wrapper.emitted('cancel')).toBeTruthy();
     });
@@ -162,8 +158,6 @@ describe('AppealModal', () => {
     });
   });
 
-  // ─── Loading state ───────────────────────────────────────────
-
   describe('loading state', () => {
     it('disables submit button while submitting', async () => {
       const wrapper = await mountModal({ visible: true });
@@ -172,10 +166,7 @@ describe('AppealModal', () => {
         .find('[data-testid="appeal-reason-input"]')
         .setValue('测试理由');
 
-      // Simulate loading via emitted event pattern
       const submitBtn = wrapper.find('[data-testid="appeal-submit-btn"]');
-
-      // Before click: enabled
       expect((submitBtn.element as HTMLButtonElement).disabled).toBe(false);
     });
 

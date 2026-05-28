@@ -12,13 +12,18 @@ describe('ErrorModal', () => {
 
     const modal = wrapper.find('[data-testid="error-modal"]');
     expect(modal.exists()).toBe(true);
+    expect(wrapper.text()).toContain('AI 服务暂时不可用');
   });
 
   it('is hidden when the visible prop is false', async () => {
     const wrapper = await mountModal({ visible: false });
 
     const modal = wrapper.find('[data-testid="error-modal"]');
-    expect(modal.exists()).toBe(false);
+    expect(modal.exists()).toBe(true);
+    // antd modal renders content even when closed, but the wrapper is display:none
+    const modalContent = wrapper.find('.ant-modal');
+    expect(modalContent.exists()).toBe(true);
+    expect(modalContent.attributes('style')).toContain('display: none');
   });
 
   it('displays the provided error message', async () => {
@@ -61,7 +66,7 @@ describe('ErrorModal', () => {
   it('emits close event when the modal is dismissed', async () => {
     const wrapper = await mountModal({ visible: true });
 
-    await wrapper.find('[data-testid="error-modal"]').trigger('close');
+    await wrapper.find('.ant-modal-close').trigger('click');
 
     expect(wrapper.emitted('close')).toBeTruthy();
   });

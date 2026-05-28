@@ -1,9 +1,7 @@
 <template>
-  <div data-testid="summary-card" class="summary-card">
-    <h3 class="summary-card__title">小说简介</h3>
-
+  <a-card data-testid="summary-card" title="小说简介">
     <div v-if="loading" data-testid="summary-loading" class="summary-card__loading">
-      简介生成中...
+      <a-spin tip="简介生成中..." />
     </div>
 
     <div v-else-if="!oneLiner && !fullSummary" data-testid="summary-empty" class="summary-card__empty">
@@ -23,16 +21,16 @@
 
       <div v-if="editable" class="summary-card__section">
         <span class="summary-card__label">自定义一句话简介 (可选)</span>
-        <textarea
+        <a-textarea
           data-testid="custom-brief-input"
-          class="summary-card__custom-input"
           :value="customBrief"
           :placeholder="customBriefPlaceholder"
-          @input="$emit('update:customBrief', ($event.target as HTMLTextAreaElement).value)"
+          :rows="2"
+          @update:value="$emit('update:customBrief', $event)"
         />
       </div>
     </template>
-  </div>
+  </a-card>
 </template>
 
 <script setup lang="ts">
@@ -51,21 +49,6 @@ defineEmits<{
 </script>
 
 <style scoped>
-
-.summary-card {
-  padding: 24px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.summary-card__title {
-  font-size: 18px;
-  color: var(--color-text-primary);
-  margin: 0 0 16px 0;
-}
-
 .summary-card__loading,
 .summary-card__empty {
   text-align: center;
@@ -106,25 +89,5 @@ defineEmits<{
   margin: 0;
   line-height: 1.8;
   white-space: pre-wrap;
-}
-
-.summary-card__custom-input {
-  width: 100%;
-  min-height: 50px;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  color: var(--color-text-primary);
-  background-color: var(--color-bg);
-  resize: vertical;
-  margin-top: 6px;
-  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
-}
-
-.summary-card__custom-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 </style>

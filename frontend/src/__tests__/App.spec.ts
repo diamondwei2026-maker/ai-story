@@ -20,12 +20,12 @@ describe('App', () => {
 
   it('wraps content in AppLayout', async () => {
     const wrapper = await mountApp();
-    expect(wrapper.findComponent({ name: 'AppLayout' }).exists()).toBe(true);
+    expect(wrapper.find('.app-layout').exists()).toBe(true);
   });
 
   it('contains CanvasBackground for the particle animation', async () => {
     const wrapper = await mountApp();
-    expect(wrapper.findComponent({ name: 'CanvasBackground' }).exists()).toBe(true);
+    expect(wrapper.find('canvas').exists()).toBe(true);
   });
 
   it('contains a router-view for page rendering', async () => {

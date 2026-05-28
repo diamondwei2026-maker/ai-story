@@ -47,3 +47,14 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 }
+
+/* ===== Amber accent button overrides for ant-design-vue ===== */
+.amber-btn.ant-btn-primary {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #d97706;
+}
+.amber-btn.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  border-color: #b45309 !important;
+  opacity: 1;
+}

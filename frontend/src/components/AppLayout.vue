@@ -1,28 +1,23 @@
 <template>
-  <div class="app-layout">
-    <header v-if="$slots.header" class="app-layout__header">
+  <a-layout class="app-layout">
+    <a-layout-header v-if="$slots.header" class="app-layout__header">
       <slot name="header" />
-    </header>
-    <main class="app-layout__body">
+    </a-layout-header>
+    <a-layout-content class="app-layout__body">
       <slot />
-    </main>
-    <footer v-if="$slots.footer" class="app-layout__footer">
+    </a-layout-content>
+    <a-layout-footer v-if="$slots.footer" class="app-layout__footer">
       <slot name="footer" />
-    </footer>
-  </div>
+    </a-layout-footer>
+  </a-layout>
 </template>
 
 <script setup lang="ts">
 </script>
 
 <style scoped>
-
 .app-layout {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-bg);
-  color: var(--color-text-primary);
 }
 
 .app-layout__header {
@@ -30,10 +25,13 @@
   padding: 0 24px;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
+  height: auto;
+  line-height: unset;
+  display: flex;
+  align-items: center;
 }
 
 .app-layout__body {
-  flex: 1;
   padding: 24px;
 }
 

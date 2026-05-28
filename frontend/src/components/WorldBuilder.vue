@@ -1,24 +1,24 @@
 <template>
-  <div data-testid="world-builder" class="world-builder edit-card">
-    <div class="world-builder__header edit-card__header">
-      <h3 class="edit-card__title">世界观设定</h3>
-      <button
+  <a-card data-testid="world-builder" title="世界观设定">
+    <template #extra>
+      <a-button
         v-if="!editing"
+        size="small"
         data-testid="edit-world-btn"
-        class="edit-card__edit-btn"
         @click="enterEditMode"
       >
         编辑
-      </button>
-      <button
+      </a-button>
+      <a-button
         v-else
+        size="small"
+        type="primary"
         data-testid="save-world-btn"
-        class="edit-card__save-btn"
         @click="save"
       >
         保存
-      </button>
-    </div>
+      </a-button>
+    </template>
 
     <template v-if="!editing">
       <div
@@ -40,14 +40,13 @@
         class="world-builder__dimension"
       >
         <h4 class="edit-card__section-label">{{ dim.label }}</h4>
-        <textarea
-          v-model="edits[dim.key]"
-          class="edit-card__section-textarea"
-          rows="4"
+        <a-textarea
+          v-model:value="edits[dim.key]"
+          :rows="4"
         />
       </div>
     </template>
-  </div>
+  </a-card>
 </template>
 
 <script setup lang="ts">
@@ -102,9 +101,22 @@ function save() {
 </script>
 
 <style scoped>
-@import url('@/styles/edit-card.css');
-
 .world-builder__dimension {
   margin-bottom: 16px;
+}
+
+.edit-card__section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.edit-card__section-text {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
 }
 </style>

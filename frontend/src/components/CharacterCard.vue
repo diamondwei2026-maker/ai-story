@@ -1,28 +1,29 @@
 <template>
-  <div data-testid="character-card" class="character-card edit-card">
-    <div class="character-card__header edit-card__header">
-      <h3 data-testid="character-card-title" class="edit-card__title">角色卡</h3>
-      <button
+  <a-card data-testid="character-card">
+    <template #title>
+      <span data-testid="character-card-title">角色卡</span>
+    </template>
+    <template #extra>
+      <a-button
         v-if="!editing && hasCharacters"
+        size="small"
         data-testid="edit-character-btn"
-        class="edit-card__edit-btn"
         @click="enterEditMode"
       >
         编辑
-      </button>
-      <button
+      </a-button>
+      <a-button
         v-if="editing"
+        size="small"
+        type="primary"
         data-testid="save-character-btn"
-        class="edit-card__save-btn"
         @click="save"
       >
         保存
-      </button>
-    </div>
+      </a-button>
+    </template>
 
-    <div v-if="!hasCharacters && !editing" data-testid="char-empty" class="character-card__empty">
-      暂无角色数据，请先生成设定
-    </div>
+    <a-empty v-if="!hasCharacters && !editing" data-testid="char-empty" description="暂无角色数据，请先生成设定" />
 
     <template v-if="hasCharacters">
       <div
@@ -32,7 +33,7 @@
         class="character-card__char"
       >
         <div class="character-card__char-header">
-          <span data-testid="char-role-label" class="character-card__role-label">{{ char.label }}</span>
+          <a-tag data-testid="char-role-label" color="teal">{{ char.label }}</a-tag>
           <span v-if="char.name" class="character-card__char-name">{{ char.name }}</span>
         </div>
 
@@ -57,33 +58,30 @@
           <div class="character-card__arcs">
             <div class="character-card__arc">
               <span class="character-card__arc-label">欲望</span>
-              <textarea
-                v-model="edits[char.role].desire"
-                class="character-card__arc-textarea"
-                rows="2"
+              <a-textarea
+                v-model:value="edits[char.role].desire"
+                :rows="2"
               />
             </div>
             <div class="character-card__arc">
               <span class="character-card__arc-label">动机</span>
-              <textarea
-                v-model="edits[char.role].motivation"
-                class="character-card__arc-textarea"
-                rows="2"
+              <a-textarea
+                v-model:value="edits[char.role].motivation"
+                :rows="2"
               />
             </div>
             <div class="character-card__arc">
               <span class="character-card__arc-label">结局</span>
-              <textarea
-                v-model="edits[char.role].ending"
-                class="character-card__arc-textarea"
-                rows="2"
+              <a-textarea
+                v-model:value="edits[char.role].ending"
+                :rows="2"
               />
             </div>
           </div>
         </template>
       </div>
     </template>
-  </div>
+  </a-card>
 </template>
 
 <script setup lang="ts">
@@ -178,15 +176,6 @@ function save() {
 </script>
 
 <style scoped>
-@import url('@/styles/edit-card.css');
-
-.character-card__empty {
-  text-align: center;
-  padding: 24px;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-}
-
 .character-card__char {
   padding: 12px;
   border: 1px solid var(--color-border-light);
@@ -199,14 +188,6 @@ function save() {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
-}
-
-.character-card__role-label {
-  font-size: 13px;
-  color: #fff;
-  background: var(--color-primary);
-  padding: 2px 10px;
-  border-radius: var(--radius-sm);
 }
 
 .character-card__char-name {
@@ -241,19 +222,6 @@ function save() {
   color: var(--color-text-secondary);
   line-height: 1.6;
   margin: 0;
-  flex: 1;
-}
-
-.character-card__arc-textarea {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border-light);
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: vertical;
-  font-family: inherit;
-  color: var(--color-text-secondary);
   flex: 1;
 }
 </style>
