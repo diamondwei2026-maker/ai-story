@@ -42,7 +42,8 @@ export class DeepSeekChatModel implements IChatModel {
     });
 
     for await (const chunk of stream) {
-      const content = chunk.choices?.[0]?.delta?.content;
+      const delta = chunk.choices?.[0]?.delta as Record<string, unknown> | undefined;
+      const content = (delta?.content as string) || (delta?.reasoning_content as string);
       if (content) {
         yield { content };
       }
