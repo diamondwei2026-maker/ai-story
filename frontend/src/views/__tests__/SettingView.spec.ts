@@ -83,10 +83,7 @@ describe('SettingView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      const btn = wrapper.find('[data-testid="generate-setting-btn"]');
-      await btn.trigger('click');
-      await wrapper.vm.$nextTick();
-
+      // Auto-generate already triggered; loading should be visible
       expect(wrapper.find('[data-testid="setting-loading"]').exists()).toBe(true);
     });
 
@@ -104,12 +101,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate already triggers the API call
       expect(mockGenerateSetting).toHaveBeenCalledWith('test-project-1', { idea: '' });
     });
 
@@ -127,12 +121,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate completes; WorldBuilder should be visible
       const worldBuilder = wrapper.find('[data-testid="world-builder"]');
       expect(worldBuilder.exists()).toBe(true);
     });
@@ -151,13 +142,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      // Switch to Characters tab
+      // Auto-generate completed; switch to Characters tab
       const tabs = wrapper.findAll('.ant-tabs-tab');
       const charactersTab = tabs.find(el => el.text() === '角色');
       if (charactersTab) {
@@ -183,12 +170,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate completed; WorldBuilder should have content prop
       const worldBuilder = wrapper.findComponent({ name: 'WorldBuilder' });
       if (worldBuilder.exists()) {
         expect(worldBuilder.props('content')).toBeTruthy();
@@ -211,12 +195,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate completed; confirm button should be visible
       const confirmBtn = wrapper.find('[data-testid="confirm-setting-btn"]');
       expect(confirmBtn.exists()).toBe(true);
     });
@@ -243,14 +224,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      // Generate first
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      // Then confirm
+      // Auto-generate completed; confirm
       await wrapper.find('[data-testid="confirm-setting-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
@@ -303,12 +279,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate completed; reject button should be visible
       expect(wrapper.find('[data-testid="reject-setting-btn"]').exists()).toBe(true);
     });
 
@@ -333,12 +306,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate completed; click reject
       await wrapper.find('[data-testid="reject-setting-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
@@ -377,12 +347,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate triggered and failed; error should be visible
       const errorEl = wrapper.find('[data-testid="setting-error"]');
       expect(errorEl.exists()).toBe(true);
       expect(errorEl.text()).toContain('AI 服务暂时不可用');
@@ -394,12 +361,9 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
+      // Auto-generate triggered and failed; retry button should be visible
       expect(wrapper.find('[data-testid="setting-retry-btn"]').exists()).toBe(true);
     });
 
@@ -419,14 +383,10 @@ describe('SettingView', () => {
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      // First attempt fails
-      await wrapper.find('[data-testid="generate-setting-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      // Click retry
+      // Auto-generate triggered and consumed the first (failing) call
+      // Click retry button to trigger the second call
       await wrapper.find('[data-testid="setting-retry-btn"]').trigger('click');
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));

@@ -81,17 +81,7 @@
       v-if="loaded && projects.length === 0"
       data-testid="empty-state"
       description="你的写作台还是空的，开始你的第一部小说吧。"
-    >
-      <template #action>
-        <a-button
-          type="primary"
-          size="large"
-          @click="showCreateModal = true"
-        >
-          创建我的第一个项目
-        </a-button>
-      </template>
-    </EmptyState>
+    />
 
     <CreateProjectModal
       v-model:open="showCreateModal"

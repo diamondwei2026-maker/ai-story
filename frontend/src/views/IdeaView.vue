@@ -117,25 +117,13 @@
         </a-button>
       </div>
 
-      <!-- Confirmed state -->
-      <a-result
-        v-if="isConfirmed"
-        status="success"
-        title="灵感已确认"
-        sub-title="正在前往设定阶段..."
-      >
-        <template #extra>
-          <a-button type="primary" @click="store.setCurrentPhase('SETTING')">
-            前往设定集
-          </a-button>
-        </template>
-      </a-result>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useWorkflowStore } from '@/stores/useWorkflowStore';
 import {
   generateIdea,
@@ -155,6 +143,7 @@ const props = defineProps<{
 }>();
 
 const store = useWorkflowStore();
+const router = useRouter();
 
 const ideaData = ref<StepDataResponse | null>(null);
 const ideaText = ref('');
@@ -278,6 +267,7 @@ async function handleConfirm() {
     ideaData.value = result;
     store.setStepStatus('IDEA', 'CONFIRMED');
     store.setCurrentPhase('SETTING');
+    router.push({ name: 'workflow.setting', params: { id: props.projectId } });
   } catch (e) {
     error.value = e instanceof Error ? e.message : '确认失败';
   }

@@ -1,4 +1,5 @@
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useWorkflowStore, type PhaseType } from '@/stores/useWorkflowStore';
 
 interface StepLike {
@@ -20,11 +21,13 @@ interface UsePhaseWorkflowOptions<T extends StepLike> {
 
 export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptions<T>) {
   const store = useWorkflowStore();
+  const router = useRouter();
 
   const data = ref<T | null>(null);
   const loading = ref(false);
   const regenerating = ref(false);
   const error = ref<string | null>(null);
+  const initialLoadDone = ref(false);
 
   const isConfirmed = computed(() => {
     return (
@@ -46,6 +49,8 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
       }
     } catch {
       // Silently ignore fetch errors on mount
+    } finally {
+      initialLoadDone.value = true;
     }
   });
 
@@ -85,6 +90,10 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
       data.value = result;
       store.setStepStatus(opts.phase, 'CONFIRMED');
       store.setCurrentPhase(opts.nextPhase);
+      const nextRoute = `workflow.${opts.nextPhase.toLowerCase()}`;
+      router.push({ name: nextRoute, params: { id: opts.projectId } }).catch(() => {
+        // Route may not exist yet (e.g., BEATS, DRAFTING) — silently ignore
+      });
     } catch (e) {
       error.value = e instanceof Error ? e.message : '确认失败';
     }
@@ -110,6 +119,7 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
     error,
     isConfirmed,
     reviewAnnotations,
+    initialLoadDone,
     handleGenerate,
     handleRegenerate,
     handleConfirm,

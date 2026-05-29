@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
 import type { StepDataResponse } from '@/api/common';
@@ -122,6 +122,7 @@ const {
   error,
   isConfirmed,
   reviewAnnotations,
+  initialLoadDone,
   handleGenerate,
   handleRegenerate,
   handleConfirm,
@@ -135,6 +136,13 @@ const {
   confirmFn: confirmSetting,
   rejectFn: rejectSetting,
   generateArgs: () => ({ idea: '' }),
+});
+
+// 进入设定页后若无数据则自动生成
+watch(initialLoadDone, (done) => {
+  if (done && !settingData.value && !loading.value) {
+    handleGenerate();
+  }
 });
 </script>
 

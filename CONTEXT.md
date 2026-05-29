@@ -104,7 +104,7 @@
 
 ## 实施状态
 
-> 最后更新：2026-05-29（IDEA Phase 数据职责分离：`generateIdea` → output 仅含卖点方案 + 简介泄露 sanitization；`generateIdeaSummary` → 仅传选中卖点给 AI + 简介存入 `review` JSON 独立字段 + 卖点泄露 sanitization；Prompt 双向加强输出约束；`useIdeaParser` 从 `review` 优先读取简介，output 正则回退兼容旧数据。实机全链路 curl 验证通过）
+> 最后更新：2026-05-29（Phase 确认自动跳转：`IdeaView.handleConfirm` 删除中间态"前往设定集"按钮，改为 `router.push` 直达设定集；`usePhaseWorkflow.handleConfirm` 新增 `router.push` 使所有 Phase 确认后自动跳转下一阶段路由；`SettingView` 新增 `initialLoadDone` watcher 进入页后自动生成设定。实机全链路 curl 验证通过，前后端 70 条测试零回归）
 
 | 模块 | 状态 | 已实现接口 | 备注 |
 |------|------|-----------|------|
