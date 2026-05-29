@@ -100,9 +100,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
+import { getIdea } from '@/api/idea';
 import type { StepDataResponse } from '@/api/common';
 import WorldBuilder from '@/components/WorldBuilder.vue';
 import CharacterCard from '@/components/CharacterCard.vue';
@@ -114,6 +115,27 @@ const props = defineProps<{
 }>();
 
 const activeTab = ref('world');
+
+/** 从 IDEA 阶段提取的已确认创意摘要，供设定生成使用 */
+const ideaBasis = ref('');
+
+/**
+ * 从 IDEA 阶段的 output 中提取一句话简介 + 500字简介，
+ * 这部分内容代表了用户已确认的故事核心创意。
+ */
+function extractIdeaBasis(output: string, review: Record<string, unknown> | null): string {
+  // priority: review.oneLiner / review.fullSummary (独立存储)
+  const rv = review as Record<string, unknown> | null;
+  const oneLiner =
+    (typeof rv?.oneLiner === 'string' && rv.oneLiner) ||
+    (output.match(/#+ 一句话简介\n([\s\S]*?)(?=\n#+ |$)/)?.[1]?.trim()) ||
+    '';
+  const fullSummary =
+    (typeof rv?.fullSummary === 'string' && rv.fullSummary) ||
+    (output.split(/#+ 500字简介\n/)[1]?.trim()) ||
+    '';
+  return [oneLiner, fullSummary].filter(Boolean).join('\n\n');
+}
 
 const {
   data: settingData,
@@ -135,12 +157,27 @@ const {
   generateFn: generateSetting,
   confirmFn: confirmSetting,
   rejectFn: rejectSetting,
-  generateArgs: () => ({ idea: '' }),
+  generateArgs: () => ({ idea: ideaBasis.value }),
 });
 
-// 进入设定页后若无数据则自动生成
-watch(initialLoadDone, (done) => {
-  if (done && !settingData.value && !loading.value) {
+// 加载 IDEA 阶段已确认的创意内容
+const ideaLoaded = ref(false);
+onMounted(async () => {
+  try {
+    const ideaData = await getIdea(props.projectId);
+    if (ideaData) {
+      ideaBasis.value = extractIdeaBasis(ideaData.output, ideaData.review as Record<string, unknown> | null);
+    }
+  } catch {
+    // 静默忽略，最坏情况 idea 为空（回退兼容）
+  } finally {
+    ideaLoaded.value = true;
+  }
+});
+
+// 待设定初始查询和 IDEA 数据都就绪后再自动生成
+watch([initialLoadDone, ideaLoaded], ([settingDone, ideaDone]) => {
+  if (settingDone && ideaDone && !settingData.value && !loading.value) {
     handleGenerate();
   }
 });

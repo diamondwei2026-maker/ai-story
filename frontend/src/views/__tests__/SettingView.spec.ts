@@ -7,6 +7,7 @@ const mockGenerateSetting = vi.fn();
 const mockConfirmSetting = vi.fn();
 const mockRejectSetting = vi.fn();
 const mockGetSetting = vi.fn();
+const mockGetIdea = vi.fn();
 
 vi.mock('@/api/setting', () => ({
   generateSetting: (...args: any[]) => mockGenerateSetting(...args),
@@ -15,11 +16,17 @@ vi.mock('@/api/setting', () => ({
   getSetting: (...args: any[]) => mockGetSetting(...args),
 }));
 
+vi.mock('@/api/idea', () => ({
+  getIdea: (...args: any[]) => mockGetIdea(...args),
+}));
+
 describe('SettingView', () => {
   beforeEach(() => {
     localStorage.clear();
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    // 默认无 IDEA 数据（回退兼容旧行为）
+    mockGetIdea.mockResolvedValue(null);
   });
 
   const mountView = async () => {
@@ -105,6 +112,43 @@ describe('SettingView', () => {
 
       // Auto-generate already triggers the API call
       expect(mockGenerateSetting).toHaveBeenCalledWith('test-project-1', { idea: '' });
+    });
+
+    it('passes confirmed IDEA summary as idea to generateSetting', async () => {
+      mockGetSetting.mockResolvedValue(null);
+      // 模拟 IDEA 阶段已确认的摘要数据（包含独立存储字段）
+      mockGetIdea.mockResolvedValue({
+        id: 'idea-step-1',
+        projectId: 'test-project-1',
+        phaseType: 'IDEA',
+        status: 'CONFIRMED',
+        output: '## 卖点方案 1:\n核心卖点: 赛博修仙\n\n# 一句话简介\n一个程序员在赛博朋克世界修仙。\n\n# 500字简介\n详细故事描述...',
+        review: {
+          selectedSellPoint: 0,
+          summaryGenerated: true,
+          oneLiner: '独立存储的一句话简介',
+          fullSummary: '独立存储的完整简介',
+        },
+        version: 1,
+      });
+      mockGenerateSetting.mockResolvedValue({
+        id: 'step-2',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'AWAITING_REVIEW',
+        output: '## 时代背景\n赛博修仙世界。',
+        review: {},
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      // 应优先使用 review 中独立存储的字段
+      expect(mockGenerateSetting).toHaveBeenCalledWith('test-project-1', {
+        idea: '独立存储的一句话简介\n\n独立存储的完整简介',
+      });
     });
 
     it('displays WorldBuilder after successful generation', async () => {
