@@ -142,14 +142,17 @@ export class StepService {
     step.status = 'AI_GENERATING';
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
+    // 剥离 AI 可能自发输出的简介段落，确保只保留卖点方案
+    const sanitizedOutput = output.replace(/\n#+ (一句话简介|500字简介)[\s\S]*$/i, '');
+
     const updated = await this.prisma.stepData.update({
       where: { id: step.id },
       data: {
         status: 'AWAITING_REVIEW',
-        output,
+        output: sanitizedOutput,
         input: feedback ? `idea: ${idea}\nfeedback: ${feedback}` : idea,
         review: {
-          complianceCheck: this.runPowerSystemCheck(output),
+          complianceCheck: this.runPowerSystemCheck(sanitizedOutput),
           annotations: 'AI 生成内容，仅供参考',
         } as any,
         version: { increment: 1 },
@@ -168,23 +171,37 @@ export class StepService {
       throw new BadRequestException('selectedSellPoint is required');
     }
 
+    // 从 output 中只提取选中卖点的内容，不传全量卖点到 AI
+    const sellPointBlocks = (existing.output ?? '').match(
+      /## 卖点方案 \d+:[\s\S]*?(?=\n## 卖点方案 \d+:|\n#+ (?:一句话简介|500字简介)|$)/g,
+    ) ?? [];
+    const selectedContent = sellPointBlocks[opts.selectedSellPoint] ?? (existing.output ?? '');
+
     const prompt = this.promptLoader.renderTemplate('creation', 'idea-summary-generation', {
-      sellPointContent: existing.output ?? '',
-      selectedSellPoint: String(opts.selectedSellPoint),
+      sellPointContent: selectedContent,
       customBrief: opts.customBrief ?? '',
     });
 
     const { content: summaryOutput } = await this.collectAiOutput(TaskType.IDEA, prompt);
 
+    // 剥离 AI 可能自发输出的卖点段落，确保只保留简介
+    const sanitizedSummary = summaryOutput.replace(/\n#+ 卖点方案 \d+:[\s\S]*$/i, '');
+
+    const oneLinerMatch = sanitizedSummary.match(/#+ 一句话简介\n([\s\S]*?)(?=\n#+ |$)/);
+    const oneLiner = oneLinerMatch ? oneLinerMatch[1].trim() : '';
+    const fullSummaryParts = sanitizedSummary.split(/#+ 500字简介\n/);
+    const fullSummary = fullSummaryParts.length >= 2 ? fullSummaryParts[1].trim() : '';
+
     const updated = await this.prisma.stepData.update({
       where: { id: existing.id },
       data: {
         status: 'AWAITING_REVIEW',
-        output: (existing.output ?? '') + '\n\n' + summaryOutput,
         review: {
           ...(existing.review as Record<string, unknown>),
           selectedSellPoint: opts.selectedSellPoint,
           summaryGenerated: true,
+          oneLiner,
+          fullSummary,
         } as any,
         version: { increment: 1 },
       },

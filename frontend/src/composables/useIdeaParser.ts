@@ -1,7 +1,10 @@
 import { computed, type Ref } from 'vue';
 import type { SellPoint } from '@/components/MarketAnalysisCard.vue';
 
-export function useIdeaParser(output: Ref<string | undefined | null>) {
+export function useIdeaParser(
+  output: Ref<string | undefined | null>,
+  review: Ref<Record<string, unknown> | undefined | null>,
+) {
   const sellPoints = computed((): SellPoint[] => {
     const text = output.value ?? '';
     const result: SellPoint[] = [];
@@ -46,19 +49,25 @@ export function useIdeaParser(output: Ref<string | undefined | null>) {
   });
 
   const hasSummary = computed(() => {
+    const rv = review.value as Record<string, any> | null | undefined;
+    if (rv?.summaryGenerated) return true;
     const text = output.value ?? '';
-    return text.includes('## 500字简介') || text.includes('## 一句话简介');
+    return /#+ (?:一句话简介|500字简介)/.test(text);
   });
 
   const oneLiner = computed(() => {
+    const rv = review.value as Record<string, any> | null | undefined;
+    if (typeof rv?.oneLiner === 'string' && rv.oneLiner.length > 0) return rv.oneLiner;
     const text = output.value ?? '';
-    const match = text.match(/## 一句话简介\n([\s\S]*?)(?=\n## |$)/);
+    const match = text.match(/#+ 一句话简介\n([\s\S]*?)(?=\n#+ |$)/);
     return match ? match[1].trim() : '';
   });
 
   const fullSummary = computed(() => {
+    const rv = review.value as Record<string, any> | null | undefined;
+    if (typeof rv?.fullSummary === 'string' && rv.fullSummary.length > 0) return rv.fullSummary;
     const text = output.value ?? '';
-    const parts = text.split('## 500字简介\n');
+    const parts = text.split(/#+ 500字简介\n/);
     if (parts.length < 2) return '';
     return parts[1].trim();
   });

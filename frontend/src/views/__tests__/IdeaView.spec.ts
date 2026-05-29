@@ -260,8 +260,15 @@ describe('IdeaView', () => {
         projectId: 'test-project-1',
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
-        output: '## 一句话简介\n女医生重生星际。\n## 500字简介\n详细简介内容...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        output: '## 卖点方案 1: 星际医妃风华录\n...',
+        review: {
+          oneLiner: '女医生重生星际。',
+          fullSummary: '详细简介内容...',
+          summaryGenerated: true,
+          selectedSellPoint: 0,
+          complianceCheck: { passed: true },
+          annotations: '仅供参考',
+        },
         version: 1,
       });
 
@@ -302,7 +309,13 @@ describe('IdeaView', () => {
         projectId: 'test-project-1',
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
-        output: '## 一句话简介\n...\n## 500字简介\n...',
+        output: '## 卖点方案 1: ...\n## 卖点方案 2: ...\n## 卖点方案 3: ...',
+        review: {
+          oneLiner: '女医生重生星际。',
+          fullSummary: '详细简介内容...',
+          summaryGenerated: true,
+          selectedSellPoint: 1,
+        },
       });
 
       const wrapper = await mountView();
@@ -338,7 +351,13 @@ describe('IdeaView', () => {
       });
       mockGenerateIdeaSummary.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
-        status: 'AWAITING_REVIEW', output: '## 一句话简介\n...\n## 500字简介\n...',
+        status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
+        review: {
+          oneLiner: '女医生重生星际。',
+          fullSummary: '详细简介内容...',
+          summaryGenerated: true,
+          selectedSellPoint: 0,
+        },
       });
 
       const wrapper = await mountView();
@@ -369,7 +388,13 @@ describe('IdeaView', () => {
       });
       mockGenerateIdeaSummary.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
-        status: 'AWAITING_REVIEW', output: '## 一句话简介\n...\n## 500字简介\n...',
+        status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
+        review: {
+          oneLiner: '女医生重生星际。',
+          fullSummary: '详细简介内容...',
+          summaryGenerated: true,
+          selectedSellPoint: 0,
+        },
       });
       mockConfirmIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
@@ -528,8 +553,14 @@ describe('IdeaView', () => {
       mockGetIdea.mockResolvedValue({
         id: 'step-with-summary', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
-        output: '## 卖点方案...\n## 一句话简介\n女医生重生星际。\n## 500字简介\n详细简介...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        output: '## 卖点方案 1: ...\n## 卖点方案 2: ...\n## 卖点方案 3: ...',
+        review: {
+          oneLiner: '女医生重生星际。',
+          fullSummary: '详细简介内容...',
+          summaryGenerated: true,
+          complianceCheck: { passed: true },
+          annotations: '仅供参考',
+        }, version: 1,
       });
 
       const wrapper = await mountView();

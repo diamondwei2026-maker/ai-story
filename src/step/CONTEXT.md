@@ -44,7 +44,9 @@ BLOCKED → 手动修改/上诉 → 重新审核
 
 ### Phase 管理 (`step.service.ts`)
 
-- **灵感提取 (IDEA)**: `generateIdea()` → `confirmIdea()` / `rejectIdea()`
+- **灵感提取 (IDEA)**: `generateIdea()` → `confirmIdea()` / `rejectIdea()`；`generateIdeaSummary()` 生成一句话简介+500字简介
+  - 数据职责分离：`generateIdea()` → `output` 仅含 3 个卖点方案（含简介泄露 sanitization）；`generateIdeaSummary()` → 仅提取选中卖点传给 AI，简介存入 `review.oneLiner`/`review.fullSummary`/`review.summaryGenerated`，`output` 不变
+  - 双向 sanitization：卖点生成剥离 `#+ 一句话简介`/`#+ 500字简介` 段落，简介生成剥离 `#+ 卖点方案` 段落
 - **设定集 (SETTING)**: `generateSetting()` → `confirmSetting()` / `rejectSetting()`
 - **剧情大纲 (OUTLINE)**: `generateOutline()` → `confirmOutline()` / `rejectOutline()`；`switchStructure()` 切换大纲格式
 - **细纲拆解 (BEATS)**: `generateBeats()` → `confirmBeats()` / `rejectBeats()`；`updateBeatWordCount()` / `updateBeatStructure()` 轻量修改
@@ -63,7 +65,9 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - `confirmChapter()` → COMPLETED
 - `disputeChapter()` → DISPUTED
 
-### 审核决策路径 (`step.service.ts` — 审核方法内嵌于 StepService，无独立 review.service.ts)
+### 审核决策路径 (`review.service.ts`)
+
+审核逻辑已从 StepService 提取至独立的 `ReviewService`（约 200 行），含 `evaluateChapter`/`appealReview`/`getAvailableActions`/`getActionsForChapter`/`forceDisputeChapter` + 5 个私有辅助方法。
 
 - 四档结论（PASS / PASS_WITH_SUGGESTIONS / NEEDS_REVISION / BLOCKED）
 - `evaluateChapter()` — 自动审核

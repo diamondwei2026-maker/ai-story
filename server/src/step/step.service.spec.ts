@@ -1411,8 +1411,11 @@ describe('StepService', () => {
 
       expect(step).toBeDefined();
       expect(step.phaseType).toBe('IDEA');
-      expect(step.output).toContain('一句话简介');
-      expect(step.output).toContain('500字简介');
+      expect(step.output).not.toContain('一句话简介');
+      expect(step.output).not.toContain('500字简介');
+      expect(step.review).toHaveProperty('oneLiner');
+      expect(step.review).toHaveProperty('fullSummary');
+      expect(step.review).toHaveProperty('summaryGenerated', true);
     });
 
     it('should include the one-liner summary', async () => {
@@ -1426,9 +1429,9 @@ describe('StepService', () => {
         selectedSellPoint: 0,
       });
 
-      const oneLinerMatch = step.output!.match(/## 一句话简介\n(.+)/);
-      expect(oneLinerMatch).toBeDefined();
-      expect(oneLinerMatch![1].trim().length).toBeGreaterThan(10);
+      expect(step.review).toHaveProperty('oneLiner');
+      expect(typeof (step.review as any).oneLiner).toBe('string');
+      expect((step.review as any).oneLiner.length).toBeGreaterThan(10);
     });
 
     it('should include the 500-word summary', async () => {
@@ -1442,9 +1445,9 @@ describe('StepService', () => {
         selectedSellPoint: 0,
       });
 
-      const fullSummary = step.output!.split('## 500字简介\n')[1];
-      expect(fullSummary).toBeDefined();
-      expect(fullSummary.trim().length).toBeGreaterThan(200);
+      expect(step.review).toHaveProperty('fullSummary');
+      expect(typeof (step.review as any).fullSummary).toBe('string');
+      expect((step.review as any).fullSummary.length).toBeGreaterThan(200);
     });
 
     it('should throw when no IDEA step exists to generate summary for', async () => {

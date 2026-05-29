@@ -173,6 +173,8 @@ const suggestedPrompts = [
 
 const output = computed(() => ideaData.value?.output);
 
+const review = computed(() => ideaData.value?.review);
+
 const isConfirmed = computed(() => {
   return (
     ideaData.value?.status === 'CONFIRMED' ||
@@ -190,7 +192,7 @@ const {
   hasSummary: summaryGenerated,
   oneLiner: summaryOneLiner,
   fullSummary: summaryFull,
-} = useIdeaParser(output);
+} = useIdeaParser(output, review);
 
 const currentSubStep = computed(() => {
   if (isConfirmed.value) return 3;
