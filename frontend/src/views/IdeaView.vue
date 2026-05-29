@@ -41,7 +41,7 @@
           size="small"
           @click="handleGenerate"
         >
-          Retry
+          重试
         </a-button>
       </template>
     </a-alert>
@@ -51,7 +51,7 @@
       <IdeaInput
         v-model="ideaText"
         :disabled="false"
-        placeholder="Describe your story idea..."
+        placeholder="描述你的故事创意..."
       />
       <div class="idea-view__prompts">
         <span class="idea-view__prompts-label caption">试试这个灵感：</span>

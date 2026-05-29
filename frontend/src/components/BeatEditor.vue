@@ -84,7 +84,7 @@ function handleSaveStructure() {
         v-model:checked="editIsClimax"
         class="climax-row"
       >
-        标记为高潮章节 (isClimax)
+        标记为高潮章节
       </a-checkbox>
     </div>
 

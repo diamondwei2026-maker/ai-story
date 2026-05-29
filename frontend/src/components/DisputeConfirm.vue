@@ -2,7 +2,7 @@
   <div data-testid="dispute-confirm-backdrop">
     <a-modal
       :open="visible"
-      title="强制标记 DISPUTED"
+      title="强制标记争议"
       :mask-closable="true"
       :get-container="false"
       @cancel="emit('cancel')"
@@ -33,7 +33,7 @@
           data-testid="dispute-confirm-btn"
           @click="emit('confirm')"
         >
-          确认标记 DISPUTED
+          确认标记争议
         </a-button>
       </template>
     </a-modal>

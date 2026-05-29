@@ -32,7 +32,7 @@
           size="small"
           @click="handleGenerate"
         >
-          Retry
+          重试
         </a-button>
       </template>
     </a-alert>
@@ -224,7 +224,7 @@ const parsedOutline = computed<OutlineItem[]>(() => {
       const title = lines[0].trim();
       const body = lines.slice(1).join('\n').trim();
       items.push({
-        title: title || `Section ${i + 1}`,
+        title: title || `第${i + 1}段`,
         body: body || block.trim(),
         color: COLORS[i % COLORS.length],
       });

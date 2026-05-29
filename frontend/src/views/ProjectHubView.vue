@@ -11,7 +11,7 @@
           data-testid="create-project-btn"
           @click="showCreateModal = true"
         >
-          New Project
+          新建项目
         </a-button>
       </div>
     </div>

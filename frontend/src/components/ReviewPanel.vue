@@ -165,7 +165,7 @@ function pushAppealAction(
   if (props.reviewResult.appealCount < 1) {
     actions.push({ key: 'appeal', label: '上诉' });
   } else {
-    actions.push({ key: 'force_dispute', label: '强制标记 DISPUTED' });
+    actions.push({ key: 'force_dispute', label: '强制标记争议' });
   }
 }
 

@@ -63,7 +63,7 @@ const projectId = computed(() => route.params.id as string);
 
 const projectTitle = computed(() => {
   const p = projectStore.projects.find((pr) => pr.id === projectId.value);
-  return p?.title ?? 'Project';
+  return p?.title ?? '项目';
 });
 
 const phaseLabels: Record<string, string> = {

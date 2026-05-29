@@ -32,7 +32,7 @@
           size="small"
           @click="handleGenerate"
         >
-          Retry
+          重试
         </a-button>
       </template>
     </a-alert>
