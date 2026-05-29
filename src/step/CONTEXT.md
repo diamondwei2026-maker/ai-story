@@ -34,7 +34,7 @@ NEEDS_REVISION → 采纳/手动修改/上诉 → 重新审核
 BLOCKED → 手动修改/上诉 → 重新审核
 ```
 
-上诉只给一次机会。二次审核维持 BLOCKED/NEEDS_REVISION → 可强制 DISPUTED。
+上诉只给一次机会。二次审核维持 BLOCKED/NEEDS_REVISION → 可强制标记争议。
 
 ### 章节顺序锁
 
@@ -68,7 +68,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - 四档结论（PASS / PASS_WITH_SUGGESTIONS / NEEDS_REVISION / BLOCKED）
 - `evaluateChapter()` — 自动审核
 - `appealReview()` — 上诉（仅一次）
-- `forceDisputeChapter()` — 强制标记 DISPUTED（需完成上诉流程）
+- `forceDisputeChapter()` — 强制标记争议（需完成上诉流程）
 - `getAvailableActions()` / `getActionsForChapter()` — 决策路径查询
 
 ### FactSheet 补偿队列 (`factsheet-compensation.service.ts`)
