@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useWorkflowStore, type PhaseType } from '@/stores/useWorkflowStore';
+import { useWorkflowStore, type PhaseType, type StepStatus } from '@/stores/useWorkflowStore';
 
 interface StepLike {
   status: string;
@@ -17,6 +17,27 @@ interface UsePhaseWorkflowOptions<T extends StepLike> {
   confirmFn: (projectId: string) => Promise<T>;
   rejectFn: (projectId: string) => Promise<T>;
   generateArgs: () => Record<string, string>;
+}
+
+/**
+ * 将后端 StepData 的状态映射为前端 StepStatus。
+ * 后端状态: PENDING | AI_GENERATING | AWAITING_REVIEW | CONFIRMED | REJECTED
+ * 前端状态: PENDING | IN_PROGRESS | CONFIRMED | REJECTED
+ */
+function backendStatusToStepStatus(status: string): StepStatus | null {
+  switch (status) {
+    case 'CONFIRMED':
+      return 'CONFIRMED';
+    case 'REJECTED':
+      return 'REJECTED';
+    case 'AI_GENERATING':
+    case 'AWAITING_REVIEW':
+      return 'IN_PROGRESS';
+    case 'PENDING':
+      return 'PENDING';
+    default:
+      return null;
+  }
 }
 
 export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptions<T>) {
@@ -46,6 +67,11 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
       const existing = await opts.getFn(opts.projectId);
       if (existing) {
         data.value = existing;
+        // 将后端数据状态同步到 workflow store，确保 Stepper 正确显示
+        const mapped = backendStatusToStepStatus(existing.status);
+        if (mapped) {
+          store.setStepStatus(opts.phase, mapped);
+        }
       }
     } catch {
       // Silently ignore fetch errors on mount
@@ -57,6 +83,7 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
   async function handleGenerate() {
     loading.value = true;
     error.value = null;
+    store.setStepStatus(opts.phase, 'IN_PROGRESS');
     try {
       const result = await opts.generateFn(opts.projectId, opts.generateArgs());
       data.value = result;
@@ -105,6 +132,7 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
     try {
       const result = await opts.rejectFn(opts.projectId);
       data.value = result;
+      store.setStepStatus(opts.phase, 'REJECTED');
     } catch (e) {
       error.value = e instanceof Error ? e.message : '驳回失败';
     } finally {
