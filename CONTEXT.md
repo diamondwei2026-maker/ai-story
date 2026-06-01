@@ -104,7 +104,7 @@
 
 ## 实施状态
 
-> 最后更新：2026-05-29（Phase 确认自动跳转：`IdeaView.handleConfirm` 删除中间态"前往设定集"按钮，改为 `router.push` 直达设定集；`usePhaseWorkflow.handleConfirm` 新增 `router.push` 使所有 Phase 确认后自动跳转下一阶段路由；`SettingView` 新增 `initialLoadDone` watcher 进入页后自动生成设定。实机全链路 curl 验证通过，前后端 70 条测试零回归）
+> 最后更新：2026-06-01（删除 Phase 页面的"AI 生成内容，仅供参考"横幅提示——移除 IdeaView/SettingView/OutlineView 三处 `<a-alert>` + `usePhaseWorkflow.reviewAnnotations` computed + StepService 5 处 `annotations` 写入。旧数据中的该字段值不受影响，但前端不再渲染。前后端 10 文件，819 条测试零回归）
 
 | 模块 | 状态 | 已实现接口 | 备注 |
 |------|------|-----------|------|
