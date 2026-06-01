@@ -41,9 +41,9 @@ describe('useAiStatus', () => {
     const { aiMeta, setAiMeta } = useAiStatus();
     setAiMeta(mockAiMeta);
 
-    expect(aiMeta.value).toEqual(mockAiMeta);
-    expect(aiMeta.value.modelUsed).toBe('deepseek-r1');
-    expect(aiMeta.value.degraded).toBe(false);
+    expect(aiMeta.value!).toEqual(mockAiMeta);
+    expect(aiMeta.value!.modelUsed).toBe('deepseek-r1');
+    expect(aiMeta.value!.degraded).toBe(false);
   });
 
   it('降级时 isDegraded 应为 true', async () => {
@@ -52,7 +52,7 @@ describe('useAiStatus', () => {
     const { aiMeta, setAiMeta } = useAiStatus();
     setAiMeta(mockDegradedMeta);
 
-    expect(aiMeta.value.degraded).toBe(true);
+    expect(aiMeta.value!.degraded).toBe(true);
   });
 
   it('setUnavailable(true) 后 isUnavailable 应为 true', async () => {
@@ -81,7 +81,7 @@ describe('useAiStatus', () => {
     setAiMeta(mockFailedMeta);
     setUnavailable(true);
 
-    expect(aiMeta.value.failed).toBe(true);
+    expect(aiMeta.value!.failed).toBe(true);
     expect(isUnavailable.value).toBe(true);
   });
 

@@ -98,7 +98,7 @@ describe('BeatList', () => {
       { ...mockBeats[0], status: 'STALE' as const },
       ...mockBeats.slice(1),
     ];
-    const wrapper = await mountList({ beats: staleBeats });
+    const wrapper = await mountList({ beats: staleBeats as typeof mockBeats });
 
     const staleBadges = wrapper.findAll('[data-testid="beat-stale-badge"]');
     expect(staleBadges).toHaveLength(1);

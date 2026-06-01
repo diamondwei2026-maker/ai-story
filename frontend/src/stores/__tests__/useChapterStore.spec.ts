@@ -13,6 +13,8 @@ const mockChapter = {
   chapterFingerprint: null,
   contextSummary: null,
   reviewResult: null,
+  changeAnalysis: null as Record<string, unknown> | null,
+  targetedFixHistory: [] as import("@/stores/useChapterStore").TargetedFixEntry[],
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

@@ -23,7 +23,7 @@ describe('WorkflowStepper', () => {
     steps: StepInfo[];
     currentPhase: PhaseType;
     phaseOrder: PhaseType[];
-    factsheetAlert?: { level: string; depth: number };
+    factsheetAlert?: { level: 'NORMAL' | 'PRIORITY' | 'WARNING' | 'CRITICAL'; depth: number };
     projectStatus?: string;
     allChaptersCompleted?: boolean;
   }) => {

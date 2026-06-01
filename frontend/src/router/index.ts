@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router';
 import ProjectHubView from '@/views/ProjectHubView.vue';
 import WorkflowView from '@/views/WorkflowView.vue';
 import IdeaView from '@/views/IdeaView.vue';
@@ -20,19 +20,19 @@ const routes = [
         path: 'idea',
         name: 'workflow.idea',
         component: IdeaView,
-        props: (route) => ({ projectId: route.params.id }),
+        props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
       },
       {
         path: 'setting',
         name: 'workflow.setting',
         component: SettingView,
-        props: (route) => ({ projectId: route.params.id }),
+        props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
       },
       {
         path: 'outline',
         name: 'workflow.outline',
         component: OutlineView,
-        props: (route) => ({ projectId: route.params.id }),
+        props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
       },
     ],
   },

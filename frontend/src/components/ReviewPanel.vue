@@ -11,7 +11,7 @@
     <!-- Dimension scores -->
     <a-descriptions :column="4" size="small" bordered class="review-panel__dimensions">
       <a-descriptions-item
-        v-for="dim in dimensions"
+        v-for="dim in dimensionScores"
         :key="dim.key"
         :label="dim.label"
         :data-testid="`dimension-${dim.key}`"
@@ -115,6 +115,14 @@ const dimensions = [
   { key: 'VALUES', label: '价值观' },
 ];
 
+	const dimensionScores = computed(() => {
+	  const dims = props.reviewResult.dimensions;
+	  return dimensions.map((d) => ({
+	    ...d,
+	    score: (dims[d.key as keyof typeof dims]?.score ?? 0).toFixed(1),
+	  }));
+	});
+
 const verdictLabels: Record<string, string> = {
   PASS: 'PASS · 通过',
   PASS_WITH_SUGGESTIONS: '通过（有建议）',
@@ -206,7 +214,7 @@ function handleAction(key: string) {
     | 'manual-edit'
     | 'appeal'
     | 'force-dispute';
-  emit(event);
+  emit(event as any);
 }
 </script>
 
