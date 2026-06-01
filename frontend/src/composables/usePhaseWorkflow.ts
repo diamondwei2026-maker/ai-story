@@ -57,11 +57,6 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
     );
   });
 
-  const reviewAnnotations = computed(() => {
-    const annotations = data.value?.review?.annotations;
-    return typeof annotations === 'string' ? annotations : null;
-  });
-
   onMounted(async () => {
     try {
       const existing = await opts.getFn(opts.projectId);
@@ -146,7 +141,6 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
     regenerating,
     error,
     isConfirmed,
-    reviewAnnotations,
     initialLoadDone,
     handleGenerate,
     handleRegenerate,

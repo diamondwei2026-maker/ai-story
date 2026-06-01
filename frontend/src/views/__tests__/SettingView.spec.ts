@@ -462,7 +462,7 @@ describe('SettingView', () => {
       expect(wrapper.find('[data-testid="world-builder"]').exists()).toBe(true);
     });
 
-    it('shows review annotations in the content', async () => {
+    it('does not show review annotations when annotations is empty', async () => {
       mockGetSetting.mockResolvedValue({
         id: 'step-review',
         projectId: 'test-project-1',
@@ -471,7 +471,7 @@ describe('SettingView', () => {
         output: '设定内容',
         review: {
           powerSystemCheck: { passed: true, flags: [] },
-          annotations: 'AI 生成内容，仅供参考',
+          annotations: '',
         },
         version: 1,
       });
@@ -480,8 +480,7 @@ describe('SettingView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(wrapper.find('[data-testid="review-annotations"]').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="review-annotations"]').text()).toContain('仅供参考');
+      expect(wrapper.find('[data-testid="review-annotations"]').exists()).toBe(false);
     });
   });
 

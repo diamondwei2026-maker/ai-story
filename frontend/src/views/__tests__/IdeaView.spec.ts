@@ -108,7 +108,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
 
@@ -137,7 +137,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
 
@@ -152,7 +152,7 @@ describe('IdeaView', () => {
       expect(wrapper.find('[data-testid="sellpoint-selector"]').exists()).toBe(true);
     });
 
-    it('shows review annotations after generation', async () => {
+    it('does not show review annotations when annotations is empty', async () => {
       mockGetIdea.mockResolvedValue(null);
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1',
@@ -160,7 +160,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...',
-        review: { complianceCheck: { passed: true }, annotations: 'AI 生成内容，仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
 
@@ -173,8 +173,7 @@ describe('IdeaView', () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const reviewEl = wrapper.find('[data-testid="review-annotations"]');
-      expect(reviewEl.exists()).toBe(true);
-      expect(reviewEl.text()).toContain('仅供参考');
+      expect(reviewEl.exists()).toBe(false);
     });
   });
 
@@ -187,7 +186,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 新方案\n...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
 
@@ -224,7 +223,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
 
@@ -252,7 +251,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
       mockGenerateIdeaSummary.mockResolvedValue({
@@ -267,7 +266,7 @@ describe('IdeaView', () => {
           summaryGenerated: true,
           selectedSellPoint: 0,
           complianceCheck: { passed: true },
-          annotations: '仅供参考',
+          annotations: '',
         },
         version: 1,
       });
@@ -301,7 +300,7 @@ describe('IdeaView', () => {
         phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: ...\n## 卖点方案 2: ...\n## 卖点方案 3: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' },
+        review: { complianceCheck: { passed: true }, annotations: '' },
         version: 1,
       });
       mockGenerateIdeaSummary.mockResolvedValue({
@@ -347,7 +346,7 @@ describe('IdeaView', () => {
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        review: { complianceCheck: { passed: true }, annotations: '' }, version: 1,
       });
       mockGenerateIdeaSummary.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
@@ -384,7 +383,7 @@ describe('IdeaView', () => {
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        review: { complianceCheck: { passed: true }, annotations: '' }, version: 1,
       });
       mockGenerateIdeaSummary.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
@@ -457,7 +456,7 @@ describe('IdeaView', () => {
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        review: { complianceCheck: { passed: true }, annotations: '' }, version: 1,
       });
 
       const wrapper = await mountView();
@@ -476,7 +475,7 @@ describe('IdeaView', () => {
       mockGenerateIdea.mockResolvedValue({
         id: 'step-1', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW', output: '## 卖点方案 1: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        review: { complianceCheck: { passed: true }, annotations: '' }, version: 1,
       });
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
@@ -538,7 +537,7 @@ describe('IdeaView', () => {
         id: 'step-existing', projectId: 'test-project-1', phaseType: 'IDEA',
         status: 'AWAITING_REVIEW',
         output: '## 卖点方案 1: 星际医妃风华录\n...\n## 卖点方案 2: ...\n## 卖点方案 3: ...',
-        review: { complianceCheck: { passed: true }, annotations: '仅供参考' }, version: 1,
+        review: { complianceCheck: { passed: true }, annotations: '' }, version: 1,
       });
 
       const wrapper = await mountView();
@@ -559,7 +558,7 @@ describe('IdeaView', () => {
           fullSummary: '详细简介内容...',
           summaryGenerated: true,
           complianceCheck: { passed: true },
-          annotations: '仅供参考',
+          annotations: '',
         }, version: 1,
       });
 

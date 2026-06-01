@@ -90,7 +90,7 @@ export class StepService {
         input: currentContent ? `${idea}\n\n--- 用户编辑内容 ---\n${currentContent}` : idea,
         review: {
           powerSystemCheck: this.runPowerSystemCheck(output),
-          annotations: 'AI 生成内容，仅供参考',
+          annotations: '',
         } as any,
         version: { increment: 1 },
       },
@@ -153,7 +153,7 @@ export class StepService {
         input: feedback ? `idea: ${idea}\nfeedback: ${feedback}` : idea,
         review: {
           complianceCheck: this.runPowerSystemCheck(sanitizedOutput),
-          annotations: 'AI 生成内容，仅供参考',
+          annotations: '',
         } as any,
         version: { increment: 1 },
       },
@@ -277,7 +277,7 @@ export class StepService {
           structurePacing: this.runPacingReview(output),
           conflictReview: this.runConflictReview(output),
           climaxReview: this.runClimaxReview(output),
-          annotations: 'AI 生成内容，仅供参考',
+          annotations: '',
         } as any,
         version: { increment: 1 },
       },
@@ -317,7 +317,7 @@ export class StepService {
       structurePacing: this.runPacingReview(output),
       conflictReview: this.runConflictReview(output),
       climaxReview: this.runClimaxReview(output),
-      annotations: 'AI 生成内容，仅供参考',
+      annotations: '',
     };
 
     const updated = await this.prisma.stepData.update({
@@ -391,7 +391,7 @@ export class StepService {
         input: currentContent
           ? `outline: ${outline}\n\n--- 用户编辑内容 ---\n${currentContent}`
           : `outline: ${outline}`,
-        review: { beatCount: newBeats.length, annotations: 'AI 生成内容，仅供参考' } as any,
+        review: { beatCount: newBeats.length, annotations: '' } as any,
         version: { increment: 1 },
       },
     });

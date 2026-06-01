@@ -570,7 +570,7 @@ describe('OutlineView', () => {
       expect(wrapper.find('[data-testid="outline-tree"]').exists()).toBe(true);
     });
 
-    it('shows review annotations in the content', async () => {
+    it('does not show review annotations when annotations is empty', async () => {
       mockGetOutline.mockResolvedValue({
         id: 'step-review',
         projectId: 'test-project-1',
@@ -581,7 +581,7 @@ describe('OutlineView', () => {
           structurePacing: { passed: true, score: 80 },
           conflictReview: { passed: true, notes: '冲突递进合理' },
           climaxReview: { passed: true, notes: '高潮有力' },
-          annotations: 'AI 生成内容，仅供参考',
+          annotations: '',
         },
         version: 1,
       });
@@ -590,8 +590,7 @@ describe('OutlineView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(wrapper.find('[data-testid="review-annotations"]').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="review-annotations"]').text()).toContain('仅供参考');
+      expect(wrapper.find('[data-testid="review-annotations"]').exists()).toBe(false);
     });
 
     it('displays emotion labels on plot points', async () => {

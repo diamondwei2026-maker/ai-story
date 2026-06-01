@@ -11,15 +11,6 @@
       </a-steps>
     </div>
 
-    <a-alert
-      v-if="reviewAnnotations"
-      data-testid="review-annotations"
-      type="warning"
-      :message="reviewAnnotations"
-      banner
-      show-icon
-    />
-
     <!-- Loading -->
     <div v-if="loading" data-testid="idea-loading" class="idea-view__loading">
       <a-spin tip="卖点方案生成中，请稍候..." />
@@ -171,10 +162,6 @@ const isConfirmed = computed(() => {
   );
 });
 
-const reviewAnnotations = computed(() => {
-  const annotations = ideaData.value?.review?.annotations;
-  return typeof annotations === 'string' ? annotations : null;
-});
 
 const {
   sellPoints: parsedSellPoints,

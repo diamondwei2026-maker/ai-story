@@ -2,15 +2,6 @@
   <div data-testid="setting-view" class="setting-view">
     <h2 data-testid="setting-title" class="setting-view__title section-title">设定集</h2>
 
-    <a-alert
-      v-if="reviewAnnotations"
-      data-testid="review-annotations"
-      type="warning"
-      :message="reviewAnnotations"
-      banner
-      show-icon
-    />
-
     <!-- Loading -->
     <div v-if="loading" data-testid="setting-loading" class="setting-view__loading">
       <a-spin tip="设定生成中，请稍候..." />
@@ -143,7 +134,6 @@ const {
   regenerating,
   error,
   isConfirmed,
-  reviewAnnotations,
   initialLoadDone,
   handleGenerate,
   handleRegenerate,

@@ -1330,7 +1330,6 @@ describe('StepService', () => {
       expect(step.review).toBeDefined();
       expect(step.review).toHaveProperty('complianceCheck');
       expect(step.review).toHaveProperty('annotations');
-      expect(step.review!.annotations).toContain('仅供参考');
     });
 
     it('should throw when project does not exist', async () => {

@@ -2,15 +2,6 @@
   <div data-testid="outline-view" class="outline-view">
     <h2 data-testid="outline-title" class="outline-view__title section-title">剧情大纲</h2>
 
-    <a-alert
-      v-if="reviewAnnotations"
-      data-testid="review-annotations"
-      type="warning"
-      :message="reviewAnnotations"
-      banner
-      show-icon
-    />
-
     <!-- Loading -->
     <div v-if="loading" data-testid="outline-loading" class="outline-view__loading">
       <a-spin tip="大纲生成中，请稍候..." />
@@ -170,7 +161,6 @@ const {
   regenerating,
   error,
   isConfirmed,
-  reviewAnnotations,
   handleGenerate,
   handleRegenerate,
   handleConfirm,
