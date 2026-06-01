@@ -2,10 +2,14 @@
   "name": "novelcraft-pro-server",
   "version": "0.0.1",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && npx prisma generate",
     "start": "nest start",
     "start:dev": "nest start --watch",
+    "start:prod": "node dist/main",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },

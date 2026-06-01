@@ -1,0 +1,25 @@
+# Render Blueprint — Infrastructure as Code
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This deploys the NestJS backend server.
+# The frontend is deployed on Vercel separately.
+
+services:
+  - type: web
+    name: novelcraft-pro-server
+    runtime: node
+    region: singapore  # 新加坡，对国内访问延迟较低
+    plan: free
+    buildCommand: npm run build -w server
+    startCommand: npm run start:prod -w server
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
