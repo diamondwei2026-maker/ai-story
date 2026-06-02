@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
+
 withDefaults(defineProps<{
   sourceContent: string;
   patchContent: string;
@@ -18,17 +20,21 @@ const emit = defineEmits<{
     <div class="targeted-fix-diff__panels">
       <div class="targeted-fix-diff__panel">
         <h4 class="targeted-fix-diff__panel-title">原始内容</h4>
-        <pre
+        <div
           data-testid="diff-source"
           class="targeted-fix-diff__content targeted-fix-diff__content--source"
-        >{{ sourceContent }}</pre>
+        >
+          <MarkdownRenderer :content="sourceContent" />
+        </div>
       </div>
       <div class="targeted-fix-diff__panel">
         <h4 class="targeted-fix-diff__panel-title">修补内容</h4>
-        <pre
+        <div
           data-testid="diff-patch"
           class="targeted-fix-diff__content targeted-fix-diff__content--patch"
-        >{{ patchContent }}</pre>
+        >
+          <MarkdownRenderer :content="patchContent" />
+        </div>
       </div>
     </div>
 

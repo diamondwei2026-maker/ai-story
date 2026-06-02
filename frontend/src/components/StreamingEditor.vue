@@ -20,7 +20,11 @@
         data-testid="editor-content"
         :class="['streaming-editor__content', { 'streaming-editor__content--active': isStreaming }]"
       >
-        <p class="streaming-editor__text serif-accent">{{ content }}</p>
+        <MarkdownRenderer
+          v-if="!isStreaming"
+          :content="content"
+        />
+        <p v-else class="streaming-editor__text serif-accent">{{ content }}</p>
         <span v-if="isStreaming" class="streaming-editor__cursor streaming-editor__cursor--inline">|</span>
       </div>
 
@@ -61,6 +65,7 @@
 import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 import EmptyState from '@/components/EmptyState.vue';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = defineProps<{
   content: string;

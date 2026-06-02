@@ -82,10 +82,10 @@
             :color="item.color"
           >
             <h4 class="outline-item__title">{{ item.title }}</h4>
-            <p class="outline-item__body body-text">{{ item.body }}</p>
+            <MarkdownRenderer :content="item.body" />
           </a-timeline-item>
         </a-timeline>
-        <pre v-else class="outline-view__fallback body-text">{{ outlineData.output }}</pre>
+        <MarkdownRenderer v-else :content="outlineData.output" />
       </div>
 
       <div data-testid="emotion-curve" class="outline-view__emotion-bar">
@@ -142,6 +142,7 @@ import {
 } from '@/api/outline';
 import type { StepDataResponse } from '@/api/common';
 import EmptyState from '@/components/EmptyState.vue';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = defineProps<{
   projectId: string;

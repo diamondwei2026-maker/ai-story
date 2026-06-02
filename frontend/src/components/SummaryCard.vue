@@ -30,9 +30,10 @@
 
       <div class="summary-card__section">
         <span data-testid="full-summary-label" class="summary-card__label">500字简介</span>
-        <p data-testid="full-summary" class="summary-card__full body-text">
-          {{ fullSummary }}
-        </p>
+        <MarkdownRenderer
+          data-testid="full-summary"
+          :content="fullSummary"
+        />
       </div>
 
       <div v-if="editable" class="summary-card__section">
@@ -52,6 +53,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { message } from 'ant-design-vue';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = defineProps<{
   oneLiner: string;

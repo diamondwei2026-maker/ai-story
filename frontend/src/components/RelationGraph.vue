@@ -26,11 +26,11 @@
     <template v-if="!editing">
       <div data-testid="relation-conflicts" class="relation-graph__section">
         <h4 class="edit-card__section-label">冲突关系</h4>
-        <p class="edit-card__section-text">{{ conflicts }}</p>
+        <MarkdownRenderer :content="conflicts" />
       </div>
       <div data-testid="relation-bonds" class="relation-graph__section">
         <h4 class="edit-card__section-label">情感纽带</h4>
-        <p class="edit-card__section-text">{{ bonds }}</p>
+        <MarkdownRenderer :content="bonds" />
       </div>
     </template>
 
@@ -54,8 +54,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { parseSections } from '@/composables/useContentParser';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = defineProps<{
   content?: string;
@@ -63,6 +64,10 @@ const props = defineProps<{
 
 const editing = ref(false);
 const savedEdits = ref<{ conflicts: string; bonds: string }>({ conflicts: '', bonds: '' });
+
+watch(() => props.content, () => {
+  savedEdits.value = { conflicts: '', bonds: '' };
+});
 
 function parseRelationParts(text: string): { conflicts: string; bonds: string } {
   const conflictsMatch = text.match(/冲突关系[：:]\s*([\s\S]*?)(?=情感纽带[：:]|$)/);

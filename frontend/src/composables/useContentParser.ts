@@ -1,3 +1,11 @@
+/** Strip markdown inline formatting that AI may add to headers. */
+function normalizeHeader(raw: string): string {
+  return raw
+    .replace(/^\*\*(.+?)\*\*$/, '$1')  // **Header**
+    .replace(/^\*(.+?)\*$/, '$1')        // *Header*
+    .trim();
+}
+
 export function parseSections(content: string): Record<string, string> {
   const normalized = content.replace(/\r\n/g, '\n');
   const sections: Record<string, string> = {};
@@ -12,7 +20,7 @@ export function parseSections(content: string): Record<string, string> {
       if (currentSection) {
         sections[currentSection] = currentContent.join('\n').trim();
       }
-      currentSection = headerMatch[1].trim();
+      currentSection = normalizeHeader(headerMatch[1]);
       currentContent = [];
     } else {
       currentContent.push(line);

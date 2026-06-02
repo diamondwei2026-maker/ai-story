@@ -28,7 +28,11 @@
           :header="dim.label"
           :data-testid="`dimension-${dim.key}`"
         >
-          <p class="world-builder__text body-text">{{ dim.value || '尚未生成。' }}</p>
+          <MarkdownRenderer
+            v-if="dim.value"
+            :content="dim.value"
+          />
+          <p v-else class="world-builder__text body-text">尚未生成。</p>
         </a-collapse-panel>
       </a-collapse>
     </template>
@@ -51,8 +55,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { parseSections } from '@/composables/useContentParser';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 interface Dimension {
   key: string;
@@ -76,12 +81,19 @@ const editing = ref(false);
 const activePanels = ref<string[]>(DIMENSIONS.map((d) => d.key));
 const savedEdits = ref<Record<string, string>>({});
 
+// When new content arrives (e.g. regenerate), discard stale saved edits
+// so they don't block the fresh parsed content from rendering.
+watch(() => props.content, () => {
+  savedEdits.value = {};
+});
+
 const parsed = computed(() => parseSections(props.content ?? ''));
 
 const dimensions = computed<Dimension[]>(() =>
   DIMENSIONS.map((d) => ({
     ...d,
-    value: savedEdits.value[d.key] ?? parsed.value[d.sectionHeader] ?? '',
+    // Use || (not ??) so empty-string savedEdits also fall through to parsed
+    value: savedEdits.value[d.key] || parsed.value[d.sectionHeader] || '',
   })),
 );
 

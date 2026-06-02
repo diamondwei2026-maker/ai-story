@@ -316,7 +316,7 @@ describe('OutlineView', () => {
       expect(wrapper.find('[data-testid="reject-outline-btn"]').exists()).toBe(true);
     });
 
-    it('calls rejectOutline API on reject button click', async () => {
+    it('regenerates directly on reject button click (no reject API)', async () => {
       mockGetOutline.mockResolvedValue(null);
       mockGenerateOutline.mockResolvedValue({
         id: 'step-1',
@@ -331,13 +331,6 @@ describe('OutlineView', () => {
         },
         version: 1,
       });
-      mockRejectOutline.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'REJECTED',
-        output: '大纲内容',
-      });
 
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
@@ -351,7 +344,9 @@ describe('OutlineView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      expect(mockRejectOutline).toHaveBeenCalledWith('test-project-1');
+      // Reject no longer calls rejectOutline — it directly regenerates
+      expect(mockRejectOutline).not.toHaveBeenCalled();
+      expect(mockGenerateOutline).toHaveBeenCalledTimes(2);
     });
 
     it('hides reject button when outline is confirmed', async () => {

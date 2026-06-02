@@ -93,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { parseSections } from '@/composables/useContentParser';
 
 interface CharacterData {
@@ -133,6 +133,10 @@ const props = defineProps<{
 const editing = ref(false);
 const savedEdits = ref<Record<string, CharacterData>>({});
 
+watch(() => props.content, () => {
+  savedEdits.value = {};
+});
+
 function parseCharacterData(text: string): CharacterData {
   const extract = (key: string): string => {
     const match = text.match(new RegExp(`^${key}[：:]\\s*(.+)$`, 'm'));
@@ -165,10 +169,10 @@ const characters = computed<CharacterEntry[]>(() =>
     return {
       role: rc.role,
       label: rc.label,
-      name: editsData?.name ?? parsedData.name,
-      desire: editsData?.desire ?? parsedData.desire,
-      motivation: editsData?.motivation ?? parsedData.motivation,
-      ending: editsData?.ending ?? parsedData.ending,
+      name: editsData?.name || parsedData.name,
+      desire: editsData?.desire || parsedData.desire,
+      motivation: editsData?.motivation || parsedData.motivation,
+      ending: editsData?.ending || parsedData.ending,
     };
   }),
 );

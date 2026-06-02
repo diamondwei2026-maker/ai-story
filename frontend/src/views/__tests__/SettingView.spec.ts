@@ -329,7 +329,7 @@ describe('SettingView', () => {
       expect(wrapper.find('[data-testid="reject-setting-btn"]').exists()).toBe(true);
     });
 
-    it('calls rejectSetting API on reject button click', async () => {
+    it('calls generateSetting directly on reject button click (no reject API)', async () => {
       mockGetSetting.mockResolvedValue(null);
       mockGenerateSetting.mockResolvedValue({
         id: 'step-1',
@@ -339,13 +339,6 @@ describe('SettingView', () => {
         output: '设定内容',
         review: { powerSystemCheck: { passed: true, flags: [] } },
         version: 1,
-      });
-      mockRejectSetting.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'SETTING',
-        status: 'REJECTED',
-        output: '设定内容',
       });
 
       const wrapper = await mountView();
@@ -357,8 +350,8 @@ describe('SettingView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));
 
-      expect(mockRejectSetting).toHaveBeenCalledWith('test-project-1');
-      // After rejection, should automatically regenerate new content
+      // Reject no longer calls rejectSetting — it directly regenerates
+      expect(mockRejectSetting).not.toHaveBeenCalled();
       expect(mockGenerateSetting).toHaveBeenCalledTimes(2);
     });
 
@@ -385,14 +378,6 @@ describe('SettingView', () => {
           review: { powerSystemCheck: { passed: true, flags: [] } },
           version: 2,
         });
-      mockRejectSetting.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'SETTING',
-        status: 'REJECTED',
-        output: '原始设定内容',
-      });
-
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 50));

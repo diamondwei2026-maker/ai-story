@@ -124,16 +124,14 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
   async function handleReject() {
     loading.value = true;
     error.value = null;
+    store.setStepStatus(opts.phase, 'IN_PROGRESS');
     try {
-      const result = await opts.rejectFn(opts.projectId);
-      // Mark as rejected but don't update data.value yet —
-      // handleGenerate will overwrite it with the fresh generation
-      store.setStepStatus(opts.phase, 'REJECTED');
-      // Immediately regenerate new content after rejection,
-      // matching the button label "驳回，重新生成"
-      await handleGenerate();
+      // "驳回，重新生成" = just regenerate fresh content.
+      // No need to persist a REJECTED status that gets overwritten immediately.
+      const fresh = await opts.generateFn(opts.projectId, opts.generateArgs());
+      data.value = fresh;
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '驳回失败';
+      error.value = e instanceof Error ? e.message : '重新生成失败';
     } finally {
       loading.value = false;
     }
