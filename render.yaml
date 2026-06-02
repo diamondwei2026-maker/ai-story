@@ -8,18 +8,19 @@ services:
   - type: web
     name: novelcraft-pro-server
     runtime: node
-    region: singapore  # 新加坡，对国内访问延迟较低
+    nodeVersion: "22"           # NestJS 11 / Prisma 6 需要较新的 Node
+    region: singapore           # 新加坡，对国内访问延迟较低
     plan: free
-    buildCommand: npm run build -w server
-    startCommand: npm run start:prod -w server
+    buildCommand: npm run build:render -w server
+    startCommand: node server/dist/main
     envVars:
       - key: PORT
         value: "10000"
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        sync: false              # ⚠️ 务必在 Render 仪表板设置此值
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: CORS_ORIGIN
-        sync: false
+        sync: false              # ⚠️ 设置为 Vercel 前端域名，如 https://xxx.vercel.app
