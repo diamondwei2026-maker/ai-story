@@ -28,22 +28,11 @@
       </template>
     </a-alert>
 
-    <!-- Generate button (when no setting and not loading) -->
+    <!-- 无设定且初始加载已完成（极端情况回退显示） -->
     <EmptyState
-      v-if="!settingData && !loading"
-      description="还没有设定，AI将基于已确认的灵感创建设定集"
-    >
-      <template #action>
-        <a-button
-          type="primary"
-          data-testid="generate-setting-btn"
-          :loading="loading"
-          @click="handleGenerate"
-        >
-          生成设定
-        </a-button>
-      </template>
-    </EmptyState>
+      v-if="!settingData && !loading && initialLoadDone"
+      description="设定尚未生成"
+    />
 
     <!-- Setting content -->
     <template v-if="settingData && !loading">

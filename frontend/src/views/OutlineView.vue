@@ -28,40 +28,17 @@
       </template>
     </a-alert>
 
-    <!-- Generate button (when no outline and not loading) -->
+    <!-- 无大纲且初始加载已完成（极端情况回退显示） -->
     <EmptyState
-      v-if="!outlineData && !loading"
-      description="选择叙事结构，让AI构建你的剧情大纲"
-    >
-      <template #action>
-        <div
-          v-if="!isConfirmed"
-          data-testid="structure-switcher"
-          class="outline-view__structure-select"
-        >
-          <span class="outline-view__structure-select-label">叙事结构：</span>
-          <a-segmented
-            v-model:value="selectedStructure"
-            :options="structureOptions"
-            block
-          />
-        </div>
-        <a-button
-          type="primary"
-          data-testid="generate-outline-btn"
-          :loading="loading"
-          class="outline-view__generate-btn"
-          @click="handleGenerate"
-        >
-          生成大纲
-        </a-button>
-      </template>
-    </EmptyState>
+      v-if="!outlineData && !loading && initialLoadDone"
+      description="大纲尚未生成"
+    />
 
     <!-- Outline content -->
     <template v-if="outlineData && !loading">
+      <!-- TODO: 暂时屏蔽叙事结构选择，默认使用网文十章 -->
       <div
-        v-if="!isConfirmed"
+        v-if="false"
         data-testid="structure-switcher"
         class="outline-view__structure-select"
       >
@@ -131,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import {
   generateOutline,
@@ -148,7 +125,8 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const selectedStructure = ref('three-act');
+// TODO: 暂时硬编码为网文十章，后续恢复叙事结构选择时改回 'three-act'
+const selectedStructure = ref('web-novel-ten');
 
 const structureOptions = [
   { value: 'three-act', label: '三幕式' },
@@ -162,6 +140,7 @@ const {
   regenerating,
   error,
   isConfirmed,
+  initialLoadDone,
   handleGenerate,
   handleRegenerate,
   handleConfirm,
@@ -175,6 +154,13 @@ const {
   confirmFn: confirmOutline,
   rejectFn: rejectOutline,
   generateArgs: () => ({ setting: '', structure: selectedStructure.value }),
+});
+
+// 初始加载完成后，若无大纲则自动生成（默认使用网文十章结构）
+watch(initialLoadDone, (done) => {
+  if (done && !loading.value && (!outlineData.value || outlineData.value?.status === 'REJECTED')) {
+    handleGenerate();
+  }
 });
 
 const emotionLabels = computed(() => {
