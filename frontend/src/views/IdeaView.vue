@@ -38,7 +38,7 @@
     </a-alert>
 
     <!-- Step 0: Idea Input (no data yet) -->
-    <div v-if="!ideaData && !loading" class="idea-view__empty">
+    <div v-if="!data && !loading" class="idea-view__empty">
       <IdeaInput
         v-model="ideaText"
         :disabled="false"
@@ -68,7 +68,7 @@
     </div>
 
     <!-- Step 1: Sell Point Selection -->
-    <template v-if="ideaData && !loading">
+    <template v-if="data && !loading">
       <SellPointSelector
         v-if="!summaryGenerated"
         :sell-points="parsedSellPoints"
@@ -113,9 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useWorkflowStore } from '@/stores/useWorkflowStore';
+import { ref, computed, watch } from 'vue';
+import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import {
   generateIdea,
   generateIdeaSummary,
@@ -133,17 +132,11 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const store = useWorkflowStore();
-const router = useRouter();
-
-const ideaData = ref<StepDataResponse | null>(null);
 const ideaText = ref('');
 const feedbackText = ref('');
 const selectedSellPointIndex = ref(-1);
 const customBrief = ref('');
-const loading = ref(false);
 const summaryLoading = ref(false);
-const error = ref<string | null>(null);
 
 const suggestedPrompts = [
   '一个能预见未来5分钟的侦探',
@@ -151,17 +144,41 @@ const suggestedPrompts = [
   '两个星际殖民地里互相竞争的厨师',
 ];
 
-const output = computed(() => ideaData.value?.output);
-
-const review = computed(() => ideaData.value?.review);
-
-const isConfirmed = computed(() => {
-  return (
-    ideaData.value?.status === 'CONFIRMED' ||
-    store.getStepStatus('IDEA') === 'CONFIRMED'
-  );
+const {
+  data,
+  loading,
+  error,
+  isConfirmed,
+  handleGenerate,
+  handleConfirm,
+} = usePhaseWorkflow<StepDataResponse>({
+  projectId: props.projectId,
+  phase: 'IDEA',
+  nextPhase: 'SETTING',
+  getFn: getIdea,
+  generateFn: generateIdea,
+  confirmFn: (projectId) =>
+    confirmIdea(projectId, {
+      selectedSellPoint: selectedSellPointIndex.value,
+      customBrief: customBrief.value || undefined,
+    }),
+  rejectFn: rejectIdea,
+  generateArgs: () => ({ idea: ideaText.value }),
 });
 
+// 从后端恢复 selectedSellPointIndex（用户刷新页面后不丢失卖点选择状态）
+watch(data, (newData) => {
+  if (newData) {
+    const review = newData.review as Record<string, unknown> | null;
+    if (review && typeof review.selectedSellPoint === 'number') {
+      selectedSellPointIndex.value = review.selectedSellPoint as number;
+    }
+  }
+});
+
+const output = computed(() => data.value?.output);
+
+const review = computed(() => data.value?.review);
 
 const {
   sellPoints: parsedSellPoints,
@@ -173,43 +190,12 @@ const {
 const currentSubStep = computed(() => {
   if (isConfirmed.value) return 3;
   if (summaryGenerated.value) return 2;
-  if (ideaData.value && !summaryGenerated.value) return 1;
+  if (data.value && !summaryGenerated.value) return 1;
   return 0;
-});
-
-onMounted(async () => {
-  try {
-    const existing = await getIdea(props.projectId);
-    if (existing) {
-      ideaData.value = existing;
-      const review = existing.review as Record<string, unknown> | null;
-      if (review && typeof review.selectedSellPoint === 'number') {
-        selectedSellPointIndex.value = review.selectedSellPoint as number;
-      }
-    }
-  } catch {
-    // Silently ignore fetch errors on mount
-  }
 });
 
 function onSelectSellPoint(index: number) {
   selectedSellPointIndex.value = index;
-}
-
-async function handleGenerate() {
-  loading.value = true;
-  error.value = null;
-  try {
-    const result = await generateIdea(props.projectId, {
-      idea: ideaText.value,
-    });
-    ideaData.value = result;
-    store.setStepStatus('IDEA', 'IN_PROGRESS');
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '生成失败';
-  } finally {
-    loading.value = false;
-  }
 }
 
 async function handleRegenerateWithFeedback(feedback: string) {
@@ -220,7 +206,7 @@ async function handleRegenerateWithFeedback(feedback: string) {
       idea: ideaText.value,
       feedback,
     });
-    ideaData.value = result;
+    data.value = result;
     selectedSellPointIndex.value = -1;
     feedbackText.value = '';
   } catch (e) {
@@ -237,39 +223,11 @@ async function handleGenerateSummary(sellPointIndex: number) {
     const result = await generateIdeaSummary(props.projectId, {
       selectedSellPoint: sellPointIndex,
     });
-    ideaData.value = result;
+    data.value = result;
   } catch (e) {
     error.value = e instanceof Error ? e.message : '简介生成失败';
   } finally {
     summaryLoading.value = false;
-  }
-}
-
-async function handleConfirm() {
-  try {
-    const result = await confirmIdea(props.projectId, {
-      selectedSellPoint: selectedSellPointIndex.value,
-      customBrief: customBrief.value || undefined,
-    });
-    ideaData.value = result;
-    store.setStepStatus('IDEA', 'CONFIRMED');
-    store.setCurrentPhase('SETTING');
-    router.push({ name: 'workflow.setting', params: { id: props.projectId } });
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '确认失败';
-  }
-}
-
-async function handleReject() {
-  loading.value = true;
-  error.value = null;
-  try {
-    const result = await rejectIdea(props.projectId);
-    ideaData.value = result;
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '驳回失败';
-  } finally {
-    loading.value = false;
   }
 }
 </script>
