@@ -186,8 +186,19 @@ datasource db {
 
 1. [MongoDB Atlas](https://cloud.mongodb.com) 注册/登录
 2. 创建 **M0 Free** 集群，选择 **AWS / Singapore**（与 Render 同区域）
-3. 在 **Database Access** 创建数据库用户
-4. 在 **Network Access** 添加 `0.0.0.0/0`（允许所有 IP，Render 无固定 IP）
+3. 在 **Database Access** 创建数据库用户（用户名/密码，记好备用）
+4. 在 **Network Access** 配置 IP 白名单
+
+### 4.2 Network Access —— 关键步骤
+
+> ⚠️ **Render 免费实例没有固定出站 IP**，部署时必须开放全网访问，否则 `prisma db push` 及运行时连接都会失败。
+
+1. 进入 Atlas 左侧 **Network Access**
+2. 点击 **+ Add IP Address**
+3. 选择 **Allow Access from Anywhere**（或手动输入 `0.0.0.0/0`）
+4. 点击 **Confirm**
+
+> 症状提示：如果 Network Access 未开放，构建日志会卡在 `Datasource "db": MongoDB database ...` 后无输出，构建标记为失败但无明显报错。
 
 ### 4.2 获取连接字符串
 
@@ -273,11 +284,18 @@ VITE_API_BASE_URL=/api
 2. 确认 Vercel 仪表板中 `VITE_API_BASE_URL` 已设为 Render 域名
 3. Render 免费实例 15 分钟无访问会休眠，首次请求需要 30-60 秒唤醒
 
-### 7.5 MongoDB 连接失败
+### 7.5 MongoDB 连接失败 / prisma db push 卡住
 
-1. Atlas Network Access 是否添加了 `0.0.0.0/0`
-2. `DATABASE_URL` 中的用户名密码是否转义特殊字符
-3. Render 日志中查看具体错误：`Dashboard → Logs`
+**症状**：构建日志显示 `Datasource "db": MongoDB database ...` 后无输出，构建失败但无明显报错。
+
+**原因**：Atlas Network Access 未开放 Render 的 IP。Render 免费实例使用动态出站 IP，不在 Atlas 默认白名单内。
+
+**解决**：Atlas → Network Access → 添加 `0.0.0.0/0`（允许所有 IP）。
+
+**其他排查**：
+1. `DATABASE_URL` 中的用户名密码是否含特殊字符（需 URL 编码）
+2. 数据库用户是否已创建且有 `readWrite` 权限
+3. Render 日志 → 切换到运行时日志查看具体错误
 
 ### 7.6 Prisma generate 失败（本地 Windows）
 
