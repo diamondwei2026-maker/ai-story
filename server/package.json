@@ -6,11 +6,11 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "nest build && prisma generate",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
+    "build": "npx nest build && npx prisma generate",
+    "start": "npx nest start",
+    "start:dev": "npx nest start --watch",
     "start:prod": "node dist/main",
-    "build:render": "nest build && prisma generate && prisma db push",
+    "build:render": "npx nest build && npx prisma generate && npx prisma db push",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
