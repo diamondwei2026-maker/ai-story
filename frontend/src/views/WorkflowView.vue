@@ -43,15 +43,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useWorkflowStore, PHASE_ORDER } from '@/stores/useWorkflowStore';
+import { useWorkflowStore, PHASE_ORDER, type PhaseType } from '@/stores/useWorkflowStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import type { StepInfo } from '@/components/WorkflowStepper.vue';
 import WorkflowStepper from '@/components/WorkflowStepper.vue';
 import ModelBadge from '@/components/ModelBadge.vue';
 import AiUnavailableModal from '@/components/AiUnavailableModal.vue';
 import { useAiStatus } from '@/composables/useAiStatus';
+
+/** 已实现前端视图的 phase → route name 映射 */
+const PHASE_TO_ROUTE: Record<string, string> = {
+  IDEA: 'workflow.idea',
+  SETTING: 'workflow.setting',
+  OUTLINE: 'workflow.outline',
+  // BEATS / DRAFTING 尚未实现子视图
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -96,8 +104,38 @@ const steps = computed<StepInfo[]>(() =>
 );
 
 function handleStepClick(phase: string) {
-  store.setCurrentPhase(phase as any);
+  // 1. 先导航到对应 phase 的子路由（仅已实现的 phase）
+  const routeName = PHASE_TO_ROUTE[phase];
+  if (routeName) {
+    router.push({ name: routeName, params: { id: projectId.value } });
+  }
+  // 2. 再更新 store，确保 Stepper 高亮正确
+  store.setCurrentPhase(phase as PhaseType);
 }
+
+/** 根据项目服务器状态同步 workflow store 的 currentPhase，
+ *  确保刷新页面或从 Hub 进入时 Stepper 与路由一致。 */
+watch(
+  [() => projectStore.projects, projectId],
+  ([projects, id]) => {
+    if (!id) return;
+    const project = projects.find((p) => p.id === id);
+    if (!project) return;
+
+    const serverPhase = project.status;
+    // 只同步已实现视图的 phase；BEATS / DRAFTING 回退到 OUTLINE
+    const syncedPhase: PhaseType =
+      serverPhase === 'IDEA' || serverPhase === 'SETTING' || serverPhase === 'OUTLINE'
+        ? serverPhase
+        : 'OUTLINE';
+
+    // 仅当 store 与服务器不一致时更新
+    if (store.currentPhase !== syncedPhase) {
+      store.setCurrentPhase(syncedPhase);
+    }
+  },
+  { immediate: true },
+);
 
 function handleAiRetry() {
   aiStatus.setUnavailable(false);

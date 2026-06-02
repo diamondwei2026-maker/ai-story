@@ -184,8 +184,21 @@ async function handleCreateProject(title: string) {
   router.push({ name: 'workflow.idea', params: { id: project.id } });
 }
 
+/** 根据项目 status 映射到已实现的 phase 路由，用于恢复工作进度 */
+const PHASE_ROUTE_MAP: Record<string, string> = {
+  IDEA: 'workflow.idea',
+  SETTING: 'workflow.setting',
+  OUTLINE: 'workflow.outline',
+  // BEATS / DRAFTING 视图尚未实现，回退到 OUTLINE
+  BEATS: 'workflow.outline',
+  DRAFTING: 'workflow.outline',
+  COMPLETED: 'workflow.outline',
+};
+
 function openProject(id: string) {
-  router.push({ name: 'workflow.idea', params: { id } });
+  const project = projectStore.projects.find((p) => p.id === id);
+  const routeName = PHASE_ROUTE_MAP[project?.status ?? ''] ?? 'workflow.idea';
+  router.push({ name: routeName, params: { id } });
 }
 
 onMounted(() => {
