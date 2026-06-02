@@ -17,6 +17,10 @@ interface UsePhaseWorkflowOptions<T extends StepLike> {
   confirmFn: (projectId: string) => Promise<T>;
   rejectFn: (projectId: string) => Promise<T>;
   generateArgs: () => Record<string, string>;
+  /** 前置阶段的类型，用于 mount 时同步其状态到 store */
+  previousPhase?: PhaseType;
+  /** 前置阶段的 getFn，用于 mount 时同步其状态到 store */
+  previousGetFn?: (projectId: string) => Promise<T | null>;
 }
 
 /**
@@ -68,6 +72,22 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
           store.setStepStatus(opts.phase, mapped);
         }
       }
+
+      // 同时同步前置阶段的状态到 store，避免 Stepper 因 localStorage 丢失
+      // 而显示错误的「进行中」（前置阶段在服务端可能已 CONFIRMED）
+      if (opts.previousGetFn && opts.previousPhase) {
+        try {
+          const prev = await opts.previousGetFn(opts.projectId);
+          if (prev) {
+            const prevMapped = backendStatusToStepStatus(prev.status);
+            if (prevMapped) {
+              store.setStepStatus(opts.previousPhase, prevMapped);
+            }
+          }
+        } catch {
+          // Silently ignore — best effort sync
+        }
+      }
     } catch {
       // Silently ignore fetch errors on mount
     } finally {
@@ -78,12 +98,20 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
   async function handleGenerate() {
     loading.value = true;
     error.value = null;
+    const previousStatus = store.getStepStatus(opts.phase);
     store.setStepStatus(opts.phase, 'IN_PROGRESS');
     try {
       const result = await opts.generateFn(opts.projectId, opts.generateArgs());
       data.value = result;
+      // 生成成功后同步后端状态到 store（后端可能返回 AI_GENERATING / AWAITING_REVIEW）
+      const mapped = backendStatusToStepStatus(result.status);
+      if (mapped) {
+        store.setStepStatus(opts.phase, mapped);
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : '生成失败';
+      // 生成失败时回退状态，避免卡在「进行中」
+      store.setStepStatus(opts.phase, previousStatus);
     } finally {
       loading.value = false;
     }
@@ -124,14 +152,22 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
   async function handleReject() {
     loading.value = true;
     error.value = null;
+    const previousStatus = store.getStepStatus(opts.phase);
     store.setStepStatus(opts.phase, 'IN_PROGRESS');
     try {
       // "驳回，重新生成" = just regenerate fresh content.
       // No need to persist a REJECTED status that gets overwritten immediately.
       const fresh = await opts.generateFn(opts.projectId, opts.generateArgs());
       data.value = fresh;
+      // 生成成功后同步后端状态到 store
+      const mapped = backendStatusToStepStatus(fresh.status);
+      if (mapped) {
+        store.setStepStatus(opts.phase, mapped);
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : '重新生成失败';
+      // 生成失败时回退状态
+      store.setStepStatus(opts.phase, previousStatus);
     } finally {
       loading.value = false;
     }

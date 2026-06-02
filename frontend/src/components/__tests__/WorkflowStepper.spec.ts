@@ -102,16 +102,39 @@ describe('WorkflowStepper', () => {
     expect(wrapper.emitted('step-click')![0]).toEqual(['IDEA']);
   });
 
-  it('does not emit step-click when clicking a future phase step', async () => {
+  it('does not emit step-click when clicking a future phase step with unconfirmed prerequisites', async () => {
     const wrapper = await mountStepper({
       steps,
       currentPhase: 'OUTLINE',
       phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
     });
 
-    await wrapper.findAll('[data-testid="step-item"]')[4].trigger('click');
+    // BEATS is index 3, OUTLINE is current (2). OUTLINE is not CONFIRMED → BEATS should NOT be clickable
+    await wrapper.findAll('[data-testid="step-item"]')[3].trigger('click');
 
     expect(wrapper.emitted('step-click')).toBeFalsy();
+  });
+
+  it('emits step-click when clicking a future phase whose prerequisites are all confirmed', async () => {
+    const confirmedSteps: StepInfo[] = [
+      { phase: 'IDEA', label: '灵感提取', status: 'CONFIRMED' },
+      { phase: 'SETTING', label: '设定集', status: 'CONFIRMED' },
+      { phase: 'OUTLINE', label: '剧情大纲', status: 'CONFIRMED' },
+      { phase: 'BEATS', label: '细纲拆解', status: 'PENDING' },
+      { phase: 'DRAFTING', label: '正文迭代', status: 'PENDING' },
+    ];
+
+    const wrapper = await mountStepper({
+      steps: confirmedSteps,
+      currentPhase: 'SETTING',
+      phaseOrder: ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'],
+    });
+
+    // OUTLINE (index 2) is ahead of current (SETTING=1), but IDEA and SETTING are both CONFIRMED
+    await wrapper.findAll('[data-testid="step-item"]')[2].trigger('click');
+
+    expect(wrapper.emitted('step-click')).toBeTruthy();
+    expect(wrapper.emitted('step-click')![0]).toEqual(['OUTLINE']);
   });
 
   it('renders the step counter (e.g., "步骤 3/5")', async () => {

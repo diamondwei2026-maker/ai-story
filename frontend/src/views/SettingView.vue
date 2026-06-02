@@ -137,6 +137,8 @@ const {
   confirmFn: confirmSetting,
   rejectFn: rejectSetting,
   generateArgs: () => ({ idea: ideaBasis.value }),
+  previousPhase: 'IDEA',
+  previousGetFn: getIdea,
 });
 
 // 加载 IDEA 阶段已确认的创意内容

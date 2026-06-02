@@ -113,6 +113,16 @@ function handleStepClick(phase: string) {
   store.setCurrentPhase(phase as PhaseType);
 }
 
+/** 项目切换时加载该项目隔离的工作流状态快照，
+ *  避免不同项目间的 stepStatus 串扰（Issue 根因）。 */
+watch(
+  projectId,
+  (id) => {
+    store.loadForProject(id);
+  },
+  { immediate: true },
+);
+
 /** 根据项目服务器状态同步 workflow store 的 currentPhase，
  *  确保刷新页面或从 Hub 进入时 Stepper 与路由一致。 */
 watch(

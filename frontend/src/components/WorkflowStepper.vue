@@ -162,7 +162,13 @@ function statusLabel(status: StepStatus): string {
 
 function isClickable(index: number): boolean {
   if (isReadonly.value) return false;
-  return index <= currentIndex.value;
+  // 当前及之前的步骤始终可点击
+  if (index <= currentIndex.value) return true;
+  // 若前方步骤的所有前置均已确认，也允许点击（处理 localStorage 丢失后从 Hub 进入的正确重定向场景）
+  const allPreviousConfirmed = props.steps
+    .slice(0, index)
+    .every((s) => s.status === 'CONFIRMED');
+  return allPreviousConfirmed;
 }
 
 function onStepsClick(e: MouseEvent) {
