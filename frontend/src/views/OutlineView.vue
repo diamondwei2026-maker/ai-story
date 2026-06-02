@@ -36,7 +36,7 @@
 
     <!-- Outline content -->
     <template v-if="outlineData && !loading">
-      <!-- TODO: 暂时屏蔽叙事结构选择，默认使用网文十章 -->
+      <!-- TODO: 暂时屏蔽叙事结构选择，默认使用网文十段 -->
       <div
         v-if="false"
         data-testid="structure-switcher"
@@ -126,12 +126,12 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-// TODO: 暂时硬编码为网文十章，后续恢复叙事结构选择时改回 'three-act'
+// TODO: 暂时硬编码为网文十段，后续恢复叙事结构选择时改回 'three-act'
 const selectedStructure = ref('web-novel-ten');
 
 const structureOptions = [
   { value: 'three-act', label: '三幕式' },
-  { value: 'web-novel-ten', label: '网文十章' },
+  { value: 'web-novel-ten', label: '网文十段' },
   { value: 'four-act-eight', label: '四幕八段' },
 ];
 
@@ -159,7 +159,7 @@ const {
   previousGetFn: getSetting,
 });
 
-// 初始加载完成后，若无大纲则自动生成（默认使用网文十章结构）
+// 初始加载完成后，若无大纲则自动生成（默认使用网文十段结构）
 watch(initialLoadDone, (done) => {
   if (done && !loading.value && (!outlineData.value || outlineData.value?.status === 'REJECTED')) {
     handleGenerate();
