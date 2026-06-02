@@ -10,7 +10,7 @@ services:
     runtime: node
     region: singapore           # 新加坡，对国内访问延迟较低
     plan: free
-    buildCommand: cd server && npm install && npx nest build && npx prisma generate && npx prisma db push
+    buildCommand: cd server && npm install && npx nest build && npx prisma generate
     startCommand: cd server && node dist/main
     envVars:
       - key: PORT
