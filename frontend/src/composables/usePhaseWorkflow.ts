@@ -126,8 +126,12 @@ export function usePhaseWorkflow<T extends StepLike>(opts: UsePhaseWorkflowOptio
     error.value = null;
     try {
       const result = await opts.rejectFn(opts.projectId);
-      data.value = result;
+      // Mark as rejected but don't update data.value yet —
+      // handleGenerate will overwrite it with the fresh generation
       store.setStepStatus(opts.phase, 'REJECTED');
+      // Immediately regenerate new content after rejection,
+      // matching the button label "驳回，重新生成"
+      await handleGenerate();
     } catch (e) {
       error.value = e instanceof Error ? e.message : '驳回失败';
     } finally {

@@ -113,6 +113,7 @@
 | 06-01 | 删除 Phase 页面"AI 生成内容，仅供参考"横幅提示 | 移除 IdeaView/SettingView/OutlineView 三处 `<a-alert>` + `usePhaseWorkflow.reviewAnnotations` computed + StepService 5 处 `annotations` 写入。前后端 10 文件，819 条测试零回归 |
 | 06-02 | **IdeaView 迁移至 `usePhaseWorkflow`** — 原先 IdeaView 自行管理 `loading/error/isConfirmed` 等状态，与 SettingView/OutlineView 不一致，导致 IDEA 阶段确认后 Stepper 的 `stepStatus` 未同步（仍显示 PENDING）。迁移后三个 Phase 视图统一使用 `usePhaseWorkflow()` composable：挂载时自动 fetch 后端数据 → 同步 stepStatus 到 workflowStore → 提供 `handleGenerate/Confirm/Reject` 统一方法。同时引入 `useIdeaParser` composable 分离卖点/摘要解析逻辑。 | IdeaView.vue、usePhaseWorkflow.ts、useWorkflowStore.ts |
 | 06-02 | **修复 Phase 导航回退 Bug** — `ProjectHubView.openProject()` 原先写死导航到 `workflow.idea`。生成设定未确认后返回列表，再次点击项目会错误跳回 IDEA 阶段（已确认无操作按钮）。修复：`openProject` 改为根据 `project.status` 映射到对应 Phase 路由（IDEA→idea / SETTING→setting / OUTLINE→outline），BEATS/DRAFTING/COMPLETED 回退到 OUTLINE。`WorkflowView.handleStepClick` 改为先导航路由再更新 store。新增 `watch` 在 WorkflowView 挂载时同步 `store.currentPhase` 与后端 `project.status`。 | ProjectHubView.vue、WorkflowView.vue |
+| 06-02 | **修复"驳回，重新生成"不重新生成 + 二次点击 400 Bug** — `usePhaseWorkflow.handleReject` 只调 reject API（改 status 为 REJECTED）但未触发生成，用户看到旧内容以为没反应；二次点击时 step 已 REJECTED 导致服务端 400。修复：`handleReject` 在 reject 成功后自动调用 `handleGenerate()` 生成全新内容（不传 `currentContent`，AI 从零创作）；`SettingView` watcher 增加对 `status === 'REJECTED'` 的检测，页面加载时若 step 已驳回则自动重新生成。 | usePhaseWorkflow.ts、SettingView.vue |
 
 | 模块 | 状态 | 已实现接口 | 备注 |
 |------|------|-----------|------|
@@ -147,3 +148,29 @@
 - 后端测试：Jest 30 + supertest + RxJS Observable
 - 前端测试：Vitest 2.1 + @vue/test-utils + happy-dom
 - 运行时：Node.js 22.16
+
+## 待优化项
+
+> 已有对策但非紧急，留待后续迭代处理。
+
+### API 响应结构精简（confirm / reject 端点）{#api-response-trim}
+
+**现状**：所有 Phase 端点（generate / confirm / reject / GET）统一返回完整 `StepData` 对象，包含 `id`、`projectId`、`phaseType`、`status`、`input`、`output`、`review`、`version` 等全部字段。
+
+**问题**：
+
+| 操作 | 实际变化 | 返回的 `output` | 实际需要 |
+|------|---------|----------------|---------|
+| `generate` | 全部字段 | **新的** ✓ | 全量 ✓ |
+| `confirm` | status → CONFIRMED, confirmedAt | **旧的**（冗余） | status + confirmedAt |
+| `reject` | status → REJECTED | **旧的**（冗余且有误导性） | status |
+
+具体影响：
+
+1. **语义误导** — `reject` 返回的 `output` 是被驳回的旧内容，前端若做了 `data.value = result` 就会把已驳回内容当"当前内容"展示
+2. **冗余传输** — 设定集等大内容 Phase 的 `output` 可达数千字，confirm/reject 只需改一个 status 却回传整个文档
+3. **调用方判断负担** — 前端需自行判断返回值中哪些字段可信、哪些是过时的
+
+**建议方案**：`confirm` 和 `reject` 端点只返回 `{ status, confirmedAt? }`，generate 和 GET 保持全量返回。需前后端联调（API 契约变更）。
+
+**风险**：低。当前前端 `handleConfirm` 和 `handleReject` 已不依赖返回值中的 `output`（confirm 用 `store.setStepStatus` 驱动 UI，reject 后直接调 `handleGenerate` 覆盖）。

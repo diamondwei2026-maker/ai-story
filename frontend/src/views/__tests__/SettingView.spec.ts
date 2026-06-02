@@ -358,6 +358,53 @@ describe('SettingView', () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(mockRejectSetting).toHaveBeenCalledWith('test-project-1');
+      // After rejection, should automatically regenerate new content
+      expect(mockGenerateSetting).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows regenerated content after reject-and-regenerate', async () => {
+      mockGetSetting.mockResolvedValue(null);
+      // First call: auto-generation
+      mockGenerateSetting
+        .mockResolvedValueOnce({
+          id: 'step-1',
+          projectId: 'test-project-1',
+          phaseType: 'SETTING',
+          status: 'AWAITING_REVIEW',
+          output: '原始设定内容',
+          review: { powerSystemCheck: { passed: true, flags: [] } },
+          version: 1,
+        })
+        // Second call: regeneration after reject
+        .mockResolvedValueOnce({
+          id: 'step-1',
+          projectId: 'test-project-1',
+          phaseType: 'SETTING',
+          status: 'AWAITING_REVIEW',
+          output: '全新生成的设定内容',
+          review: { powerSystemCheck: { passed: true, flags: [] } },
+          version: 2,
+        });
+      mockRejectSetting.mockResolvedValue({
+        id: 'step-1',
+        projectId: 'test-project-1',
+        phaseType: 'SETTING',
+        status: 'REJECTED',
+        output: '原始设定内容',
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Auto-generate completed; click reject
+      await wrapper.find('[data-testid="reject-setting-btn"]').trigger('click');
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Should show the regenerated content
+      const worldBuilder = wrapper.find('[data-testid="world-builder"]');
+      expect(worldBuilder.exists()).toBe(true);
     });
 
     it('hides reject button when setting is confirmed', async () => {

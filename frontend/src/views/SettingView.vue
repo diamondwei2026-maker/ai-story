@@ -167,7 +167,7 @@ onMounted(async () => {
 
 // 待设定初始查询和 IDEA 数据都就绪后再自动生成
 watch([initialLoadDone, ideaLoaded], ([settingDone, ideaDone]) => {
-  if (settingDone && ideaDone && !settingData.value && !loading.value) {
+  if (settingDone && ideaDone && !loading.value && (!settingData.value || settingData.value?.status === 'REJECTED')) {
     handleGenerate();
   }
 });
