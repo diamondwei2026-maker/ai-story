@@ -26,6 +26,13 @@ describe('PromptTemplateLoaderService', () => {
     it('should throw when template name does not exist in valid category', () => {
       expect(() => service.loadTemplate('creation', 'nonexistent-template')).toThrow();
     });
+
+    it('should load beats-generation template', () => {
+      const content = service.loadTemplate('creation', 'beats-generation');
+      expect(content).toContain('大纲');
+      expect(content).toContain('{{outline}}');
+      expect(content).toContain('{{currentContent}}');
+    });
   });
 
   describe('renderTemplate', () => {
@@ -76,11 +83,12 @@ describe('PromptTemplateLoaderService', () => {
   describe('listTemplates', () => {
     it('should list all templates in a given category', () => {
       const templates = service.listTemplates('creation');
-      expect(templates).toHaveLength(6);
+      expect(templates).toHaveLength(7);
       expect(templates).toContain('idea-generation');
       expect(templates).toContain('idea-summary-generation');
       expect(templates).toContain('setting-generation');
       expect(templates).toContain('outline-generation');
+      expect(templates).toContain('beats-generation');
       expect(templates).toContain('change-analysis');
       expect(templates).toContain('targeted-fix');
     });
@@ -98,9 +106,10 @@ describe('PromptTemplateLoaderService', () => {
 
     it('should list all templates across all categories when no category specified', () => {
       const all = service.listTemplates();
-      expect(all.length).toBeGreaterThanOrEqual(4);
+      expect(all.length).toBeGreaterThanOrEqual(5);
       expect(all).toContain('creation/idea-generation');
       expect(all).toContain('creation/setting-generation');
+      expect(all).toContain('creation/beats-generation');
       expect(all).toContain('drafting/chapter-write');
       expect(all).toContain('system/style-config');
     });

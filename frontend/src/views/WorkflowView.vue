@@ -58,7 +58,8 @@ const PHASE_TO_ROUTE: Record<string, string> = {
   IDEA: 'workflow.idea',
   SETTING: 'workflow.setting',
   OUTLINE: 'workflow.outline',
-  // BEATS / DRAFTING 尚未实现子视图
+  BEATS: 'workflow.beats',
+  DRAFTING: 'workflow.drafting',
 };
 
 const route = useRoute();
@@ -133,9 +134,9 @@ watch(
     if (!project) return;
 
     const serverPhase = project.status;
-    // 只同步已实现视图的 phase；BEATS / DRAFTING 回退到 OUTLINE
     const syncedPhase: PhaseType =
-      serverPhase === 'IDEA' || serverPhase === 'SETTING' || serverPhase === 'OUTLINE'
+      serverPhase === 'IDEA' || serverPhase === 'SETTING' || serverPhase === 'OUTLINE' ||
+      serverPhase === 'BEATS' || serverPhase === 'DRAFTING'
         ? serverPhase
         : 'OUTLINE';
 

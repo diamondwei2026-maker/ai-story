@@ -1609,9 +1609,9 @@ describe('StepService', () => {
     projectId: string;
     chapters: { id: string }[];
   }> {
-    const project = projectService.create({ title: 'FactSheet集成测试' });
+    const project = await projectService.create({ title: 'FactSheet集成测试' });
     project.status = 'SETTING';
-    projectService.update(project.id, {});
+    await projectService.update(project.id, {});
 
     await service.generateSetting(project.id, { idea: '测试创意' });
     await service.confirmSetting(project.id);
@@ -1622,7 +1622,7 @@ describe('StepService', () => {
     await service.generateBeats(project.id, { outline: '大纲' });
     await service.confirmBeats(project.id);
 
-    const chapters = service.getChaptersByProjectId(project.id);
+    const chapters = await service.getChaptersByProjectId(project.id);
     return { projectId: project.id, chapters };
   }
 
@@ -2012,9 +2012,9 @@ describe('StepService', () => {
 
   describe('generateOutline — aiMeta propagation (Issue #19)', () => {
     it('should include aiMeta in StepData after outline generation', async () => {
-      const project = projectService.create({ title: '大纲aiMeta' });
+      const project = await projectService.create({ title: '大纲aiMeta' });
       project.status = 'OUTLINE';
-      projectService.update(project.id, {});
+      await projectService.update(project.id, {});
 
       const step = await service.generateOutline(project.id, {
         setting: '设定内容',
@@ -2029,13 +2029,13 @@ describe('StepService', () => {
 
   describe('generateBeats — aiMeta propagation (Issue #19)', () => {
     it('should not throw and should store StepData with aiMeta', async () => {
-      const project = projectService.create({ title: '细纲aiMeta' });
+      const project = await projectService.create({ title: '细纲aiMeta' });
       project.status = 'BEATS';
-      projectService.update(project.id, {});
+      await projectService.update(project.id, {});
 
       await service.generateBeats(project.id, { outline: '大纲内容' });
 
-      const step = service.getStepByProjectId(project.id, 'BEATS');
+      const step = await service.getStepByProjectId(project.id, 'BEATS');
       expect(step).toBeDefined();
       expect(step!.aiMeta).toBeDefined();
       expect(step!.aiMeta!.modelUsed).toBeTruthy();
@@ -2045,7 +2045,7 @@ describe('StepService', () => {
   describe('useR1 model routing during chapter generation', () => {
     it('should use CRITICAL_CHAPTER task type when beat.useR1 is true', async () => {
       const { projectId, chapters } = await setupDraftingProject();
-      const beats = service.getBeatsByProjectId(projectId);
+      const beats = await service.getBeatsByProjectId(projectId);
       const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
       chapter1Beat!.useR1 = true;
 
@@ -2064,7 +2064,7 @@ describe('StepService', () => {
 
     it('should use CHAPTER_GENERATION task type when beat.useR1 is false', async () => {
       const { projectId, chapters } = await setupDraftingProject();
-      const beats = service.getBeatsByProjectId(projectId);
+      const beats = await service.getBeatsByProjectId(projectId);
       const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
       chapter1Beat!.useR1 = false;
 
@@ -2088,7 +2088,7 @@ describe('StepService', () => {
 
     it('should respect useR1 in continueChapterGeneration', async () => {
       const { projectId, chapters } = await setupDraftingProject();
-      const beats = service.getBeatsByProjectId(projectId);
+      const beats = await service.getBeatsByProjectId(projectId);
       const chapter1Beat = beats.find((b) => b.chapterNumber === 1);
       chapter1Beat!.useR1 = true;
 

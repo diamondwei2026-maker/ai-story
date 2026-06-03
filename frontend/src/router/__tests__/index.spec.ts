@@ -13,9 +13,9 @@ describe('Router configuration', () => {
     expect(router.currentRoute).toBeDefined();
   });
 
-  it('has 5 routes: home, workflow, workflow.idea, workflow.setting, and workflow.outline', () => {
+  it('has 7 routes: home, workflow, workflow.idea, workflow.setting, workflow.outline, workflow.beats, and workflow.drafting', () => {
     const routes = router.getRoutes();
-    expect(routes).toHaveLength(5);
+    expect(routes).toHaveLength(7);
   });
 
   it('defines "/" as the home route pointing to ProjectHubView', () => {
@@ -66,5 +66,17 @@ describe('Router configuration', () => {
     await router.isReady();
     expect(router.currentRoute.value.name).toBe('workflow.idea');
     expect(router.currentRoute.value.params.id).toBe('123');
+  });
+
+  it('defines "/project/:id/beats" as a child of workflow', () => {
+    const beatsRoute = router.getRoutes().find((r: any) => r.name === 'workflow.beats');
+    expect(beatsRoute).toBeDefined();
+    expect(beatsRoute.path).toBe('/project/:id/beats');
+  });
+
+  it('defines "/project/:id/drafting" as a child of workflow', () => {
+    const draftingRoute = router.getRoutes().find((r: any) => r.name === 'workflow.drafting');
+    expect(draftingRoute).toBeDefined();
+    expect(draftingRoute.path).toBe('/project/:id/drafting');
   });
 });

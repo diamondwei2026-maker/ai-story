@@ -4,6 +4,8 @@ import WorkflowView from '@/views/WorkflowView.vue';
 import IdeaView from '@/views/IdeaView.vue';
 import SettingView from '@/views/SettingView.vue';
 import OutlineView from '@/views/OutlineView.vue';
+import BeatsView from '@/views/BeatsView.vue';
+import DraftingPlaceholder from '@/views/DraftingPlaceholder.vue';
 
 const routes = [
   {
@@ -32,6 +34,18 @@ const routes = [
         path: 'outline',
         name: 'workflow.outline',
         component: OutlineView,
+        props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
+      },
+      {
+        path: 'beats',
+        name: 'workflow.beats',
+        component: BeatsView,
+        props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
+      },
+      {
+        path: 'drafting',
+        name: 'workflow.drafting',
+        component: DraftingPlaceholder,
         props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
       },
     ],

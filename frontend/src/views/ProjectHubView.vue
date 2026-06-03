@@ -189,9 +189,9 @@ const PHASE_ROUTE_MAP: Record<string, string> = {
   IDEA: 'workflow.idea',
   SETTING: 'workflow.setting',
   OUTLINE: 'workflow.outline',
-  // BEATS / DRAFTING 视图尚未实现，回退到 OUTLINE
-  BEATS: 'workflow.outline',
-  DRAFTING: 'workflow.outline',
+  BEATS: 'workflow.beats',
+  DRAFTING: 'workflow.drafting',
+  // COMPLETED 暂回退到 outline（完本只读模式未实现）
   COMPLETED: 'workflow.outline',
 };
 

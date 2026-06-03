@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { lastValueFrom, Observable } from 'rxjs';
 import { toArray } from 'rxjs/operators';
 import {
@@ -368,19 +367,23 @@ export class StepService {
     // Replace all beats for this project in DB
     await this.prisma.beat.deleteMany({ where: { projectId } });
     for (const beat of newBeats) {
-      await this.prisma.beat.create({
-        data: {
-          id: beat.id,
-          projectId: beat.projectId,
-          chapterNumber: beat.chapterNumber,
-          plan: beat.plan as any,
-          targetWordCount: beat.targetWordCount,
-          hookCount: beat.hookCount,
-          isClimax: beat.isClimax,
-          useR1: beat.useR1,
-          status: beat.status,
-        },
-      });
+      const createData: Record<string, unknown> = {
+        projectId: beat.projectId,
+        chapterNumber: beat.chapterNumber,
+        plan: beat.plan,
+        targetWordCount: beat.targetWordCount,
+        hookCount: beat.hookCount,
+        isClimax: beat.isClimax,
+        useR1: beat.useR1,
+        status: beat.status,
+      };
+      // Only set id when reusing an existing valid DB ObjectId (from merge logic)
+      if (beat.id) {
+        createData.id = beat.id;
+      }
+      const created = await this.prisma.beat.create({ data: createData as any });
+      // Update beat id with DB-generated value for return consistency
+      beat.id = (created as Record<string, unknown>).id as string;
     }
 
     await this.prisma.stepData.update({
@@ -421,7 +424,6 @@ export class StepService {
       for (const beat of beats) {
         await this.prisma.chapter.create({
           data: {
-            id: randomUUID(),
             projectId: beat.projectId,
             chapterNumber: beat.chapterNumber,
             title: null,
@@ -808,7 +810,7 @@ export class StepService {
       };
 
       beats.push({
-        id: randomUUID(),
+        id: '',
         projectId,
         chapterNumber,
         plan,
