@@ -104,17 +104,19 @@
 
 ## 实施状态
 
-> 最后更新：2026-06-02（修复项目间 stepStatus 串扰 + useWorkflowStore 项目隔离）
+> 最后更新：2026-06-03（OutlineView 重构 + 术语统一）
 
-### 近期更新（2026-06-01 ~ 2026-06-02）
+### 近期更新（2026-06-01 ~ 2026-06-03）
 
 | 日期 | 变更 | 影响范围 |
 |------|------|----------|
+| 06-03 | **OutlineView 重构** — ① 移除无关联编辑能力的「刷新关联内容」按钮，仅保留「驳回，重新生成」和「确认大纲」两个操作；② 新增 `stripEmotionTags` 函数过滤正文中的 `[爽点]`/`[虐点]`/`[高潮]` 等内联情绪标签（commit `467788f` 已移除专属情绪节点组件，但正文中嵌入的标签未过滤）；③ 正则支持网文十段「第X段」格式（原仅匹配「第X幕」/「第X章」/「Act X」，导致网文十段结构返回的段落无法解析为时间线）；④ `##` 前缀在第一正则分支中剥离，与 fallback 分支行为统一；⑤ 修复多段落正文空行被 `.filter(Boolean)` 吃掉导致 `\n\n` 段落分隔丢失的格式问题。 | OutlineView.vue、OutlineView.spec.ts（含 6 个新增测试） |
+| 06-03 | **术语统一：网文十章 → 网文十段** — CONTEXT.md 5 处全部更新。PRD 对应行待后续 PRD 修订时统一。 | CONTEXT.md |
 | 06-01 | 删除 Phase 页面"AI 生成内容，仅供参考"横幅提示 | 移除 IdeaView/SettingView/OutlineView 三处 `<a-alert>` + `usePhaseWorkflow.reviewAnnotations` computed + StepService 5 处 `annotations` 写入。前后端 10 文件，819 条测试零回归 |
 | 06-02 | **IdeaView 迁移至 `usePhaseWorkflow`** — 原先 IdeaView 自行管理 `loading/error/isConfirmed` 等状态，与 SettingView/OutlineView 不一致，导致 IDEA 阶段确认后 Stepper 的 `stepStatus` 未同步（仍显示 PENDING）。迁移后三个 Phase 视图统一使用 `usePhaseWorkflow()` composable：挂载时自动 fetch 后端数据 → 同步 stepStatus 到 workflowStore → 提供 `handleGenerate/Confirm/Reject` 统一方法。同时引入 `useIdeaParser` composable 分离卖点/摘要解析逻辑。 | IdeaView.vue、usePhaseWorkflow.ts、useWorkflowStore.ts |
 | 06-02 | **修复 Phase 导航回退 Bug** — `ProjectHubView.openProject()` 原先写死导航到 `workflow.idea`。生成设定未确认后返回列表，再次点击项目会错误跳回 IDEA 阶段（已确认无操作按钮）。修复：`openProject` 改为根据 `project.status` 映射到对应 Phase 路由（IDEA→idea / SETTING→setting / OUTLINE→outline），BEATS/DRAFTING/COMPLETED 回退到 OUTLINE。`WorkflowView.handleStepClick` 改为先导航路由再更新 store。新增 `watch` 在 WorkflowView 挂载时同步 `store.currentPhase` 与后端 `project.status`。 | ProjectHubView.vue、WorkflowView.vue |
 | 06-02 | **修复"驳回，重新生成"不重新生成 + 二次点击 400 Bug** — `usePhaseWorkflow.handleReject` 只调 reject API（改 status 为 REJECTED）但未触发生成，用户看到旧内容以为没反应；二次点击时 step 已 REJECTED 导致服务端 400。修复：`handleReject` 在 reject 成功后自动调用 `handleGenerate()` 生成全新内容（不传 `currentContent`，AI 从零创作）；`SettingView` watcher 增加对 `status === 'REJECTED'` 的检测，页面加载时若 step 已驳回则自动重新生成。 | usePhaseWorkflow.ts、SettingView.vue |
-| 06-02 | **去除设定集与剧情大纲生成按钮，进入后自动生成；大纲默认使用网文十章结构** — IDEA 确认后进入 SETTING 自动触发 `generateSetting`；大纲结构从三幕式改为网文十章（`web-novel-ten`），叙事结构选择器暂时隐藏（`v-if="false"`）。 | SettingView.vue、OutlineView.vue |
+| 06-02 | **去除设定集与剧情大纲生成按钮，进入后自动生成；大纲默认使用网文十段结构** — IDEA 确认后进入 SETTING 自动触发 `generateSetting`；大纲结构从三幕式改为网文十段（`web-novel-ten`），叙事结构选择器暂时隐藏（`v-if="false"`）。 | SettingView.vue、OutlineView.vue |
 | 06-02 | **Markdown 渲染 + 修复格式转换问题** — 新增 `MarkdownRenderer.vue` 组件（marked + DOMPurify，支持 GFM 表格、任务列表），Outline/Idea/Setting 输出统一使用。修复了之前纯文本显示导致的格式丢失问题。 | MarkdownRenderer.vue、OutlineView.vue、IdeaView.vue、SettingView.vue |
 | 06-02 | **修复项目间 stepStatus 状态串扰** — 根因：`useWorkflowStore` 使用全局单一 localStorage key (`workflowStore`)，不同项目共享同一份 stepStatuses。从项目 A（已走到 OUTLINE）切换到项目 B（新建 IDEA）时，store 仍加载项目 A 旧状态，导致 Stepper 显示 IDEA=已完成、SETTING=进行中、OUTLINE=进行中。修复：① `useWorkflowStore` key 按项目隔离为 `workflowStore:{projectId}`，新增 `loadForProject(id)` 加载/切换作用域状态，自动迁移旧全局 key；② `WorkflowView` 新增 `watch(projectId)` 调用 `loadForProject`；③ `usePhaseWorkflow` — `handleGenerate`/`handleReject` 失败时回退 IN_PROGRESS，`onMounted` 同步前置阶段的后端真实状态（通过新增的 `previousPhase`/`previousGetFn` 可选参数）；④ `WorkflowStepper.isClickable` 允许前置全确认时点击后续步骤；⑤ 新增 6 个测试用例（项目隔离、跨项目切换、旧数据迁移等）。 | useWorkflowStore.ts、WorkflowView.vue、usePhaseWorkflow.ts、SettingView.vue、OutlineView.vue、WorkflowStepper.vue、useWorkflowStore.spec.ts、WorkflowStepper.spec.ts |
 | 06-02 | **修复「设定阶段驳回重新生成」逻辑** — `handleReject` 从"调 reject API → 标记 REJECTED → 调 handleGenerate"简化为"直接调 generateFn 重新生成"，不再调用 reject API（无需持久化 REJECTED 中间状态）。 | usePhaseWorkflow.ts |
@@ -179,10 +181,10 @@
 
 **风险**：低。当前前端 `handleConfirm` 和 `handleReject` 已不依赖返回值中的 `output`（confirm 用 `store.setStepStatus` 驱动 UI，reject 后直接调 `handleGenerate` 覆盖）。
 
-### 大纲叙事结构选择器暂隐藏（硬编码网文十章）{#outline-structure-hardcoded}
+### 大纲叙事结构选择器暂隐藏（硬编码网文十段）{#outline-structure-hardcoded}
 
-**现状**：PRD 规划支持三种叙事结构（三幕式 `three-act` / 网文十章 `web-novel-ten` / 四幕八段 `four-act-eight`），前端 `OutlineView.vue` 中结构选择器 UI（`a-segmented`）通过 `v-if="false"` 隐藏，`selectedStructure` 硬编码为 `'web-novel-ten'`。
+**现状**：PRD 规划支持三种叙事结构（三幕式 `three-act` / 网文十段 `web-novel-ten` / 四幕八段 `four-act-eight`），前端 `OutlineView.vue` 中结构选择器 UI（`a-segmented`）通过 `v-if="false"` 隐藏，`selectedStructure` 硬编码为 `'web-novel-ten'`。**注意**：前端正则已支持「第X段」格式解析（06-03），三种结构的节标记均在解析器中就绪。
 
-**原因**：当前优先验证网文十章结构，后续迭代恢复多结构选项。服务端 `generateOutline` 和 `switchStructure` 已完整支持三种结构。
+**原因**：当前优先验证网文十段结构，后续迭代恢复多结构选项。服务端 `generateOutline` 和 `switchStructure` 已完整支持三种结构。
 
-**建议方案**：恢复 `v-if` 条件（移除 `false` 或绑定用户偏好），允许用户在三种结构中自由切换。需确认 `switchStructure` 在网文十章 ↔ 其他格式互转时情节点保留逻辑的正确性。**涉及**：`OutlineView.vue:130`。
+**建议方案**：恢复 `v-if` 条件（移除 `false` 或绑定用户偏好），允许用户在三种结构中自由切换。需确认 `switchStructure` 在网文十段 ↔ 其他格式互转时情节点保留逻辑的正确性。**涉及**：`OutlineView.vue`。
