@@ -563,13 +563,13 @@ describe('OutlineView', () => {
       expect(wrapper.find('[data-testid="review-annotations"]').exists()).toBe(false);
     });
 
-    it('displays emotion labels on plot points', async () => {
+    it('strips [爽点] tag from outline body text', async () => {
       mockGetOutline.mockResolvedValue({
-        id: 'step-emotion',
+        id: 'step-strip-1',
         projectId: 'test-project-1',
         phaseType: 'OUTLINE',
         status: 'AWAITING_REVIEW',
-        output: '## 第一幕\n情节点1\n情节点2\n## 第二幕\n情节点3',
+        output: '## 第一幕\n主角登场 [爽点]\n## 第二幕\n遭遇挫折',
         review: {
           structurePacing: { passed: true, score: 85 },
           conflictReview: { passed: true, notes: '' },
@@ -582,12 +582,151 @@ describe('OutlineView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(wrapper.find('[data-testid="outline-tree"]').exists()).toBe(true);
+      const tree = wrapper.find('[data-testid="outline-tree"]');
+      expect(tree.text()).toContain('主角登场');
+      expect(tree.text()).not.toContain('[爽点]');
+    });
+
+    it('strips [虐点] and [高潮] tags from outline body text', async () => {
+      mockGetOutline.mockResolvedValue({
+        id: 'step-strip-2',
+        projectId: 'test-project-1',
+        phaseType: 'OUTLINE',
+        status: 'AWAITING_REVIEW',
+        output: '## 第一幕\n主角升级 [爽点]\n## 第二幕\n朋友背叛 [虐点]\n## 第三幕\n最终决战 [高潮]',
+        review: {
+          structurePacing: { passed: true, score: 85 },
+          conflictReview: { passed: true, notes: '' },
+          climaxReview: { passed: true, notes: '' },
+        },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      const tree = wrapper.find('[data-testid="outline-tree"]');
+      const text = tree.text();
+      expect(text).toContain('主角升级');
+      expect(text).toContain('朋友背叛');
+      expect(text).toContain('最终决战');
+      expect(text).not.toContain('[爽点]');
+      expect(text).not.toContain('[虐点]');
+      expect(text).not.toContain('[高潮]');
+    });
+
+    it('preserves non-emotion bracket content in outline text', async () => {
+      mockGetOutline.mockResolvedValue({
+        id: 'step-strip-3',
+        projectId: 'test-project-1',
+        phaseType: 'OUTLINE',
+        status: 'AWAITING_REVIEW',
+        output: '## 第一幕\n主角获得[神器]提升实力\n## 第二幕\n遭遇[暗影军团]伏击',
+        review: {
+          structurePacing: { passed: true, score: 85 },
+          conflictReview: { passed: true, notes: '' },
+          climaxReview: { passed: true, notes: '' },
+        },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).toContain('[神器]');
+      expect(text).toContain('[暗影军团]');
+    });
+
+    it('parses 第X段 format from web-novel-ten structure', async () => {
+      mockGetOutline.mockResolvedValue({
+        id: 'step-paragraph',
+        projectId: 'test-project-1',
+        phaseType: 'OUTLINE',
+        status: 'AWAITING_REVIEW',
+        output: '第一段\n主角出场，展示金手指\n第二段\n首次冲突，小试牛刀\n第三段\n遭遇强敌，被迫逃亡',
+        review: {
+          structurePacing: { passed: true, score: 85 },
+          conflictReview: { passed: true, notes: '' },
+          climaxReview: { passed: true, notes: '' },
+        },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      const tree = wrapper.find('[data-testid="outline-tree"]');
+      const text = tree.text();
+      // 三段都应出现在时间线中
+      expect(text).toContain('第一段');
+      expect(text).toContain('主角出场');
+      expect(text).toContain('第二段');
+      expect(text).toContain('首次冲突');
+      expect(text).toContain('第三段');
+      expect(text).toContain('被迫逃亡');
+    });
+
+    it('parses ## 第一段 markdown header format', async () => {
+      mockGetOutline.mockResolvedValue({
+        id: 'step-md-para',
+        projectId: 'test-project-1',
+        phaseType: 'OUTLINE',
+        status: 'AWAITING_REVIEW',
+        output: '## 第一段\n开篇引入\n## 第二段\n冲突升级\n## 第三段\n高潮收尾',
+        review: {
+          structurePacing: { passed: true, score: 85 },
+          conflictReview: { passed: true, notes: '' },
+          climaxReview: { passed: true, notes: '' },
+        },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).not.toContain('##');
+      expect(text).toContain('第一段');
+      expect(text).toContain('第二段');
+      expect(text).toContain('第三段');
+    });
+
+    it('preserves multiline body text across all sections', async () => {
+      mockGetOutline.mockResolvedValue({
+        id: 'step-multiline',
+        projectId: 'test-project-1',
+        phaseType: 'OUTLINE',
+        status: 'AWAITING_REVIEW',
+        output: '第一段\n主角出场，展示金手指\n\n修炼突破，踏入新境界\n第二段\n首次冲突\n\n小试牛刀',
+        review: {
+          structurePacing: { passed: true, score: 85 },
+          conflictReview: { passed: true, notes: '' },
+          climaxReview: { passed: true, notes: '' },
+        },
+        version: 1,
+      });
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await new Promise((r) => setTimeout(r, 10));
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      // 第一段的两段正文都独立存在
+      expect(text).toContain('主角出场');
+      expect(text).toContain('修炼突破');
+      // 第二段的正文存在
+      expect(text).toContain('首次冲突');
+      expect(text).toContain('小试牛刀');
     });
   });
 
   describe('regenerate (refresh) flow', () => {
-    it('shows refresh button when outline is not confirmed', async () => {
+    it('does not show refresh button when outline is not confirmed', async () => {
       mockGetOutline.mockResolvedValue({
         id: 'step-r1',
         projectId: 'test-project-1',
@@ -606,7 +745,7 @@ describe('OutlineView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(wrapper.find('[data-testid="regenerate-outline-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="regenerate-outline-btn"]').exists()).toBe(false);
     });
 
     it('does not show refresh button when outline is confirmed', async () => {
@@ -630,49 +769,6 @@ describe('OutlineView', () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(wrapper.find('[data-testid="regenerate-outline-btn"]').exists()).toBe(false);
-    });
-
-    it('calls generateOutline with currentContent when refresh is clicked', async () => {
-      mockGetOutline.mockResolvedValue({
-        id: 'step-r2',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 第一幕\n原大纲',
-        review: {
-          structurePacing: { passed: true, score: 80 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 1,
-      });
-      mockGenerateOutline.mockResolvedValue({
-        id: 'step-r2-new',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 第一幕\n刷新后的大纲',
-        review: {
-          structurePacing: { passed: true, score: 85 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 2,
-      });
-
-      const wrapper = await mountView();
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="regenerate-outline-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 50));
-
-      expect(mockGenerateOutline).toHaveBeenCalledWith('test-project-1', {
-        setting: '',
-        structure: 'three-act',
-        currentContent: '## 第一幕\n原大纲',
-      });
     });
   });
 });

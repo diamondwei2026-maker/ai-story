@@ -62,20 +62,13 @@
             <MarkdownRenderer :content="item.body" />
           </a-timeline-item>
         </a-timeline>
-        <MarkdownRenderer v-else :content="outlineData.output" />
+        <MarkdownRenderer v-else :content="stripEmotionTags(outlineData.output)" />
       </div>
 
       <div
         v-if="!isConfirmed"
         class="outline-view__actions"
       >
-        <a-button
-          data-testid="regenerate-outline-btn"
-          :loading="regenerating"
-          @click="handleRegenerate"
-        >
-          {{ regenerating ? '刷新中...' : '刷新关联内容' }}
-        </a-button>
         <a-button
           danger
           data-testid="reject-outline-btn"
@@ -128,12 +121,10 @@ const structureOptions = [
 const {
   data: outlineData,
   loading,
-  regenerating,
   error,
   isConfirmed,
   initialLoadDone,
   handleGenerate,
-  handleRegenerate,
   handleConfirm,
   handleReject,
 } = usePhaseWorkflow<StepDataResponse>({
@@ -166,20 +157,28 @@ interface OutlineItem {
 
 const COLORS = ['teal', 'blue', 'purple', 'orange', 'green', 'red', 'cyan'];
 
+const EMOTION_KEYWORDS = ['爽点', '虐点', '高潮', '伏笔', '转折', '铺垫', '冲突', '悬念'];
+
+function stripEmotionTags(text: string): string {
+  return text.replace(/\[([^\]]*)\]/g, (_, inner: string) =>
+    EMOTION_KEYWORDS.some((k) => inner.includes(k)) ? '' : `[${inner}]`,
+  ).replace(/ {2,}/g, ' ');
+}
+
 const parsedOutline = computed<OutlineItem[]>(() => {
   const output = outlineData.value?.output ?? '';
   const items: OutlineItem[] = [];
 
-  const actMatch = output.match(/(?:^|\n)(第[一二三四五六七八九十]+幕|Act\s+\d+|第\d+章)[\s：:]*([\s\S]*?)(?=\n(?:第[一二三四五六七八九十]+幕|Act\s+\d+|第\d+章)|\n*$)/g);
+  const actMatch = output.match(/(?:^|\n)(?:#{1,3}\s+)?(第[一二三四五六七八九十]+幕|第[一二三四五六七八九十]+段|Act\s+\d+|第\d+章)[\s：:]*([\s\S]*?)(?=\n(?:#{1,3}\s+)?(?:第[一二三四五六七八九十]+幕|第[一二三四五六七八九十]+段|Act\s+\d+|第\d+章)|\n*$)/g);
 
   if (actMatch && actMatch.length > 0) {
     actMatch.forEach((block, i) => {
-      const lines = block.trim().split('\n').filter(Boolean);
-      const title = lines[0].trim();
-      const body = lines.slice(1).join('\n').trim();
+      const lines = block.trim().split('\n');
+      const title = lines[0].trim().replace(/^#{1,3}\s*/, '');
+      const body = lines.slice(1).join('\n');
       items.push({
-        title: title || `第${i + 1}段`,
-        body: body || block.trim(),
+        title: stripEmotionTags(title).trim() || `第${i + 1}段`,
+        body: stripEmotionTags(body || block.trim()).trimEnd(),
         color: COLORS[i % COLORS.length],
       });
     });
@@ -187,9 +186,9 @@ const parsedOutline = computed<OutlineItem[]>(() => {
   }
 
   const lines = output.split('\n').filter(Boolean);
-  if (lines.every((l) => /^(#{1,3}\s|第.+[幕章节])/.test(l.trim()))) {
+  if (lines.every((l) => /^(#{1,3}\s|第.+[幕章节段])/.test(l.trim()))) {
     lines.forEach((line, i) => {
-      const cleaned = line.replace(/^#{1,3}\s*/, '').trim();
+      const cleaned = stripEmotionTags(line.replace(/^#{1,3}\s*/, '').trim());
       items.push({
         title: cleaned,
         body: '',
