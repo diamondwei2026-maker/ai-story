@@ -118,6 +118,7 @@ import {
   switchStructure,
 } from '@/api/outline';
 import { getSetting } from '@/api/setting';
+import { getIdea } from '@/api/idea';
 import type { StepDataResponse } from '@/api/common';
 import EmptyState from '@/components/EmptyState.vue';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
@@ -155,8 +156,10 @@ const {
   confirmFn: confirmOutline,
   rejectFn: rejectOutline,
   generateArgs: () => ({ setting: '', structure: selectedStructure.value }),
-  previousPhase: 'SETTING',
-  previousGetFn: getSetting,
+  previousPhases: [
+    { phase: 'IDEA', getFn: getIdea },
+    { phase: 'SETTING', getFn: getSetting },
+  ],
 });
 
 // 初始加载完成后，若无大纲则自动生成（默认使用网文十段结构）
