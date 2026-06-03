@@ -160,33 +160,8 @@ describe('OutlineView', () => {
       expect(wrapper.find('[data-testid="outline-tree"]').exists()).toBe(true);
     });
 
-    it('displays EmotionCurve after successful generation', async () => {
-      mockGetOutline.mockResolvedValue(null);
-      mockGenerateOutline.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 第一幕\n情节点1 [爽点]\n情节点2 [悬念点]\n## 第二幕\n情节点3 [虐点]',
-        review: {
-          structurePacing: { passed: true, score: 85 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 1,
-      });
-
-      const wrapper = await mountView();
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
-
-      await wrapper.find('[data-testid="generate-outline-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 50));
-
-      expect(wrapper.find('[data-testid="emotion-curve"]').exists()).toBe(true);
-    });
   });
+
 
   describe('confirm outline flow', () => {
     it('shows confirm button after generation', async () => {
@@ -594,7 +569,7 @@ describe('OutlineView', () => {
         projectId: 'test-project-1',
         phaseType: 'OUTLINE',
         status: 'AWAITING_REVIEW',
-        output: '## 第一幕\n情节点1 [爽点]\n情节点2 [悬念点]\n## 第二幕\n情节点3 [虐点]',
+        output: '## 第一幕\n情节点1\n情节点2\n## 第二幕\n情节点3',
         review: {
           structurePacing: { passed: true, score: 85 },
           conflictReview: { passed: true, notes: '' },
@@ -607,7 +582,7 @@ describe('OutlineView', () => {
       await wrapper.vm.$nextTick();
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(wrapper.find('[data-testid="emotion-curve"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="outline-tree"]').exists()).toBe(true);
     });
   });
 

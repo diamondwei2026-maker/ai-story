@@ -65,17 +65,6 @@
         <MarkdownRenderer v-else :content="outlineData.output" />
       </div>
 
-      <div data-testid="emotion-curve" class="outline-view__emotion-bar">
-        <span class="outline-view__emotion-label caption">情绪节点：</span>
-        <a-tag
-          v-for="label in emotionLabels"
-          :key="label"
-          :color="emotionColor(label)"
-        >
-          {{ label }}
-        </a-tag>
-      </div>
-
       <div
         v-if="!isConfirmed"
         class="outline-view__actions"
@@ -168,24 +157,6 @@ watch(initialLoadDone, (done) => {
     handleGenerate();
   }
 });
-
-const emotionLabels = computed(() => {
-  const output = outlineData.value?.output ?? '';
-  const labels: string[] = [];
-  if (/\[爽点\]/.test(output)) labels.push('爽点');
-  if (/\[虐点\]/.test(output)) labels.push('虐点');
-  if (/\[悬念点\]/.test(output)) labels.push('悬念点');
-  return labels;
-});
-
-function emotionColor(label: string): string {
-  const map: Record<string, string> = {
-    '爽点': 'green',
-    '虐点': 'red',
-    '悬念点': 'orange',
-  };
-  return map[label] ?? 'default';
-}
 
 interface OutlineItem {
   title: string;
@@ -310,17 +281,6 @@ async function handleSwitchStructure() {
   font-family: inherit;
   margin: 0;
   color: var(--color-text-secondary);
-}
-
-.outline-view__emotion-bar {
-  margin-bottom: var(--space-md);
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.outline-view__emotion-label {
-  color: var(--color-text-muted);
 }
 
 .outline-view__actions {
