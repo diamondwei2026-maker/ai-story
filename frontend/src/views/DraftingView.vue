@@ -24,7 +24,34 @@
       </a-card>
     </div>
 
-    <!-- Chapter list -->
+    <!-- EditorWorkspace (when a chapter is selected) -->
+    <EditorWorkspace
+      v-else-if="selectedChapter"
+      :key="selectedChapter.id"
+      :chapter-id="selectedChapter.id"
+      :chapter-title="selectedChapter.title || '未命名章节'"
+      :chapter-content="selectedChapter.content || ''"
+      :chapter-status="selectedChapter.status"
+      :target-word-count="selectedChapter.targetWordCount"
+      :generation-mode="generationMode"
+      :is-generating="isGenerating"
+      :is-paused="isPaused"
+      :review-result="selectedChapter.reviewResult as any"
+      @close="closeWorkspace"
+      @mode-change="handleModeChange"
+      @content-change="(val: string) => handleContentChange(selectedChapter.id, val)"
+      @pause="handlePause(selectedChapter.id)"
+      @continue="handleContinue(selectedChapter.id)"
+      @retry="(feedback: string) => handleRetry(selectedChapter.id, feedback)"
+      @confirm="handleConfirm(selectedChapter.id)"
+      @dispute="handleDispute(selectedChapter.id)"
+      @adopt-suggestions="() => {}"
+      @adopt-and-re-review="() => {}"
+      @manual-edit="() => {}"
+      @appeal="(reason: string) => {}"
+    />
+
+    <!-- Chapter list (when no chapter selected) -->
     <div v-else data-testid="chapter-list" class="chapter-list">
       <!-- Total word count -->
       <div data-testid="total-word-count" class="chapter-list__stats">
@@ -36,6 +63,7 @@
         :key="chapter.id"
         data-testid="chapter-list-item"
         class="chapter-list__item"
+        @click="selectChapter(chapter)"
       >
         <div class="chapter-list__item-header">
           <span
@@ -72,7 +100,7 @@
             type="primary"
             size="small"
             :disabled="!canGenerate(chapter)"
-            @click="handleGenerate(chapter)"
+            @click.stop="handleGenerate(chapter)"
           >
             {{ chapter.status === 'DRAFT' ? '生成中...' : '生成正文' }}
           </a-button>
@@ -95,27 +123,14 @@ import * as chapterApi from "@/api/chapter";
 import * as projectApi from "@/api/project";
 import type { Chapter } from "@/stores/useChapterStore";
 import CompletionBanner from "@/components/CompletionBanner.vue";
-
-// ─── Constants ──────────────────────────────────────────────────────
-
-const CHAPTER_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待生成",
-  DRAFT: "生成中",
-  REVIEWING: "审核中",
-  COMPLETED: "已完成",
-  DISPUTED: "已标记争议",
-};
-
-const CHAPTER_STATUS_COLOR: Record<string, string> = {
-  PENDING: "default",
-  DRAFT: "processing",
-  REVIEWING: "orange",
-  COMPLETED: "green",
-  DISPUTED: "red",
-};
-
-const TERMINAL_STATUSES = new Set(["COMPLETED", "DISPUTED"]);
-const ACTIVE_STATUSES = new Set(["DRAFT", "REVIEWING"]);
+import EditorWorkspace from "@/components/EditorWorkspace.vue";
+import type { GenerationMode } from "@/stores/useChapterStore";
+import {
+  CHAPTER_STATUS_LABEL,
+  CHAPTER_STATUS_COLOR,
+  TERMINAL_CHAPTER_STATUSES,
+  ACTIVE_CHAPTER_STATUSES,
+} from "@/types";
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -128,6 +143,10 @@ const props = defineProps<{
 const chapters = ref<Chapter[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const selectedChapterId = ref<string | null>(null);
+const isGenerating = ref(false);
+const isPaused = ref(false);
+const generationMode = ref<GenerationMode>("new-continue");
 
 // ─── Derived ────────────────────────────────────────────────────────
 
@@ -135,13 +154,18 @@ const sortedChapters = computed(() =>
   [...chapters.value].sort((a, b) => a.chapterNumber - b.chapterNumber)
 );
 
+const selectedChapter = computed(() => {
+  if (!selectedChapterId.value) return null;
+  return chapters.value.find((c) => c.id === selectedChapterId.value) ?? null;
+});
+
 const totalWordCount = computed(() =>
   sortedChapters.value.reduce((sum, ch) => sum + wordCount(ch.content), 0)
 );
 
 const allChaptersCompleted = computed(() => {
   const list = sortedChapters.value;
-  return list.length > 0 && list.every((ch) => TERMINAL_STATUSES.has(ch.status));
+  return list.length > 0 && list.every((ch) => TERMINAL_CHAPTER_STATUSES.has(ch.status));
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -161,11 +185,11 @@ function statusTagColor(status: string): string {
 }
 
 function showGenerateButton(chapter: Chapter): boolean {
-  return !TERMINAL_STATUSES.has(chapter.status);
+  return !TERMINAL_CHAPTER_STATUSES.has(chapter.status);
 }
 
 function canGenerate(chapter: Chapter): boolean {
-  if (ACTIVE_STATUSES.has(chapter.status)) return false;
+  if (ACTIVE_CHAPTER_STATUSES.has(chapter.status)) return false;
 
   // First chapter is always available
   if (chapter.chapterNumber === 1) return true;
@@ -174,7 +198,86 @@ function canGenerate(chapter: Chapter): boolean {
   const idx = sortedChapters.value.findIndex((c) => c.id === chapter.id);
   if (idx <= 0) return false;
 
-  return TERMINAL_STATUSES.has(sortedChapters.value[idx - 1].status);
+  return TERMINAL_CHAPTER_STATUSES.has(sortedChapters.value[idx - 1].status);
+}
+
+// ─── Chapter selection ──────────────────────────────────────────────
+
+function selectChapter(chapter: Chapter) {
+  selectedChapterId.value = chapter.id;
+}
+
+function closeWorkspace() {
+  selectedChapterId.value = null;
+  isPaused.value = false;
+}
+
+// ─── Workspace event handlers ───────────────────────────────────────
+
+function handleModeChange(mode: string) {
+  generationMode.value = mode as GenerationMode;
+}
+
+function handleContentChange(_chapterId: string, _content: string) {
+  // Content changes are handled by the parent via SSE or manual editing
+}
+
+async function handlePause(chapterId: string) {
+  isPaused.value = true;
+  try {
+    await chapterApi.pauseChapter(props.projectId, chapterId);
+  } catch (e: any) {
+    error.value = e.message || "暂停失败";
+  }
+}
+
+async function handleContinue(chapterId: string) {
+  const chapter = chapters.value.find((c) => c.id === chapterId);
+  try {
+    isPaused.value = false;
+    isGenerating.value = true;
+    await chapterApi.continueChapter(props.projectId, chapterId, {
+      currentContent: chapter?.content ?? "",
+    });
+    isGenerating.value = false;
+    await fetchChapters();
+  } catch (e: any) {
+    isGenerating.value = false;
+    error.value = e.message || "继续生成失败";
+  }
+}
+
+async function handleRetry(chapterId: string, feedback: string) {
+  try {
+    isGenerating.value = true;
+    await chapterApi.retryChapter(props.projectId, chapterId, {
+      mode: generationMode.value,
+      feedback: feedback || undefined,
+    });
+    isGenerating.value = false;
+    await fetchChapters();
+  } catch (e: any) {
+    isGenerating.value = false;
+    error.value = e.message || "重试失败";
+  }
+}
+
+async function handleConfirm(chapterId: string) {
+  try {
+    await chapterApi.confirmChapter(props.projectId, chapterId);
+    await fetchChapters();
+  } catch (e: any) {
+    error.value = e.message || "确认失败";
+  }
+}
+
+async function handleDispute(chapterId: string) {
+  try {
+    await chapterApi.disputeChapter(props.projectId, chapterId);
+    await fetchChapters();
+  } catch (e: any) {
+    error.value = e.message || "争议标记失败";
+  }
 }
 
 // ─── Actions ────────────────────────────────────────────────────────

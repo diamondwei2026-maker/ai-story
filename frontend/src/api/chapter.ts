@@ -19,6 +19,64 @@ export async function generateChapter(
   );
 }
 
+export async function confirmChapter(
+  projectId: string,
+  chapterId: string,
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/confirm`,
+    { method: 'POST' },
+  );
+}
+
+export async function disputeChapter(
+  projectId: string,
+  chapterId: string,
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/dispute`,
+    { method: 'POST' },
+  );
+}
+
+export async function pauseChapter(
+  projectId: string,
+  chapterId: string,
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/pause`,
+    { method: 'POST' },
+  );
+}
+
+export async function continueChapter(
+  projectId: string,
+  chapterId: string,
+  body: { currentContent: string },
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/continue`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function retryChapter(
+  projectId: string,
+  chapterId: string,
+  body: { mode: string; feedback?: string },
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/retry`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 export interface ImpactedChapter {
   chapterNumber: number;
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';

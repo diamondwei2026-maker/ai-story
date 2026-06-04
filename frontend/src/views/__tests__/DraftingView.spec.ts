@@ -7,12 +7,22 @@ import { createRouter, createWebHistory } from "vue-router";
 
 const mockGetChapters = vi.fn();
 const mockGenerateChapter = vi.fn();
+const mockConfirmChapter = vi.fn();
+const mockDisputeChapter = vi.fn();
+const mockPauseChapter = vi.fn();
+const mockContinueChapter = vi.fn();
+const mockRetryChapter = vi.fn();
 const mockConfirmCompletion = vi.fn();
 const mockReopenProject = vi.fn();
 
 vi.mock("@/api/chapter", () => ({
   getChapters: (...args: any[]) => mockGetChapters(...args),
   generateChapter: (...args: any[]) => mockGenerateChapter(...args),
+  confirmChapter: (...args: any[]) => mockConfirmChapter(...args),
+  disputeChapter: (...args: any[]) => mockDisputeChapter(...args),
+  pauseChapter: (...args: any[]) => mockPauseChapter(...args),
+  continueChapter: (...args: any[]) => mockContinueChapter(...args),
+  retryChapter: (...args: any[]) => mockRetryChapter(...args),
 }));
 
 vi.mock("@/api/project", () => ({
@@ -540,16 +550,297 @@ describe("DraftingView", () => {
   });
 
   // ══════════════════════════════════════════════════════════════════
-  // 8. Fetch on mount
+  // 9. EditorWorkspace integration (Issue #23)
   // ══════════════════════════════════════════════════════════════════
 
-  describe("fetch on mount", () => {
-    it("calls getChapters with the projectId on mount", async () => {
+  describe("EditorWorkspace integration", () => {
+    it("renders chapter list by default (no EditorWorkspace)", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-testid="chapter-list"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
+    });
+
+    it("opens EditorWorkspace when a chapter card is clicked", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockGenerateChapter.mockResolvedValue({});
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Click on the first chapter to select it
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      // EditorWorkspace should now be visible
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(true);
+    });
+
+    it("passes chapter title to EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-testid="workspace-title"]').text()).toContain("第一章");
+    });
+
+    it("passes chapter content to EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.props("chapterContent")).toBe("第一章正文内容...");
+    });
+
+    it("passes chapter status to EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Chapter 1 is COMPLETED
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.props("chapterStatus")).toBe("COMPLETED");
+    });
+
+    it("passes targetWordCount to EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.props("targetWordCount")).toBe(3000);
+    });
+
+    it("closes EditorWorkspace when close event is emitted", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const firstChapter = wrapper.findAll('[data-testid="chapter-list-item"]')[0];
+      await firstChapter.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(true);
+
+      // Click close button in workspace
+      await wrapper.find('[data-testid="close-workspace-btn"]').trigger("click");
+      await wrapper.vm.$nextTick();
+
+      // Should return to chapter list
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="chapter-list"]').exists()).toBe(true);
+    });
+
+    it("calls retryChapter when EditorWorkspace emits retry for PENDING chapter", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockRetryChapter.mockResolvedValue({});
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Select chapter 3 (PENDING) to open workspace
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[2].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      // Workspace should be visible with TextToolbar
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.exists()).toBe(true);
+
+      // Trigger retry via workspace (this simulates clicking "重试" in TextToolbar)
+      await workspace.vm.$emit("retry", "");
+      await wrapper.vm.$nextTick();
+
+      expect(mockRetryChapter).toHaveBeenCalledWith(
+        "proj-1",
+        "ch-3",
+        { mode: "new-continue", feedback: undefined },
+      );
+    });
+
+    it("passes generationMode to EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[0].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.props("generationMode")).toBeDefined();
+    });
+
+    it("updates generationMode when mode-change emitted from EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[0].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("mode-change", "style-upgrade");
+      await wrapper.vm.$nextTick();
+
+      expect(workspace.props("generationMode")).toBe("style-upgrade");
+    });
+
+    it("handles pause event from EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[2].trigger("click"); // PENDING chapter
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("pause");
+      await wrapper.vm.$nextTick();
+
+      // isPaused should be reflected in workspace
+      expect(workspace.props("isPaused")).toBe(true);
+    });
+
+    it("handles continue event from EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockContinueChapter.mockResolvedValue({});
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[2].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("continue");
+      await wrapper.vm.$nextTick();
+
+      expect(mockContinueChapter).toHaveBeenCalled();
+    });
+
+    it("handles retry event from EditorWorkspace with feedback", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockRetryChapter.mockResolvedValue({});
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[2].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("retry", "希望风格更热血");
+      await wrapper.vm.$nextTick();
+
+      expect(mockRetryChapter).toHaveBeenCalledWith(
+        "proj-1",
+        "ch-3",
+        { mode: "new-continue", feedback: "希望风格更热血" },
+      );
+    });
+
+    it("handles confirm event from EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockConfirmChapter.mockResolvedValue({});
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[0].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("confirm");
+      await wrapper.vm.$nextTick();
+
+      expect(mockConfirmChapter).toHaveBeenCalledWith("proj-1", "ch-1");
+    });
+
+    it("handles dispute event from EditorWorkspace", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockDisputeChapter.mockResolvedValue({});
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[0].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("dispute");
+      await wrapper.vm.$nextTick();
+
+      expect(mockDisputeChapter).toHaveBeenCalledWith("proj-1", "ch-1");
+    });
+
+    it("refetches chapters after confirm event", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockConfirmChapter.mockResolvedValue({});
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Clear previous calls
+      mockGetChapters.mockClear();
+
+      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
+      await chapters[0].trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      await workspace.vm.$emit("confirm");
+      await wrapper.vm.$nextTick();
+
+      // Should refetch after confirm
+      expect(mockGetChapters).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("does not open EditorWorkspace when no chapters exist", async () => {
       mockGetChapters.mockResolvedValue(emptyChapters);
-      await mountView({ projectId: "proj-123" });
-      await vi.waitFor(() => {
-        expect(mockGetChapters).toHaveBeenCalledWith("proj-123");
-      });
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="drafting-empty-state"]').exists()).toBe(true);
     });
   });
 });
