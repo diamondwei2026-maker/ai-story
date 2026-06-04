@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SettingController } from './step.controller';
 import { IdeaController } from './idea.controller';
 import { OutlineController } from './outline.controller';
@@ -16,7 +16,7 @@ import { AIGatewayModule } from '../ai-gateway/ai-gateway.module';
 import { STEP_DATA_ACCESS } from '../ai-gateway/context-budget.service';
 
 @Module({
-  imports: [ProjectModule, AIGatewayModule],
+  imports: [forwardRef(() => ProjectModule), AIGatewayModule],
   controllers: [
     IdeaController,
     SettingController,

@@ -9,6 +9,8 @@ import {
   BadRequestException,
   NotFoundException,
   HttpCode,
+  Optional,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { StepService } from '../step/step.service';
@@ -18,7 +20,7 @@ import { Project } from './project.entity';
 export class ProjectController {
   constructor(
     private readonly projectService: ProjectService,
-    private readonly stepService: StepService,
+    @Optional() private readonly stepService?: StepService,
   ) {}
 
   @Post()
@@ -38,7 +40,12 @@ export class ProjectController {
 
   @Get()
   async findAll(): Promise<Project[]> {
-    return this.projectService.findAll();
+    try {
+      return await this.projectService.findAll();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new InternalServerErrorException(`Failed to fetch projects: ${msg}`);
+    }
   }
 
   @Get(':id')
@@ -101,6 +108,9 @@ export class ProjectController {
     @Param('id') id: string,
     @Body() body: { action?: string },
   ): Promise<{ status?: string; needsQueueResolution: boolean }> {
+    if (!this.stepService) {
+      throw new InternalServerErrorException('Step service is not available');
+    }
     const result = await this.stepService.confirmCompletion(
       id,
       body.action as 'sync-and-complete' | 'skip-and-complete' | undefined,
@@ -111,6 +121,9 @@ export class ProjectController {
   @Post(':id/reopen')
   @HttpCode(200)
   async reopen(@Param('id') id: string): Promise<{ status: string }> {
+    if (!this.stepService) {
+      throw new InternalServerErrorException('Step service is not available');
+    }
     return this.stepService.reopenProject(id);
   }
 }
