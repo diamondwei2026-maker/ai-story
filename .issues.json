@@ -1279,7 +1279,7 @@
     "node_id": "I_kwDOSgeKl88AAAABEU0GzQ",
     "number": 21,
     "title": "#0.4 Prisma 持久化与管线接入 [AFK]",
-    "state": "open",
+    "state": "closed",
     "labels": [
       {
         "name": "ready-for-agent",
@@ -1306,7 +1306,7 @@
     "node_id": "I_kwDOSgeKl88AAAABEU0G-A",
     "number": 22,
     "title": "#1.6 章节管理与完结流程 [AFK]",
-    "state": "open",
+    "state": "closed",
     "labels": [
       {
         "name": "ready-for-agent",
@@ -1333,7 +1333,7 @@
     "node_id": "I_kwDOSgeKl88AAAABEU0HMg",
     "number": 23,
     "title": "#2.3 流式编辑器与审核面板 [AFK]",
-    "state": "open",
+    "state": "closed",
     "labels": [
       {
         "name": "ready-for-agent",
@@ -1360,7 +1360,7 @@
     "node_id": "I_kwDOSgeKl88AAAABEU0HYQ",
     "number": 24,
     "title": "#3.4 变更影响分析工作台 [AFK]",
-    "state": "open",
+    "state": "closed",
     "labels": [
       {
         "name": "ready-for-agent",
@@ -1387,7 +1387,7 @@
     "node_id": "I_kwDOSgeKl88AAAABEU0IEQ",
     "number": 25,
     "title": "#1.7 大纲结构选择器恢复 [AFK]",
-    "state": "open",
+    "state": "closed",
     "labels": [
       {
         "name": "ready-for-agent",

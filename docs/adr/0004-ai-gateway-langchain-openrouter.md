@@ -1,6 +1,8 @@
-# AI 网关：OpenRouter + LangChain 薄层封装
+# [SUPERSEDED] AI 网关：OpenAI SDK + DeepSeekChatModel
 
-AI 调用层从「DeepSeek 代理 + OpenAI 兼容 SDK」切换为「OpenRouter 模型网关 + LangChain 薄层（仅 ChatModel + PromptTemplate）」，为多模型按任务路由和未来供应商切换保留灵活性。当前所有模型限定 DeepSeek 生态。
+> **状态**：此 ADR 的原始决策（OpenRouter + LangChain）已被 Phase 1 落地否决。实际实现采用 **OpenAI SDK (`openai`) 直连 DeepSeek API**，详见文末 Implementation Note。保留此 ADR 以供决策追溯——`IChatModel` 接口抽象仍为未来供应商切换预留了扩展点。
+
+AI 调用层采用 OpenAI SDK (`openai`) 直连 DeepSeek API（`api.deepseek.com`），通过 `IChatModel` 接口抽象和 `TaskType → ModelName` 集中映射实现多模型按任务路由。当前所有模型限定 DeepSeek 生态（V3 + R1），接口抽象为未来供应商切换保留灵活性。
 
 **Considered Options**：
 - 直接调用 DeepSeek API（无网关）：最简洁，但无供应商切换能力，每次换模型需改代码。
