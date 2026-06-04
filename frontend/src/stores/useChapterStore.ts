@@ -48,7 +48,19 @@ export const useChapterStore = defineStore('chapterStore', () => {
   const error = ref<string | null>(null);
   const generationMode = ref<GenerationMode>('new-continue');
 
+  /** O(1) 索引：chapterId → chapter，避免频繁的 .find() 扫描 */
+  const chapterIndex = ref<Map<string, Chapter>>(new Map());
+
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** 重建 Map 索引（仅在数组替换时调用） */
+  function rebuildIndex() {
+    const map = new Map<string, Chapter>();
+    for (const ch of chapters.value) {
+      map.set(ch.id, ch);
+    }
+    chapterIndex.value = map;
+  }
 
   function schedulePersist() {
     if (persistTimer) clearTimeout(persistTimer);
@@ -68,11 +80,12 @@ export const useChapterStore = defineStore('chapterStore', () => {
 
   function setChapters(newChapters: Chapter[]) {
     chapters.value = sortByChapter(newChapters);
+    rebuildIndex();
     storePersist.save({ chapters: chapters.value });
   }
 
   function updateChapterContent(chapterId: string, token: string) {
-    const chapter = chapters.value.find((c) => c.id === chapterId);
+    const chapter = chapterIndex.value.get(chapterId);
     if (!chapter) return;
     chapter.content = (chapter.content ?? '') + token;
     chapter.updatedAt = new Date().toISOString();
@@ -83,7 +96,7 @@ export const useChapterStore = defineStore('chapterStore', () => {
     chapterId: string,
     status: Chapter['status'],
   ) {
-    const chapter = chapters.value.find((c) => c.id === chapterId);
+    const chapter = chapterIndex.value.get(chapterId);
     if (!chapter) return;
     chapter.status = status;
     chapter.updatedAt = new Date().toISOString();

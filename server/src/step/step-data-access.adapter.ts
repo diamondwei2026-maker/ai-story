@@ -1,64 +1,71 @@
 import { Injectable } from '@nestjs/common';
-import { StepService } from './step.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { IStepDataAccess } from '../ai-gateway/context-budget.service';
 
 @Injectable()
 export class StepDataAccessAdapter implements IStepDataAccess {
-  constructor(private readonly stepService: StepService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getChapter(projectId: string, chapterId: string) {
-    const chapters = await this.stepService.getChaptersByProjectId(projectId);
-    const chapter = chapters.find((c) => c.id === chapterId);
-    if (!chapter) return null;
+    const doc = await this.prisma.chapter.findUnique({ where: { id: chapterId } });
+    if (!doc) return null;
     return {
-      chapterNumber: chapter.chapterNumber,
-      beatPlan: chapter.beatPlan,
-      content: chapter.content,
-      contextSummary: chapter.contextSummary,
+      chapterNumber: (doc as unknown as Record<string, unknown>).chapterNumber as number,
+      beatPlan: (doc as unknown as Record<string, unknown>).beatPlan as Record<string, unknown> | null,
+      content: (doc as unknown as Record<string, unknown>).content as string | null,
+      contextSummary: (doc as unknown as Record<string, unknown>).contextSummary as string | null,
     };
   }
 
   async getPreviousChapter(projectId: string, chapterNumber: number) {
     if (chapterNumber <= 1) return null;
-    const chapters = await this.stepService.getChaptersByProjectId(projectId);
-    const prev = chapters.find((c) => c.chapterNumber === chapterNumber - 1);
-    if (!prev) return null;
+    const doc = await this.prisma.chapter.findFirst({
+      where: { projectId, chapterNumber: chapterNumber - 1 },
+    });
+    if (!doc) return null;
     return {
-      content: prev.content,
-      contextSummary: prev.contextSummary,
+      content: (doc as unknown as Record<string, unknown>).content as string | null,
+      contextSummary: (doc as unknown as Record<string, unknown>).contextSummary as string | null,
     };
   }
 
   async getBeat(projectId: string, chapterNumber: number) {
-    const beats = await this.stepService.getBeatsByProjectId(projectId);
-    const beat = beats.find((b) => b.chapterNumber === chapterNumber);
-    if (!beat) return null;
+    const doc = await this.prisma.beat.findFirst({
+      where: { projectId, chapterNumber },
+    });
+    if (!doc) return null;
     return {
-      plan: beat.plan,
+      plan: (doc as unknown as Record<string, unknown>).plan as Record<string, unknown>,
     };
   }
 
   async getIdeaStep(projectId: string) {
-    const step = await this.stepService.getIdeaByProjectId(projectId);
-    if (!step) return null;
+    const doc = await this.prisma.stepData.findFirst({
+      where: { projectId, phaseType: 'IDEA' },
+      orderBy: { version: 'desc' },
+    });
+    if (!doc) return null;
     return {
-      output: step.output,
+      output: (doc as unknown as Record<string, unknown>).output as string | null,
     };
   }
 
   async getSettingStep(projectId: string) {
-    const step = await this.stepService.getSettingByProjectId(projectId);
-    if (!step) return null;
+    const doc = await this.prisma.stepData.findFirst({
+      where: { projectId, phaseType: 'SETTING' },
+      orderBy: { version: 'desc' },
+    });
+    if (!doc) return null;
     return {
-      output: step.output,
+      output: (doc as unknown as Record<string, unknown>).output as string | null,
     };
   }
 
   async getFactsheet(projectId: string) {
-    const sheet = this.stepService.getFactsheet(projectId);
-    if (!sheet) return null;
+    const doc = await this.prisma.factSheet.findUnique({ where: { projectId } });
+    if (!doc) return null;
     return {
-      entries: sheet.data as Record<string, string>,
+      entries: (doc as unknown as Record<string, unknown>).entries as Record<string, string>,
     };
   }
 }

@@ -1,18 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { lastValueFrom, Observable } from 'rxjs';
-import { toArray } from 'rxjs/operators';
 import {
   ReviewVerdict,
   ReviewAction,
   ReviewResult,
   ReviewDimensionResult,
-  AiMeta,
 } from './step.entity';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AIGatewayService,
   TaskType,
-  AIGenerateChunk,
 } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 
@@ -156,22 +152,9 @@ export class ReviewService {
   private async collectAiOutput(
     taskType: TaskType,
     prompt: string,
-  ): Promise<{ content: string; aiMeta: AiMeta }> {
-    try {
-      const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(taskType, prompt);
-      const chunks = await lastValueFrom(chunks$.pipe(toArray()));
-      const lastChunk = chunks[chunks.length - 1];
-      const content = chunks.map((c) => c.content).join('');
-      const aiMeta: AiMeta = {
-        modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
-        degraded: lastChunk?.degraded ?? false,
-        failed: lastChunk?.failed ?? false,
-      };
-      return { content, aiMeta };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new BadRequestException(`AI 审核失败: ${msg}`);
-    }
+  ): Promise<{ content: string }> {
+    const result = await this.aiGateway.collectFullOutput(taskType, prompt);
+    return { content: result.content };
   }
 
   private parseAiReviewResponse(raw: string): ReviewResult {

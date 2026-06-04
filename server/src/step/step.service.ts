@@ -1,6 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
-import { lastValueFrom, Observable } from 'rxjs';
-import { toArray } from 'rxjs/operators';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
   StepData,
   PhaseType,
@@ -15,7 +13,6 @@ import { ProjectStatus, StatusHistoryEntry } from '../project/project.entity';
 import {
   AIGatewayService,
   TaskType,
-  AIGenerateChunk,
 } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 import { ContextBudgetService } from '../ai-gateway/context-budget.service';
@@ -366,9 +363,12 @@ export class StepService {
       }
     }
 
-    // Replace all beats for this project in DB
+    // Replace all beats for this project in DB (batch create)
     await this.prisma.beat.deleteMany({ where: { projectId } });
-    for (const beat of newBeats) {
+    const createDataList: any[] = [];
+    const beatIndexMap = new Map<number, BeatData>(); // index -> beat for ID update
+    for (let i = 0; i < newBeats.length; i++) {
+      const beat = newBeats[i];
       const createData: Record<string, unknown> = {
         projectId: beat.projectId,
         chapterNumber: beat.chapterNumber,
@@ -379,13 +379,26 @@ export class StepService {
         useR1: beat.useR1,
         status: beat.status,
       };
-      // Only set id when reusing an existing valid DB ObjectId (from merge logic)
       if (beat.id) {
         createData.id = beat.id;
       }
-      const created = await this.prisma.beat.create({ data: createData as any });
-      // Update beat id with DB-generated value for return consistency
-      beat.id = (created as Record<string, unknown>).id as string;
+      createDataList.push(createData);
+      beatIndexMap.set(i, beat);
+    }
+    // Create in parallel batches of 10 for MongoDB compatibility
+    const BATCH_SIZE = 10;
+    const createdIds: Map<number, string> = new Map();
+    for (let i = 0; i < createDataList.length; i += BATCH_SIZE) {
+      const batch = createDataList.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((data: any) => this.prisma.beat.create({ data })),
+      );
+      results.forEach((r, j) => {
+        createdIds.set(i + j, (r as Record<string, unknown>).id as string);
+      });
+    }
+    for (const [idx, beat] of beatIndexMap) {
+      beat.id = createdIds.get(idx) ?? beat.id;
     }
 
     await this.prisma.stepData.update({
@@ -410,36 +423,40 @@ export class StepService {
     const beats = await this.getBeatsByProjectId(projectId);
     const totalChapters = beats.length;
 
+    // Compute useR1 for all beats first
     for (const beat of beats) {
-      const useR1 = this.shouldUseR1(beat, totalChapters);
-      await this.prisma.beat.update({
-        where: { id: beat.id },
-        data: { useR1, status: 'CONFIRMED' },
-      });
-      beat.useR1 = useR1;
+      beat.useR1 = this.shouldUseR1(beat, totalChapters);
       beat.status = 'CONFIRMED';
     }
+
+    // Batch update all beats in parallel
+    await Promise.all(
+      beats.map((beat) =>
+        this.prisma.beat.update({
+          where: { id: beat.id },
+          data: { useR1: beat.useR1, status: 'CONFIRMED' },
+        }),
+      ),
+    );
 
     // Create chapters from confirmed beats
     const existingChapters = await this.getChaptersByProjectId(projectId);
     if (existingChapters.length === 0) {
-      for (const beat of beats) {
-        await this.prisma.chapter.create({
-          data: {
-            projectId: beat.projectId,
-            chapterNumber: beat.chapterNumber,
-            title: null,
-            beatPlan: beat.plan as any,
-            targetWordCount: beat.targetWordCount,
-            content: null,
-            status: 'PENDING',
-            chapterFingerprint: null,
-            contextSummary: null,
-            reviewResult: null,
-            changeAnalysis: null,
-          },
-        });
-      }
+      await this.prisma.chapter.createMany({
+        data: beats.map((beat) => ({
+          projectId: beat.projectId,
+          chapterNumber: beat.chapterNumber,
+          title: null,
+          beatPlan: beat.plan as any,
+          targetWordCount: beat.targetWordCount,
+          content: null,
+          status: 'PENDING' as any,
+          chapterFingerprint: null,
+          contextSummary: null,
+          reviewResult: null,
+          changeAnalysis: null,
+        })),
+      });
     }
 
     return step;
@@ -678,16 +695,35 @@ export class StepService {
   }
 
   private async runPostGenerationPipeline(chapter: ChapterData, projectId: string): Promise<void> {
-    // Step 2: Fingerprint extraction
-    const fpResult = await this.collectAiOutput(TaskType.FINGERPRINT_EXTRACTION, `Extract fingerprint for: ${chapter.content}`);
+    const chapterContent = chapter.content!;
+
+    // Phase 1: 并行执行无需互相等待的 AI 调用（指纹 + 审核）
+    const [fpResult, reviewResult] = await Promise.all([
+      this.collectAiOutput(TaskType.FINGERPRINT_EXTRACTION, `Extract fingerprint for: ${chapterContent}`),
+      this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, `Review content: ${chapterContent}`),
+    ]);
+
+    // 写入指纹结果
     await this.prisma.chapter.update({
       where: { id: chapter.id },
       data: { chapterFingerprint: fpResult.content },
     });
     chapter.chapterFingerprint = fpResult.content;
 
-    // Step 3: FactSheet update
-    const sheetUpdateResult = await this.collectAiOutput(TaskType.FACTSHEET_UPDATE, `Update FactSheet with: ${chapter.content}`);
+    // 写入审核结果
+    const reviewData: Record<string, unknown> = {
+      passed: true,
+      raw: reviewResult.content,
+      reviewedAt: new Date().toISOString(),
+    };
+    await this.prisma.chapter.update({
+      where: { id: chapter.id },
+      data: { reviewResult: reviewData as any },
+    });
+    chapter.reviewResult = reviewData;
+
+    // Step 3: FactSheet update (serial — involves CAS write)
+    const sheetUpdateResult = await this.collectAiOutput(TaskType.FACTSHEET_UPDATE, `Update FactSheet with: ${chapterContent}`);
     let updateEntries: Record<string, unknown>;
     try {
       updateEntries = JSON.parse(sheetUpdateResult.content);
@@ -713,23 +749,10 @@ export class StepService {
       await this.factsheetCompensation.enqueue(projectId, chapter.id, chapter.chapterNumber, updateEntries);
     }
 
-    // Step 4: Independent review
-    const reviewResult = await this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, `Review content: ${chapter.content}`);
-    const reviewData: Record<string, unknown> = {
-      passed: true,
-      raw: reviewResult.content,
-      reviewedAt: new Date().toISOString(),
-    };
-    await this.prisma.chapter.update({
-      where: { id: chapter.id },
-      data: { reviewResult: reviewData as any },
-    });
-    chapter.reviewResult = reviewData;
-
-    // Step 5: Context summary
-    const estimatedTokens = this.estimateTokens(chapter.content!);
+    // Step 5: Context summary (conditional)
+    const estimatedTokens = this.estimateTokens(chapterContent);
     if (estimatedTokens > 2500) {
-      const summaryResult = await this.collectAiOutput(TaskType.CHAPTER_GENERATION, `Summarize: ${chapter.content!.substring(0, 8000)}`);
+      const summaryResult = await this.collectAiOutput(TaskType.CHAPTER_GENERATION, `Summarize: ${chapterContent.substring(0, 8000)}`);
       await this.prisma.chapter.update({
         where: { id: chapter.id },
         data: { contextSummary: summaryResult.content },
@@ -769,9 +792,7 @@ export class StepService {
   }
 
   private estimateTokens(content: string): number {
-    const chineseChars = (content.match(/[一-鿿]/g) || []).length;
-    const englishWords = (content.match(/[a-zA-Z]+/g) || []).length;
-    return chineseChars + Math.ceil(englishWords * 1.3);
+    return this.contextBudgetService.estimateTokens(content);
   }
 
   private async findBeatById(beatId: string): Promise<BeatData | null> {
@@ -909,24 +930,7 @@ export class StepService {
     taskType: TaskType,
     prompt: string,
   ): Promise<{ content: string; aiMeta: AiMeta }> {
-    try {
-      const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(taskType, prompt);
-      const chunks = await lastValueFrom(chunks$.pipe(toArray()));
-      const lastChunk = chunks[chunks.length - 1];
-      const content = chunks
-        .filter((c) => !c.done && c.content)
-        .map((c) => c.content)
-        .join('');
-      const aiMeta: AiMeta = {
-        modelUsed: lastChunk?.modelUsed ?? this.aiGateway.getModelForTask(taskType),
-        degraded: lastChunk?.degraded ?? false,
-        failed: lastChunk?.failed ?? false,
-      };
-      return { content, aiMeta };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceUnavailableException(`AI 生成失败: ${msg}`);
-    }
+    return this.aiGateway.collectFullOutput(taskType, prompt);
   }
 
   private extractKeyPlotPoints(output: string): string {

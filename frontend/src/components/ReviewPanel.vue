@@ -68,28 +68,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-
-interface ReviewIssue {
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  location: string;
-  rule: string;
-  suggestion: string;
-  autoFixable: boolean;
-}
-
-interface ReviewResult {
-  verdict: string;
-  dimensions: {
-    POLITICAL_SAFETY: { score: number; issues: ReviewIssue[] };
-    SEXUAL_CONTENT: { score: number; issues: ReviewIssue[] };
-    VIOLENCE: { score: number; issues: ReviewIssue[] };
-    VALUES: { score: number; issues: ReviewIssue[] };
-  };
-  overallScore: number;
-  appealCount: number;
-  reviewedAt: string;
-  appealedAt?: string;
-}
+import type { ReviewIssue, ReviewResult } from '@/types';
 
 const props = withDefaults(defineProps<{
   reviewResult: ReviewResult;

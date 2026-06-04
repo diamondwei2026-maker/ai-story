@@ -1,5 +1,6 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { Observable, Subscriber } from 'rxjs';
+import { Injectable, Inject, ServiceUnavailableException } from '@nestjs/common';
+import { Observable, Subscriber, lastValueFrom } from 'rxjs';
+import { toArray } from 'rxjs/operators';
 
 export enum TaskType {
   IDEA = 'IDEA',
@@ -29,6 +30,15 @@ export interface AIGenerateChunk {
   modelUsed?: string;
   degraded?: boolean;
   failed?: boolean;
+}
+
+export interface AiStreamResult {
+  content: string;
+  aiMeta: {
+    modelUsed: string;
+    degraded: boolean;
+    failed?: boolean;
+  };
 }
 
 export interface DegradationLogEntry {
@@ -134,6 +144,33 @@ export class AIGatewayService {
 
   getDegradationLogs(): DegradationLogEntry[] {
     return this.degradationLogs;
+  }
+
+  /**
+   * 通用 AI 输出收集器 —— 将 Observable 流合并为完整字符串，同时返回模型元信息。
+   * 替代各 Service 中重复出现的 lastValueFrom + toArray 模式。
+   */
+  async collectFullOutput(taskType: TaskType, prompt: string): Promise<AiStreamResult> {
+    try {
+      const chunks$ = this.callWithFallback(taskType, prompt);
+      const chunks = await lastValueFrom(chunks$.pipe(toArray()));
+      const lastChunk = chunks[chunks.length - 1];
+      const content = chunks
+        .filter((c) => !c.done && c.content)
+        .map((c) => c.content)
+        .join('');
+      return {
+        content,
+        aiMeta: {
+          modelUsed: lastChunk?.modelUsed ?? this.getModelForTask(taskType),
+          degraded: lastChunk?.degraded ?? false,
+          failed: lastChunk?.failed ?? false,
+        },
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceUnavailableException(`AI 生成失败: ${msg}`);
+    }
   }
 
   private async streamGenerateCore(

@@ -1,10 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { lastValueFrom } from 'rxjs';
-import { toArray } from 'rxjs/operators';
-import { Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectService } from '../project/project.service';
-import { AIGatewayService, TaskType, AIGenerateChunk } from '../ai-gateway/ai-gateway.service';
+import { AIGatewayService, TaskType } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
 
 export type ChangeType = 'no-change' | 'whitespace-only' | 'minor' | 'substantive';
@@ -157,14 +154,8 @@ export class ChangeAnalysisService {
   }
 
   private async collectAiOutput(taskType: TaskType, prompt: string): Promise<string> {
-    try {
-      const chunks$: Observable<AIGenerateChunk> = this.aiGateway.callWithFallback(taskType, prompt);
-      const chunks = await lastValueFrom(chunks$.pipe(toArray()));
-      return chunks.map((c) => c.content).join('');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new BadRequestException(`AI 分析失败: ${msg}`);
-    }
+    const result = await this.aiGateway.collectFullOutput(taskType, prompt);
+    return result.content;
   }
 
   private parseChangeAnalysisOutput(raw: string): {
