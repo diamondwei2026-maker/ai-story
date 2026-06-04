@@ -36,13 +36,54 @@
 
     <!-- Beats content -->
     <template v-if="beats.length && !loading">
+      <!-- Config Panel (only when not confirmed) -->
+      <BeatsConfigPanel
+        v-if="!isConfirmed"
+        :default-word-count="defaultWordCount"
+        :chapter-count="beats.length"
+        :is-confirmed="isConfirmed"
+        @update:word-count="handleConfigWordCount"
+        @regenerate="handleGenerate"
+      />
+
+      <!-- Summary Card -->
+      <BeatsSummaryCard :beats="beats" />
+
+      <!-- Rhythm Chart (ECharts) -->
+      <div data-testid="beats-rhythm-chart-wrapper" class="beats-view__chart">
+        <BeatsRhythmChart :beats="beats" />
+      </div>
+
+      <!-- Hook Density Chart -->
       <div data-testid="hook-density-chart" class="beats-view__chart">
         <HookDensityChart :beats="beats" />
       </div>
 
-      <BeatList
-        :beats="beats"
-      />
+      <div class="beats-view__layout">
+        <BeatList
+          :beats="beats"
+          :selected-id="selectedBeat?.id"
+          @select="handleSelectBeat"
+        />
+
+        <div class="beats-view__detail">
+          <BeatChapterCard
+            v-if="selectedBeat"
+            :beat="selectedBeat"
+            :selected="true"
+          />
+          <BeatEditor
+            v-if="selectedBeat"
+            :beat="selectedBeat"
+            @save-wordcount="handleSaveWordCount"
+            @save-structure="handleSaveStructure"
+          />
+          <EmptyState
+            v-else
+            description="点击左侧章节查看详情"
+          />
+        </div>
+      </div>
 
       <div
         v-if="!isConfirmed"
@@ -73,15 +114,24 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { useWorkflowStore } from '@/stores/useWorkflowStore';
 import { useBeatStore } from '@/stores/useBeatStore';
+import type { Beat } from '@/stores/useBeatStore';
 import {
   getBeats,
   generateBeats,
   confirmBeats,
+  updateBeatWordCount,
+  updateBeatStructure,
 } from '@/api/beats';
 import { getOutline } from '@/api/outline';
+import { getProject } from '@/api/project';
 import type { BeatDataResponse } from '@/api/beats';
 import BeatList from '@/components/BeatList.vue';
+import BeatEditor from '@/components/BeatEditor.vue';
+import BeatChapterCard from '@/components/BeatChapterCard.vue';
 import HookDensityChart from '@/components/HookDensityChart.vue';
+import BeatsSummaryCard from '@/components/BeatsSummaryCard.vue';
+import BeatsRhythmChart from '@/components/BeatsRhythmChart.vue';
+import BeatsConfigPanel from '@/components/BeatsConfigPanel.vue';
 import EmptyState from '@/components/EmptyState.vue';
 
 const props = defineProps<{
@@ -91,14 +141,24 @@ const props = defineProps<{
 const store = useWorkflowStore();
 const beatStore = useBeatStore();
 
-// Fetch outline text for AI generation
+// Fetch outline text and project config for AI generation
 const outlineText = ref('');
+const defaultWordCount = ref(3000);
 
 onMounted(async () => {
   try {
     const outline = await getOutline(props.projectId);
     if (outline?.output) {
       outlineText.value = outline.output;
+    }
+  } catch {
+    // silently ignore — best effort
+  }
+  try {
+    const project = await getProject(props.projectId);
+    const configWordCount = (project?.config as any)?.defaultChapterWordCount;
+    if (typeof configWordCount === 'number' && configWordCount > 0) {
+      defaultWordCount.value = configWordCount;
     }
   } catch {
     // silently ignore — best effort
@@ -124,6 +184,7 @@ const {
   generateArgs: () => ({
     outline: outlineText.value,
     currentContent: '',
+    defaultWordCount: defaultWordCount.value,
   }),
   previousPhases: [
     { phase: 'OUTLINE', getFn: getOutline as (id: string) => Promise<unknown> },
@@ -147,6 +208,51 @@ watch(initialLoadDone, (done) => {
     handleGenerate();
   }
 });
+
+// ── BeatsConfigPanel ────────────────────────────────────
+
+function handleConfigWordCount(value: number) {
+  defaultWordCount.value = value;
+}
+
+// ── BeatEditor integration ──────────────────────────────
+
+const selectedBeat = ref<Beat | null>(null);
+
+function handleSelectBeat(beat: Beat) {
+  selectedBeat.value = beat;
+}
+
+async function handleSaveWordCount(wordCount: number) {
+  if (!selectedBeat.value) return;
+  try {
+    const updated = await updateBeatWordCount(selectedBeat.value.id, wordCount);
+    // Update in local data
+    const idx = beatsData.value?.findIndex((b) => b.id === updated.id);
+    if (idx !== undefined && idx >= 0 && beatsData.value) {
+      beatsData.value[idx] = updated;
+    }
+    selectedBeat.value = { ...selectedBeat.value, targetWordCount: wordCount, status: updated.status };
+    beatStore.updateBeatWordCount(updated.id, wordCount);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '保存字数失败';
+  }
+}
+
+async function handleSaveStructure(plan: Record<string, unknown>) {
+  if (!selectedBeat.value) return;
+  try {
+    const updated = await updateBeatStructure(selectedBeat.value.id, plan);
+    const idx = beatsData.value?.findIndex((b) => b.id === updated.id);
+    if (idx !== undefined && idx >= 0 && beatsData.value) {
+      beatsData.value[idx] = updated;
+    }
+    selectedBeat.value = { ...updated };
+    beatStore.updateBeatStructure(updated.id, plan);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '保存结构失败';
+  }
+}
 </script>
 
 <style scoped>
@@ -173,6 +279,19 @@ watch(initialLoadDone, (done) => {
   background-color: var(--color-surface-warm);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
+}
+
+.beats-view__layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.beats-view__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 .beats-view__actions {
