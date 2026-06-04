@@ -36,9 +36,9 @@
 
     <!-- Outline content -->
     <template v-if="outlineData && !loading">
-      <!-- TODO: 暂时屏蔽叙事结构选择，默认使用网文十段 -->
+      <!-- 叙事结构选择器：仅在 outline 存在且未确认时可见 -->
       <div
-        v-if="false"
+        v-if="!isConfirmed && initialLoadDone"
         data-testid="structure-switcher"
         class="outline-view__structure-select"
       >
@@ -47,8 +47,37 @@
           v-model:value="selectedStructure"
           :options="structureOptions"
           block
-          @change="handleSwitchStructure"
+          @change="onStructureChange"
         />
+      </div>
+
+      <!-- 结构切换确认弹窗 -->
+      <div data-testid="structure-switch-modal">
+        <a-modal
+          v-model:open="showStructureModal"
+          title="切换叙事结构"
+          :get-container="false"
+          @cancel="cancelSwitchStructure"
+        >
+          <p>
+            切换叙事结构将重新组织大纲，<strong>关键情节点保留</strong>但节点间衔接将被重写。确定继续吗？
+          </p>
+          <template #footer>
+            <a-button
+              data-testid="structure-switch-cancel"
+              @click="cancelSwitchStructure"
+            >
+              取消
+            </a-button>
+            <a-button
+              type="primary"
+              data-testid="structure-switch-confirm"
+              @click="confirmSwitchStructure"
+            >
+              确认切换
+            </a-button>
+          </template>
+        </a-modal>
       </div>
 
       <div data-testid="outline-tree" class="outline-view__tree">
@@ -109,14 +138,23 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-// TODO: 暂时硬编码为网文十段，后续恢复叙事结构选择时改回 'three-act'
-const selectedStructure = ref('web-novel-ten');
+const selectedStructure = ref('three-act');
+const showStructureModal = ref(false);
+const pendingStructure = ref<string | null>(null);
+const previousStructure = ref('three-act');
 
 const structureOptions = [
   { value: 'three-act', label: '三幕式' },
   { value: 'web-novel-ten', label: '网文十段' },
   { value: 'four-act-eight', label: '四幕八段' },
 ];
+
+/** 从 step input 字段解析当前叙事结构 */
+function parseStructureFromInput(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const match = input.match(/structure:\s*(\S+)/);
+  return match ? match[1] : null;
+}
 
 const {
   data: outlineData,
@@ -142,10 +180,20 @@ const {
   ],
 });
 
-// 初始加载完成后，若无大纲则自动生成（默认使用网文十段结构）
+// 初始加载完成后，若无大纲则自动生成（默认使用三幕式结构）
 watch(initialLoadDone, (done) => {
   if (done && !loading.value && (!outlineData.value || outlineData.value?.status === 'REJECTED')) {
     handleGenerate();
+  }
+});
+
+// 当 outlineData 就绪时，从 input 字段解析并同步叙事结构选择器
+watch(outlineData, (data) => {
+  if (data) {
+    const parsed = parseStructureFromInput((data as any)?.input);
+    if (parsed && structureOptions.some((o) => o.value === parsed)) {
+      selectedStructure.value = parsed;
+    }
   }
 });
 
@@ -201,16 +249,34 @@ const parsedOutline = computed<OutlineItem[]>(() => {
   return items;
 });
 
-async function handleSwitchStructure() {
-  if (
-    !confirm('切换叙事结构将重新组织大纲，关键情节点保留但节点间衔接将被重写。确定继续吗？')
-  ) {
+function onStructureChange(value: string | number) {
+  const strValue = String(value);
+  previousStructure.value = selectedStructure.value;
+  pendingStructure.value = strValue;
+  showStructureModal.value = true;
+}
+
+function cancelSwitchStructure() {
+  if (pendingStructure.value) {
+    selectedStructure.value = previousStructure.value;
+    pendingStructure.value = null;
+  }
+  showStructureModal.value = false;
+}
+
+async function confirmSwitchStructure() {
+  if (!pendingStructure.value) {
+    showStructureModal.value = false;
     return;
   }
+  const targetStructure = pendingStructure.value;
+  pendingStructure.value = null;
+  showStructureModal.value = false;
+
   loading.value = true;
   error.value = null;
   try {
-    const result = await switchStructure(props.projectId, selectedStructure.value);
+    const result = await switchStructure(props.projectId, targetStructure);
     outlineData.value = result;
   } catch (e) {
     error.value = e instanceof Error ? e.message : '切换结构失败';

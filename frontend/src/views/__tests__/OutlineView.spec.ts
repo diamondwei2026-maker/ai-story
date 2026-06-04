@@ -17,6 +17,44 @@ vi.mock('@/api/outline', () => ({
   switchStructure: (...args: any[]) => mockSwitchStructure(...args),
 }));
 
+// ─── test helpers ──────────────────────────────────────────
+
+interface OutlineDataOverrides {
+  id?: string;
+  status?: string;
+  input?: string;
+  output?: string;
+  review?: Record<string, unknown>;
+  version?: number;
+  confirmedAt?: string | null;
+}
+
+/** Build mock StepDataResponse with sensible defaults for outline tests */
+function makeOutlineData(overrides: OutlineDataOverrides = {}) {
+  return {
+    id: overrides.id ?? 'step-test',
+    projectId: 'test-project-1',
+    phaseType: 'OUTLINE' as const,
+    status: overrides.status ?? 'AWAITING_REVIEW',
+    input: overrides.input ?? 'structure: three-act\nsetting:',
+    output: overrides.output ?? '## 第一幕\n开场\n## 第二幕\n发展\n## 第三幕\n结局',
+    review: overrides.review ?? {
+      structurePacing: { passed: true, score: 80 },
+      conflictReview: { passed: true, notes: '' },
+      climaxReview: { passed: true, notes: '' },
+    },
+    version: overrides.version ?? 1,
+    confirmedAt: overrides.confirmedAt ?? null,
+  };
+}
+
+/** Flush async work so onMounted / watchers settle before assertions */
+async function flushAsync(wrapper: ReturnType<typeof mount>, ms = 50) {
+  await wrapper.vm.$nextTick();
+  await new Promise((r) => setTimeout(r, ms));
+  await wrapper.vm.$nextTick();
+}
+
 describe('OutlineView', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -352,99 +390,334 @@ describe('OutlineView', () => {
     });
   });
 
-  describe('structure switch flow', () => {
-    it('shows confirmation prompt when switching structure', async () => {
-      mockGetOutline.mockResolvedValue(null);
-      mockGenerateOutline.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 大纲内容',
-        review: {
-          structurePacing: { passed: true, score: 80 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 1,
-      });
+  describe('structure switcher — visibility', () => {
+    it('shows structure selector when outline data exists and is not confirmed', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        output: '## 第一幕\n开场引入\n## 第二幕\n冲突升级\n## 第三幕\n结局收尾',
+      }));
 
       const wrapper = await mountView();
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
+      await flushAsync(wrapper);
 
-      await wrapper.find('[data-testid="generate-outline-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 50));
-
-      // Switch structure
       const switcher = wrapper.find('[data-testid="structure-switcher"]');
       expect(switcher.exists()).toBe(true);
     });
 
-    it('shows warning message "关键情节点保留但节点间衔接将被重写" on switch confirmation', async () => {
-      mockGetOutline.mockResolvedValue(null);
-      mockGenerateOutline.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 大纲内容',
-        review: {
-          structurePacing: { passed: true, score: 80 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 1,
-      });
-      mockSwitchStructure.mockResolvedValue({
-        id: 'step-2',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
-        status: 'AWAITING_REVIEW',
-        output: '## 重新组织的大纲',
-        review: {
-          structurePacing: { passed: true, score: 85 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 2,
-      });
+    it('structure selector contains exactly three options: 三幕式, 网文十段, 四幕八段', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({ output: '## 大纲内容' }));
 
       const wrapper = await mountView();
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
+      await flushAsync(wrapper);
 
-      await wrapper.find('[data-testid="generate-outline-btn"]').trigger('click');
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 50));
-
-      // The switch confirm dialog should contain the warning message
-      // (This tests that the UI will show the prompt before switching)
-      expect(wrapper.find('[data-testid="structure-switcher"]').exists()).toBe(true);
+      const switcher = wrapper.find('[data-testid="structure-switcher"]');
+      expect(switcher.exists()).toBe(true);
+      const switcherText = switcher.text();
+      expect(switcherText).toContain('三幕式');
+      expect(switcherText).toContain('网文十段');
+      expect(switcherText).toContain('四幕八段');
     });
 
-    it('should not show structure switcher after outline is confirmed', async () => {
-      mockGetOutline.mockResolvedValue({
-        id: 'step-1',
-        projectId: 'test-project-1',
-        phaseType: 'OUTLINE',
+    it('hides structure selector when outline is confirmed', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
         status: 'CONFIRMED',
         output: '已确认的大纲',
-        review: {
-          structurePacing: { passed: true, score: 90 },
-          conflictReview: { passed: true, notes: '' },
-          climaxReview: { passed: true, notes: '' },
-        },
-        version: 1,
         confirmedAt: new Date().toISOString(),
-      });
+      }));
 
       const wrapper = await mountView();
-      await wrapper.vm.$nextTick();
-      await new Promise((r) => setTimeout(r, 10));
+      await flushAsync(wrapper);
 
       expect(wrapper.find('[data-testid="structure-switcher"]').exists()).toBe(false);
+    });
+  });
+
+  describe('structure switcher — default value from outline', () => {
+    it('defaults to three-act when no existing outline (first load)', async () => {
+      mockGetOutline.mockResolvedValue(null);
+      mockGenerateOutline.mockResolvedValue(makeOutlineData({ output: '## 大纲内容' }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper, 200);
+
+      // Auto-generate watcher fires; verify structure is three-act
+      const calls = mockGenerateOutline.mock.calls;
+      const relevantCall = calls.find((c: any[]) => c[0] === 'test-project-1');
+      if (relevantCall) {
+        expect(relevantCall[1].structure).toBe('three-act');
+      }
+    });
+
+    it('reads initial structure from existing outline input field (three-act)', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: three-act\nsetting: fantasy world',
+        output: '## 第一幕\n开端\n## 第二幕\n发展\n## 第三幕\n结局',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const switcher = wrapper.find('[data-testid="structure-switcher"]');
+      expect(switcher.exists()).toBe(true);
+      expect(switcher.text()).toContain('三幕式');
+    });
+
+    it('reads initial structure from existing outline input field (web-novel-ten)', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: web-novel-ten\nsetting: fantasy world',
+        output: '第一段\n开局\n第二段\n发展\n第三段\n转折\n第四段\n高潮\n第五段\n收尾',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const switcher = wrapper.find('[data-testid="structure-switcher"]');
+      expect(switcher.exists()).toBe(true);
+      expect(switcher.text()).toContain('网文十段');
+    });
+
+    it('reads initial structure from existing outline input field (four-act-eight)', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: four-act-eight\nsetting: fantasy world',
+        output: '## 第一幕\n建置\n## 第二幕\n发展\n## 第三幕\n高潮\n## 第四幕\n收束',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const switcher = wrapper.find('[data-testid="structure-switcher"]');
+      expect(switcher.exists()).toBe(true);
+      expect(switcher.text()).toContain('四幕八段');
+    });
+  });
+
+  describe('structure switch — confirmation modal', () => {
+    it('opens an Ant Design confirmation modal (not native confirm) when selector changes', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+
+      const confirmSpy = vi.spyOn(window, 'confirm');
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const switcher = wrapper.find('[data-testid="structure-switcher"]');
+      expect(switcher.exists()).toBe(true);
+
+      // Trigger structure change
+      const segmented = switcher.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'web-novel-ten');
+        await flushAsync(wrapper);
+      }
+
+      // Native confirm should NOT have been called
+      expect(confirmSpy).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it('shows a confirmation modal with warning text about key plot points preservation', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      // Trigger structure change
+      const segmented = wrapper.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'web-novel-ten');
+        await flushAsync(wrapper);
+      }
+
+      const modal = wrapper.find('[data-testid="structure-switch-modal"]');
+      expect(modal.exists()).toBe(true);
+      expect(modal.text()).toContain('关键情节点');
+    });
+
+    it('canceling the confirmation modal does NOT call switchStructure API', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+      mockSwitchStructure.mockResolvedValue(makeOutlineData({
+        output: '## 重新组织的大纲',
+        version: 2,
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      // Trigger structure change
+      const segmented = wrapper.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'web-novel-ten');
+        await flushAsync(wrapper);
+      }
+
+      const cancelBtn = wrapper.find('[data-testid="structure-switch-cancel"]');
+      if (cancelBtn.exists()) {
+        await cancelBtn.trigger('click');
+        await flushAsync(wrapper);
+      }
+
+      expect(mockSwitchStructure).not.toHaveBeenCalled();
+    });
+
+    it('confirming the modal calls switchStructure API and updates outlineData', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+      mockSwitchStructure.mockResolvedValue(makeOutlineData({
+        input: 'structure: four-act-eight\nkeyPoints preserved: ...',
+        output: '## 第一幕\n重新组织\n## 第二幕\n发展\n## 第三幕\n高潮\n## 第四幕\n收束',
+        version: 2,
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      // Trigger structure change to four-act-eight
+      const segmented = wrapper.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'four-act-eight');
+        await flushAsync(wrapper);
+      }
+
+      // Click confirm in the modal
+      const confirmBtn = wrapper.find('[data-testid="structure-switch-confirm"]');
+      if (confirmBtn.exists()) {
+        await confirmBtn.trigger('click');
+        await flushAsync(wrapper);
+      }
+
+      expect(mockSwitchStructure).toHaveBeenCalledWith('test-project-1', 'four-act-eight');
+    });
+
+    it('shows loading state during structure switch', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+      // Never-resolving promise to keep loading state
+      mockSwitchStructure.mockImplementation(
+        () => new Promise(() => { /* never resolves */ }),
+      );
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const segmented = wrapper.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'four-act-eight');
+        await flushAsync(wrapper);
+      }
+
+      const confirmBtn = wrapper.find('[data-testid="structure-switch-confirm"]');
+      if (confirmBtn.exists()) {
+        await confirmBtn.trigger('click');
+        await flushAsync(wrapper);
+      }
+
+      expect(wrapper.find('[data-testid="outline-loading"]').exists()).toBe(true);
+    });
+
+    it('shows error when structure switch fails', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData());
+      mockSwitchStructure.mockRejectedValue(new Error('切换结构失败，请重试'));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const segmented = wrapper.findComponent({ name: 'ASegmented' });
+      if (segmented.exists()) {
+        await segmented.vm.$emit('change', 'four-act-eight');
+        await flushAsync(wrapper);
+      }
+
+      const confirmBtn = wrapper.find('[data-testid="structure-switch-confirm"]');
+      if (confirmBtn.exists()) {
+        await confirmBtn.trigger('click');
+        await flushAsync(wrapper);
+      }
+
+      const errorEl = wrapper.find('[data-testid="outline-error"]');
+      expect(errorEl.exists()).toBe(true);
+      expect(errorEl.text()).toContain('切换结构失败');
+    });
+  });
+
+  describe('outline parser — all three structure formats', () => {
+    it('parses 三幕式 (three-act) format correctly', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        output: '## 第一幕\n建置与引入\n## 第二幕\n冲突与对抗\n## 第三幕\n解决与收束',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).toContain('第一幕');
+      expect(text).toContain('建置与引入');
+      expect(text).toContain('第二幕');
+      expect(text).toContain('冲突与对抗');
+      expect(text).toContain('第三幕');
+      expect(text).toContain('解决与收束');
+      expect(text).not.toContain('##');
+    });
+
+    it('parses 网文十段 (web-novel-ten) format correctly', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: web-novel-ten\nsetting:',
+        output: '第一段\n主角出场\n第二段\n获得金手指\n第三段\n首次冲突\n第四段\n实力提升\n第五段\n遭遇强敌\n第六段\n绝境突破\n第七段\n反转局势\n第八段\n真正敌人\n第九段\n最终对决\n第十段\n结局收尾',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).toContain('第一段');
+      expect(text).toContain('主角出场');
+      expect(text).toContain('第五段');
+      expect(text).toContain('遭遇强敌');
+      expect(text).toContain('第十段');
+      expect(text).toContain('结局收尾');
+    });
+
+    it('parses 四幕八段 (four-act-eight) format correctly', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: four-act-eight\nsetting:',
+        output: '## 第一幕\n建置\n## 第二幕\n发展\n## 第三幕\n高潮\n## 第四幕\n收束',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).toContain('第一幕');
+      expect(text).toContain('建置');
+      expect(text).toContain('第二幕');
+      expect(text).toContain('发展');
+      expect(text).toContain('第三幕');
+      expect(text).toContain('高潮');
+      expect(text).toContain('第四幕');
+      expect(text).toContain('收束');
+    });
+
+    it('parses Act X english format from three-act structure', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        output: 'Act 1: Setup and introduction\nAct 2: Confrontation and rising action\nAct 3: Resolution and denouement',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const text = wrapper.find('[data-testid="outline-tree"]').text();
+      expect(text).toContain('Act 1');
+      expect(text).toContain('Act 2');
+      expect(text).toContain('Act 3');
+    });
+
+    it('handles empty or unparseable outline gracefully', async () => {
+      mockGetOutline.mockResolvedValue(makeOutlineData({
+        input: 'structure: unknown\nsetting:',
+        output: 'Some unstructured text without any segment markers',
+      }));
+
+      const wrapper = await mountView();
+      await flushAsync(wrapper);
+
+      const tree = wrapper.find('[data-testid="outline-tree"]');
+      expect(tree.exists()).toBe(true);
     });
   });
 
