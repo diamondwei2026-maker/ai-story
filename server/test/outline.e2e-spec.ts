@@ -106,7 +106,7 @@ describe('Outline Phase (e2e)', () => {
         .expect(400);
     });
 
-    it('should default to three-act structure when not provided', async () => {
+    it('should default to web-novel-ten structure when not provided', async () => {
       const createRes = await request(app.getHttpServer())
         .post('/projects')
         .send({ title: '默认结构项目' })

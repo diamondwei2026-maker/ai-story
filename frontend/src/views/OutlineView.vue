@@ -138,10 +138,10 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const selectedStructure = ref('three-act');
+const selectedStructure = ref('web-novel-ten');
 const showStructureModal = ref(false);
 const pendingStructure = ref<string | null>(null);
-const previousStructure = ref('three-act');
+const previousStructure = ref('web-novel-ten');
 
 const structureOptions = [
   { value: 'three-act', label: '三幕式' },

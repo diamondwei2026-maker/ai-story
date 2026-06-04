@@ -659,7 +659,7 @@ describe('StepService', () => {
       ).rejects.toThrow(/status must be OUTLINE/);
     });
 
-    it('should default structure to three-act when not provided', async () => {
+    it('should default structure to web-novel-ten when not provided', async () => {
       const project = projectService.create({ title: '默认结构测试' });
       project.status = 'OUTLINE';
       projectService.update(project.id, {});
@@ -668,7 +668,7 @@ describe('StepService', () => {
         setting: '设定内容',
       });
 
-      expect(step.input).toContain('three-act');
+      expect(step.input).toContain('web-novel-ten');
     });
 
     it('should use regeneration prompt when currentContent is provided', async () => {

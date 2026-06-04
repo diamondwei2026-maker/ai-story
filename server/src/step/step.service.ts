@@ -249,7 +249,7 @@ export class StepService {
     if (project.status !== 'OUTLINE') throw new BadRequestException('Project status must be OUTLINE');
 
     const setting = opts.setting ?? '';
-    const structure = opts.structure ?? 'three-act';
+    const structure = opts.structure ?? 'web-novel-ten';
     if (!VALID_STRUCTURES.includes(structure as OutlineStructure)) {
       throw new BadRequestException('Invalid structure type');
     }

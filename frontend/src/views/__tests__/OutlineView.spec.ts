@@ -432,7 +432,7 @@ describe('OutlineView', () => {
   });
 
   describe('structure switcher — default value from outline', () => {
-    it('defaults to three-act when no existing outline (first load)', async () => {
+    it('defaults to web-novel-ten when no existing outline (first load)', async () => {
       mockGetOutline.mockResolvedValue(null);
       mockGenerateOutline.mockResolvedValue(makeOutlineData({ output: '## 大纲内容' }));
 
@@ -443,7 +443,7 @@ describe('OutlineView', () => {
       const calls = mockGenerateOutline.mock.calls;
       const relevantCall = calls.find((c: any[]) => c[0] === 'test-project-1');
       if (relevantCall) {
-        expect(relevantCall[1].structure).toBe('three-act');
+        expect(relevantCall[1].structure).toBe('web-novel-ten');
       }
     });
 

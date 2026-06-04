@@ -8,7 +8,7 @@ export async function generateOutline(
     method: 'POST',
     body: JSON.stringify({
       setting: opts.setting ?? '',
-      structure: opts.structure ?? 'three-act',
+      structure: opts.structure ?? 'web-novel-ten',
       currentContent: opts.currentContent ?? '',
     }),
   });
