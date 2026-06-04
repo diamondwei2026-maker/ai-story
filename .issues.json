@@ -44,9 +44,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:52:25Z",
@@ -130,9 +128,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:52:25Z",
@@ -216,9 +212,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:52:24Z",
@@ -302,9 +296,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:52:23Z",
@@ -388,9 +380,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:50:20Z",
@@ -474,9 +464,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:49:26Z",
@@ -560,9 +548,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:49:25Z",
@@ -646,9 +632,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:49:24Z",
@@ -732,9 +716,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:48:05Z",
@@ -818,9 +800,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:48:04Z",
@@ -904,9 +884,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:47:06Z",
@@ -990,9 +968,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:47:06Z",
@@ -1076,9 +1052,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-20T03:44:57Z",
@@ -1162,9 +1136,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-19T02:07:34Z",
@@ -1257,9 +1229,7 @@
     ],
     "state": "open",
     "locked": false,
-    "assignees": [
-
-    ],
+    "assignees": [],
     "milestone": null,
     "comments": 0,
     "created_at": "2026-05-18T08:32:43Z",
@@ -1297,5 +1267,140 @@
     "performed_via_github_app": null,
     "state_reason": null,
     "pinned_comment": null
+  },
+  {
+    "url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/21",
+    "repository_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story",
+    "labels_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/21/labels{/name}",
+    "comments_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/21/comments",
+    "events_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/21/events",
+    "html_url": "https://github.com/diamondwei2026-maker/ai-story/issues/21",
+    "id": 4585227981,
+    "node_id": "I_kwDOSgeKl88AAAABEU0GzQ",
+    "number": 21,
+    "title": "#0.4 Prisma 持久化与管线接入 [AFK]",
+    "state": "open",
+    "labels": [
+      {
+        "name": "ready-for-agent",
+        "color": "0066cc"
+      }
+    ],
+    "body": "## Parent\n\n- #4 #0.1 Project Skeleton and Core Data Model\n- #5 #0.2 AIGateway and Prompt Management\n\n## What to build\n\nReplace in-memory Map storage in ProjectService and StepService with PrismaService backed by MongoDB. Simultaneously wire up ContextBudgetService and model degradation chain (callWithFallback) into the actual generation pipeline. StepDataAccessAdapter currently returns null for all methods (stub) — must implement real data access reading from Prisma.\n\n## Three-dimension check\n\n- **Interface**: No new API endpoints (internal refactoring)\n- **Logic**: Extend ProjectService (Map->Prisma CRUD) + Extend StepService (Map->Prisma CRUD) + Extend StepService.generateChapter (inject callWithFallback) + Extend StepDataAccessAdapter (implement all six stub methods)\n- **Storage**: Consume [Project] [StepData] [Beat] [Chapter] [FactSheet] (all 5 collections exist in Prisma Schema)\n\n## Acceptance criteria\n\n- [ ] In-memory Map data migrated to MongoDB with zero loss\n- [ ] ProjectService CRUD all via PrismaService\n- [ ] StepService StepData/Beat/Chapter/FactSheet reads/writes all via PrismaService\n- [ ] StepDataAccessAdapter six methods return real data (non-null)\n- [ ] generateChapter AI calls go through callWithFallback degradation chain\n- [ ] ContextBudgetService.computeBudget called before Prompt construction\n- [ ] All 403 existing backend tests pass; new Prisma integration tests added\n\n## Blocked by\n\nNone - can begin immediately",
+    "milestone": null,
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-06-04T02:22:41Z",
+    "updated_at": "2026-06-04T02:22:41Z",
+    "closed_at": null,
+    "locked": false
+  },
+  {
+    "url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/22",
+    "repository_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story",
+    "labels_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/22/labels{/name}",
+    "comments_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/22/comments",
+    "events_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/22/events",
+    "html_url": "https://github.com/diamondwei2026-maker/ai-story/issues/22",
+    "id": 4585228024,
+    "node_id": "I_kwDOSgeKl88AAAABEU0G-A",
+    "number": 22,
+    "title": "#1.6 章节管理与完结流程 [AFK]",
+    "state": "open",
+    "labels": [
+      {
+        "name": "ready-for-agent",
+        "color": "0066cc"
+      }
+    ],
+    "body": "## Parent\n\n- #2 PRD: NovelCraft Pro\n- #3 PRD: State Machine Closed Loop\n- #12 #2.1 DRAFTING Generation Pipeline\n- #16 #3.3 Project Completion Flow\n\n## What to build\n\nReplace DraftingPlaceholder with a complete DraftingView: chapter list sorted by ChapterNumber with status badges, sequential lock (chapter N+1 generate button disabled until chapter N is COMPLETED/DISPUTED), empty state guide when no chapters exist, completion banner when all chapters finished (with queue check dialog offering three options: sync-and-complete / skip-and-complete / cancel), read-only overlay on all WorkflowStepper phases after completion, continue-writing button to revert to DRAFTING, total and per-chapter word count statistics.\n\n## Three-dimension check\n\n- **Interface**: Create <DraftingView /> replacing DraftingPlaceholder.vue + Consume <CompletionBanner /> + Extend <WorkflowStepper /> read-only overlay\n- **Logic**: Consume ChapterController.getChapters + generateChapter (sequential lock) + StepService.confirmCompletion/reopenProject + word count stats\n- **Storage**: Consume [Chapter] + [Project] (incl. pendingFactUpdates)\n\n## Acceptance criteria\n\n- [ ] Chapters displayed in ascending ChapterNumber order with title/word-count/status badges\n- [ ] Sequential lock: N+1 generate button disabled when chapter N not COMPLETED/DISPUTED\n- [ ] Empty state guide shown when no chapters exist\n- [ ] Completion banner shown atop WorkflowStepper when all chapters finished\n- [ ] Pre-completion pendingFactUpdates check: three-option dialog when non-empty\n- [ ] Post-completion: WorkflowStepper all phases read-only overlay\n- [ ] Continue-writing button reverts to DRAFTING\n- [ ] Total and per-chapter word count stats correct\n- [ ] Critical paths covered by frontend + backend tests\n\n## Blocked by\n\n- #21 #0.4 Prisma Persistent Storage and Pipeline Wiring",
+    "milestone": null,
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-06-04T02:22:41Z",
+    "updated_at": "2026-06-04T02:22:41Z",
+    "closed_at": null,
+    "locked": false
+  },
+  {
+    "url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/23",
+    "repository_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story",
+    "labels_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/23/labels{/name}",
+    "comments_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/23/comments",
+    "events_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/23/events",
+    "html_url": "https://github.com/diamondwei2026-maker/ai-story/issues/23",
+    "id": 4585228082,
+    "node_id": "I_kwDOSgeKl88AAAABEU0HMg",
+    "number": 23,
+    "title": "#2.3 流式编辑器与审核面板 [AFK]",
+    "state": "open",
+    "labels": [
+      {
+        "name": "ready-for-agent",
+        "color": "0066cc"
+      }
+    ],
+    "body": "## Parent\n\n- #2 PRD: NovelCraft Pro\n- #3 PRD: State Machine Closed Loop\n- #12 #2.1 DRAFTING Generation Pipeline\n- #13 #2.2 Review Decision Paths and Review Panel\n\n## What to build\n\nIntegrate SSE streaming editor and review decision panel into DraftingView: StreamingEditor typewriter effect rendering SSE token-by-token, ModeSwitcher toggling new-draft/paragraph-rewrite/style-upgrade modes, TextToolbar for editing tools. Pause preserves generated content — user can manually edit then continue. Stream disruption recovery: >=60% of target word count -> resume from saved content; <60% -> full retry. ReviewPanel dynamically renders button groups based on four-level verdict: PASS auto-confirm, PASS_WITH_SUGGESTIONS adopt or ignore, NEEDS_REVISION adopt/manual-edit/appeal, BLOCKED manual-edit/appeal only (no one-click adopt). Appeal converges once; DISPUTED unlocks next chapter.\n\n## Three-dimension check\n\n- **Interface**: Create <EditorWorkspace /> + Consume <StreamingEditor /> <ModeSwitcher /> <TextToolbar /> <ReviewPanel /> <AppealModal /> <DisputeConfirm />\n- **Logic**: Consume ChapterController.continue/pause/retry/confirm/dispute + ReviewService.appealReview/getAvailableActions\n- **Storage**: Consume [Chapter.content] + [Chapter.reviewResult] + [Chapter.status]\n\n## Acceptance criteria\n\n- [ ] SSE token-by-token typewriter effect rendering\n- [ ] Three modes toggle correctly\n- [ ] Pause preserves content for manual editing then continue\n- [ ] Stream disruption: >=60% resume, <60% full retry\n- [ ] Retry supports temporary feedback injection into Prompt (one-time only)\n- [ ] PASS auto-confirms / PASS_WITH_SUGGESTIONS can ignore and confirm\n- [ ] NEEDS_REVISION/BLOCKED appealable once\n- [ ] DISPUTED force-mark unlocks next chapter\n- [ ] Critical paths covered by frontend + backend tests\n\n## Blocked by\n\n- #22 #1.6 Chapter Management and Completion Flow",
+    "milestone": null,
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-06-04T02:22:42Z",
+    "updated_at": "2026-06-04T02:22:42Z",
+    "closed_at": null,
+    "locked": false
+  },
+  {
+    "url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/24",
+    "repository_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story",
+    "labels_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/24/labels{/name}",
+    "comments_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/24/comments",
+    "events_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/24/events",
+    "html_url": "https://github.com/diamondwei2026-maker/ai-story/issues/24",
+    "id": 4585228129,
+    "node_id": "I_kwDOSgeKl88AAAABEU0HYQ",
+    "number": 24,
+    "title": "#3.4 变更影响分析工作台 [AFK]",
+    "state": "open",
+    "labels": [
+      {
+        "name": "ready-for-agent",
+        "color": "0066cc"
+      }
+    ],
+    "body": "## Parent\n\n- #3 PRD: State Machine Closed Loop\n- #14 #3.1 ChangeAnalysis Lifecycle\n\n## What to build\n\nIntegrate change impact analysis workbench into DraftingView: on editor close, execute substantive change detection (three-tier: no-change/whitespace-only/minor-delta<50-chars-and-no-paragraph-changes -> skip; substantive -> trigger AI ChangeFingerprint+ImpactPropagation combined call). ChangeAnalysisPanel displays impacted chapters grouped by HIGH/MEDIUM/LOW severity. HIGH cannot be deferred (must decide on-the-spot: TargetedFix or skip). MEDIUM/LOW can be DEFERRED (re-reminded next time any confirmed chapter is opened). TargetedFix rendered as git-diff-style comparison view; user reviews and confirms to apply; fix record written to targetedFixHistory. Analysis results persisted in source Chapter.changeAnalysis, survives refresh.\n\n## Three-dimension check\n\n- **Interface**: Create <ImpactWorkspace /> + Consume <ChangeAnalysisPanel /> (HIGH without defer button) + Consume <TargetedFixDiff /> (left-source/right-fix dual pane)\n- **Logic**: Editor close diff detection pure function -> Consume ChangeAnalysisService.analyzeChange + applyTargetedFix\n- **Storage**: Consume [Chapter.changeAnalysis] + [Chapter.targetedFixHistory]\n\n## Acceptance criteria\n\n- [ ] Editor close triggers substantive change detection (three-tier correct)\n- [ ] Substantive changes auto-trigger ChangeAnalysis combined AI call\n- [ ] Impacted chapters grouped by HIGH/MEDIUM/LOW severity\n- [ ] HIGH severity: DEFERRED button not rendered (must decide now)\n- [ ] MEDIUM/LOW: DEFERRED available, re-reminded on next confirmed chapter open\n- [ ] TargetedFix shown as git-diff dual-pane comparison\n- [ ] Fix confirmation writes record to targetedFixHistory (traceable)\n- [ ] Analysis results survive page refresh\n- [ ] Critical paths covered by frontend + backend tests\n\n## Blocked by\n\n- #23 #2.3 Streaming Editor and Review Panel",
+    "milestone": null,
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-06-04T02:22:43Z",
+    "updated_at": "2026-06-04T02:22:43Z",
+    "closed_at": null,
+    "locked": false
+  },
+  {
+    "url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/25",
+    "repository_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story",
+    "labels_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/25/labels{/name}",
+    "comments_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/25/comments",
+    "events_url": "https://api.github.com/repos/diamondwei2026-maker/ai-story/issues/25/events",
+    "html_url": "https://github.com/diamondwei2026-maker/ai-story/issues/25",
+    "id": 4585228305,
+    "node_id": "I_kwDOSgeKl88AAAABEU0IEQ",
+    "number": 25,
+    "title": "#1.7 大纲结构选择器恢复 [AFK]",
+    "state": "open",
+    "labels": [
+      {
+        "name": "ready-for-agent",
+        "color": "0066cc"
+      }
+    ],
+    "body": "## Parent\n\n- #2 PRD: NovelCraft Pro\n- #10 #1.4 OUTLINE Plot Outline Phase\n\n## What to build\n\nRestore the outline structure selector hidden by v-if in OutlineView, allowing users to freely switch between three narrative structures: three-act / web-novel-ten-segment / four-act-eight-segment. Confirmation dialog shown before switching. Existing key plot points preserved as seeds, reorganized under new format skeleton rather than rebuilt from scratch. Backend switch-structure endpoint already fully implemented; frontend only needs UI restoration and wiring.\n\n## Three-dimension check\n\n- **Interface**: Extend <OutlineView /> — restore a-segmented structure selector + switch confirmation dialog\n- **Logic**: Consume OutlineController.switchStructure (format switch preserving plot point seeds)\n- **Storage**: None new — switch result stored in existing [StepData.output]\n\n## Acceptance criteria\n\n- [ ] Structure selector UI visible and interactive (three options)\n- [ ] Confirmation dialog shown before switching\n- [ ] Key plot points preserved after switch, reorganized under new format\n- [ ] Selector default reads from current outline format\n- [ ] Frontend parser correctly parses segment markers for all three structures\n- [ ] Critical paths covered by tests\n\n## Blocked by\n\nNone - can begin immediately",
+    "milestone": null,
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-06-04T02:22:44Z",
+    "updated_at": "2026-06-04T02:22:44Z",
+    "closed_at": null,
+    "locked": false
   }
 ]
