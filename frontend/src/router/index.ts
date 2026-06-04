@@ -5,7 +5,7 @@ import IdeaView from '@/views/IdeaView.vue';
 import SettingView from '@/views/SettingView.vue';
 import OutlineView from '@/views/OutlineView.vue';
 import BeatsView from '@/views/BeatsView.vue';
-import DraftingPlaceholder from '@/views/DraftingPlaceholder.vue';
+import DraftingView from '@/views/DraftingView.vue';
 
 const routes = [
   {
@@ -45,7 +45,7 @@ const routes = [
       {
         path: 'drafting',
         name: 'workflow.drafting',
-        component: DraftingPlaceholder,
+        component: DraftingView,
         props: (route: RouteLocationNormalized) => ({ projectId: route.params.id as string }),
       },
     ],

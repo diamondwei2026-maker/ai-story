@@ -11,11 +11,15 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
+import { StepService } from '../step/step.service';
 import { Project } from './project.entity';
 
 @Controller('projects')
 export class ProjectController {
-  constructor(private readonly projectService: ProjectService) {}
+  constructor(
+    private readonly projectService: ProjectService,
+    private readonly stepService: StepService,
+  ) {}
 
   @Post()
   async create(@Body() body: { title?: string; config?: Project['config'] }): Promise<Project> {
@@ -89,5 +93,24 @@ export class ProjectController {
       throw new BadRequestException('Only archived projects can be restored');
     }
     return project;
+  }
+
+  @Post(':id/complete')
+  @HttpCode(200)
+  async complete(
+    @Param('id') id: string,
+    @Body() body: { action?: string },
+  ): Promise<{ status?: string; needsQueueResolution: boolean }> {
+    const result = await this.stepService.confirmCompletion(
+      id,
+      body.action as 'sync-and-complete' | 'skip-and-complete' | undefined,
+    );
+    return { status: result.status, needsQueueResolution: result.needsQueueResolution };
+  }
+
+  @Post(':id/reopen')
+  @HttpCode(200)
+  async reopen(@Param('id') id: string): Promise<{ status: string }> {
+    return this.stepService.reopenProject(id);
   }
 }

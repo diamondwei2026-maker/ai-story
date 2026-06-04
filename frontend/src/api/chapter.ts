@@ -1,4 +1,23 @@
 import { request } from './common';
+import type { Chapter } from '@/stores/useChapterStore';
+
+export async function getChapters(projectId: string): Promise<Chapter[]> {
+  return request<Chapter[]>(`/projects/${projectId}/chapters`);
+}
+
+export async function generateChapter(
+  projectId: string,
+  chapterId: string,
+  body: { mode: string; feedback?: string },
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/generate`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
 
 export interface ImpactedChapter {
   chapterNumber: number;
