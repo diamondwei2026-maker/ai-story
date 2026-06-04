@@ -8,6 +8,7 @@ import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { FactsheetService } from './factsheet.service';
 import { ReviewService } from './review.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { StepData, PhaseType, StepStatus } from './step.entity';
 
 const mockChatModel = {
@@ -87,8 +88,225 @@ const mockPromptLoader = {
   ),
 };
 
+function createInMemoryPrismaMock() {
+  const stores: Record<string, Map<string, Record<string, unknown>>> = {
+    project: new Map(),
+    stepData: new Map(),
+    beat: new Map(),
+    chapter: new Map(),
+    factSheet: new Map(),
+  };
+
+  const clone = (obj: unknown) => JSON.parse(JSON.stringify(obj));
+
+  const mock = {
+    project: {
+      create: jest.fn(async (args: any) => {
+        const id = `proj-${stores.project.size + 1}`;
+        const doc = { id, ...clone(args.data), createdAt: new Date(), updatedAt: new Date() };
+        stores.project.set(id, doc);
+        return clone(doc);
+      }),
+      findMany: jest.fn(async (args?: any) => {
+        const all = Array.from(stores.project.values());
+        return clone(all.filter((d) => (args?.where?.status ? d.status !== args.where.status.not : true)));
+      }),
+      findUnique: jest.fn(async (args: any) => {
+        const doc = stores.project.get(args.where.id);
+        return doc ? clone(doc) : null;
+      }),
+      findFirst: jest.fn(async (args: any) => {
+        for (const d of stores.project.values()) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) return clone(d);
+        }
+        return null;
+      }),
+      update: jest.fn(async (args: any) => {
+        const existing = stores.project.get(args.where.id);
+        if (!existing) throw new Error('Not found');
+        const updated = { ...existing, ...clone(args.data), updatedAt: new Date() };
+        stores.project.set(args.where.id, updated);
+        return clone(updated);
+      }),
+      delete: jest.fn(async (args: any) => {
+        const existed = stores.project.has(args.where.id);
+        stores.project.delete(args.where.id);
+        return clone({ id: args.where.id });
+      }),
+      deleteMany: jest.fn(async (args: any) => {
+        let count = 0;
+        for (const [id, d] of stores.project) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) {
+            stores.project.delete(id); count++;
+          }
+        }
+        return { count };
+      }),
+    },
+    stepData: {
+      create: jest.fn(async (args: any) => {
+        const id = `step-${stores.stepData.size + 1}`;
+        const doc = { id, ...clone(args.data), confirmedAt: args.data.confirmedAt ?? null };
+        stores.stepData.set(id, doc);
+        return clone(doc);
+      }),
+      findMany: jest.fn(async (args?: any) => {
+        const all = Array.from(stores.stepData.values());
+        let result = all;
+        if (args?.where) {
+          result = result.filter((d) => Object.entries(args.where).every(([k, v]) => (d as any)[k] === v));
+        }
+        if (args?.orderBy) {
+          result.sort((a: any, b: any) => b.version - a.version);
+        }
+        return clone(result);
+      }),
+      findUnique: jest.fn(async (args: any) => {
+        const doc = stores.stepData.get(args.where.id);
+        return doc ? clone(doc) : null;
+      }),
+      findFirst: jest.fn(async (args: any) => {
+        for (const d of stores.stepData.values()) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) return clone(d);
+        }
+        return null;
+      }),
+      update: jest.fn(async (args: any) => {
+        const existing = stores.stepData.get(args.where.id);
+        if (!existing) throw new Error('Not found');
+        const data = clone(args.data);
+        // Handle Prisma increment
+        if (data.version?.increment) {
+          data.version = (existing.version as number) + (data.version.increment as number);
+        }
+        const updated = { ...existing, ...data };
+        stores.stepData.set(args.where.id, updated);
+        return clone(updated);
+      }),
+    },
+    beat: {
+      create: jest.fn(async (args: any) => {
+        const id = `beat-${stores.beat.size + 1}`;
+        const doc = { id, ...clone(args.data), createdAt: new Date(), updatedAt: new Date() };
+        stores.beat.set(id, doc);
+        return clone(doc);
+      }),
+      findMany: jest.fn(async (args?: any) => {
+        const all = Array.from(stores.beat.values());
+        let result = all;
+        if (args?.where) {
+          result = result.filter((d) => Object.entries(args.where).every(([k, v]) => (d as any)[k] === v));
+        }
+        if (args?.orderBy?.chapterNumber === 'asc') {
+          result.sort((a: any, b: any) => a.chapterNumber - b.chapterNumber);
+        }
+        return clone(result);
+      }),
+      findUnique: jest.fn(async (args: any) => {
+        const doc = stores.beat.get(args.where.id);
+        return doc ? clone(doc) : null;
+      }),
+      findFirst: jest.fn(async (args: any) => {
+        for (const d of stores.beat.values()) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) return clone(d);
+        }
+        return null;
+      }),
+      update: jest.fn(async (args: any) => {
+        const existing = stores.beat.get(args.where.id);
+        if (!existing) throw new Error('Not found');
+        const updated = { ...existing, ...clone(args.data), updatedAt: new Date() };
+        stores.beat.set(args.where.id, updated);
+        return clone(updated);
+      }),
+      deleteMany: jest.fn(async (args: any) => {
+        let count = 0;
+        for (const [id, d] of stores.beat) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) {
+            stores.beat.delete(id); count++;
+          }
+        }
+        return { count };
+      }),
+    },
+    chapter: {
+      create: jest.fn(async (args: any) => {
+        const id = `ch-${stores.chapter.size + 1}`;
+        const doc = { id, ...clone(args.data), createdAt: new Date(), updatedAt: new Date() };
+        stores.chapter.set(id, doc);
+        return clone(doc);
+      }),
+      findMany: jest.fn(async (args?: any) => {
+        const all = Array.from(stores.chapter.values());
+        let result = all;
+        if (args?.where) {
+          result = result.filter((d) => Object.entries(args.where).every(([k, v]) => (d as any)[k] === v));
+        }
+        if (args?.orderBy?.chapterNumber === 'asc') {
+          result.sort((a: any, b: any) => a.chapterNumber - b.chapterNumber);
+        }
+        return clone(result);
+      }),
+      findUnique: jest.fn(async (args: any) => {
+        const doc = stores.chapter.get(args.where.id);
+        return doc ? clone(doc) : null;
+      }),
+      findFirst: jest.fn(async (args: any) => {
+        for (const d of stores.chapter.values()) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) return clone(d);
+        }
+        return null;
+      }),
+      update: jest.fn(async (args: any) => {
+        const existing = stores.chapter.get(args.where.id);
+        if (!existing) throw new Error('Not found');
+        const updated = { ...existing, ...clone(args.data), updatedAt: new Date() };
+        stores.chapter.set(args.where.id, updated);
+        return clone(updated);
+      }),
+    },
+    factSheet: {
+      create: jest.fn(async (args: any) => {
+        const id = `fs-${stores.factSheet.size + 1}`;
+        const doc = { id, ...clone(args.data), updatedAt: new Date() };
+        stores.factSheet.set(id, doc);
+        return clone(doc);
+      }),
+      findUnique: jest.fn(async (args: any) => {
+        const doc = stores.factSheet.get(args.where.id);
+        return doc ? clone(doc) : null;
+      }),
+      findFirst: jest.fn(async (args: any) => {
+        for (const d of stores.factSheet.values()) {
+          if (Object.entries(args.where).every(([k, v]) => (d as any)[k] === v)) return clone(d);
+        }
+        return null;
+      }),
+      update: jest.fn(async (args: any) => {
+        const existing = stores.factSheet.get(args.where.id);
+        if (!existing) throw new Error('Not found');
+        const updated = { ...existing, ...clone(args.data), updatedAt: new Date() };
+        stores.factSheet.set(args.where.id, updated);
+        return clone(updated);
+      }),
+    },
+  };
+
+  return mock;
+}
+
+const mockPrisma = createInMemoryPrismaMock();
+
 const mockBudgetService = {
   calculateBudget: jest.fn().mockReturnValue({ maxTokens: 8000 }),
+  computeBudget: jest.fn().mockReturnValue({
+    globalStatic: 'SETTING output trimmed',
+    globalDynamic: 'FactSheet entries',
+    local: 'Beat plan + previous summary',
+    budget: { globalStatic: 500, globalDynamic: 300, local: 1200, total: 2000 },
+    warnings: [],
+  }),
+  estimateTokens: jest.fn().mockReturnValue(500),
 };
 
 describe('StepService', () => {
@@ -109,6 +327,7 @@ describe('StepService', () => {
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
         { provide: PromptTemplateLoaderService, useValue: mockPromptLoader },
         { provide: ContextBudgetService, useValue: mockBudgetService },
+        { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();
 
@@ -1610,17 +1829,19 @@ describe('StepService', () => {
     chapters: { id: string }[];
   }> {
     const project = await projectService.create({ title: 'FactSheet集成测试' });
-    project.status = 'SETTING';
-    await projectService.update(project.id, {});
+    // Step through state machine: IDEA → SETTING → OUTLINE → BEATS → DRAFTING
+    await service.generateIdea(project.id, { idea: '星际医生重生' });
+    await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+    await service.confirmIdea(project.id, { selectedSellPoint: 0 });  // → SETTING
 
     await service.generateSetting(project.id, { idea: '测试创意' });
-    await service.confirmSetting(project.id);
+    await service.confirmSetting(project.id);  // → OUTLINE
 
     await service.generateOutline(project.id, { setting: '设定', structure: 'three-act' });
-    await service.confirmOutline(project.id);
+    await service.confirmOutline(project.id);  // → BEATS
 
     await service.generateBeats(project.id, { outline: '大纲' });
-    await service.confirmBeats(project.id);
+    await service.confirmBeats(project.id);  // → DRAFTING
 
     const chapters = await service.getChaptersByProjectId(project.id);
     return { projectId: project.id, chapters };
@@ -2108,6 +2329,78 @@ describe('StepService', () => {
       expect(criticalCall![0]).toBe(TaskType.CRITICAL_CHAPTER);
 
       collectSpy.mockRestore();
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Issue #21: ContextBudgetService pipeline wiring (RED phase)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('generateChapter — ContextBudget pipeline integration (Issue #21)', () => {
+    it('should call computeBudget before rendering the prompt template', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+
+      await service.generateChapter(projectId, chapters[0].id, {
+        mode: 'new-continue',
+      });
+
+      // computeBudget must be called to assemble the three-layer context
+      // before PromptTemplateLoaderService.renderTemplate is invoked
+      expect(mockBudgetService.computeBudget).toHaveBeenCalledWith(
+        projectId,
+        chapters[0].id,
+      );
+    });
+
+    it('should call computeBudget ONCE per chapter generation', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      mockBudgetService.computeBudget.mockClear();
+
+      await service.generateChapter(projectId, chapters[0].id, {
+        mode: 'new-continue',
+      });
+
+      expect(mockBudgetService.computeBudget).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call computeBudget before renderTemplate (ordering check)', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      mockBudgetService.computeBudget.mockClear();
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapters[0].id, {
+        mode: 'new-continue',
+      });
+
+      // computeBudget call must happen BEFORE renderTemplate
+      const computeBudgetOrder =
+        mockBudgetService.computeBudget.mock.invocationCallOrder[0];
+      const renderTemplateOrder =
+        mockPromptLoader.renderTemplate.mock.invocationCallOrder[0];
+
+      expect(computeBudgetOrder).toBeDefined();
+      expect(renderTemplateOrder).toBeDefined();
+      expect(computeBudgetOrder).toBeLessThan(renderTemplateOrder);
+    });
+
+    it('should inject budget result into the prompt template variables', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapters[0].id, {
+        mode: 'new-continue',
+      });
+
+      // renderTemplate should receive the budget result in its vars argument
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          globalStatic: expect.any(String),
+          globalDynamic: expect.any(String),
+          localContext: expect.any(String),
+        }),
+      );
     });
   });
 });

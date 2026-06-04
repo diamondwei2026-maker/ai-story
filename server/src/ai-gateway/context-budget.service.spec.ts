@@ -3,6 +3,20 @@ import { ContextBudgetService } from './context-budget.service';
 import { AI_MODEL_TOKEN } from './ai-gateway.service';
 import { ProjectService } from '../project/project.service';
 
+// Mock ProjectService — only used for ID generation in setupProjectWithContext
+const mockProjectService = {
+  create: (data: any) => {
+    const id = `proj-${Math.random().toString(36).slice(2, 8)}`;
+    return {
+      id,
+      title: data.title,
+      status: 'IDEA',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  },
+};
+
 // ─── Mocks for dependencies ─────────────────────────────────────
 
 const mockChatModel = {
@@ -47,11 +61,11 @@ class StepDataAccessStub {
     return Array.from(this.chapters.get(projectId)?.values() ?? []);
   }
 
-  getChapter(projectId: string, chapterId: string) {
+  async getChapter(projectId: string, chapterId: string) {
     return this.chapters.get(projectId)?.get(chapterId) ?? null;
   }
 
-  getPreviousChapter(projectId: string, chapterNumber: number) {
+  async getPreviousChapter(projectId: string, chapterNumber: number) {
     const chapters = this.getChapters(projectId);
     return chapters.find((c: any) => c.chapterNumber === chapterNumber - 1) ?? null;
   }
@@ -60,19 +74,19 @@ class StepDataAccessStub {
     return this.beats.get(projectId) ?? [];
   }
 
-  getBeat(projectId: string, chapterNumber: number) {
+  async getBeat(projectId: string, chapterNumber: number) {
     return this.getBeats(projectId).find((b: any) => b.chapterNumber === chapterNumber) ?? null;
   }
 
-  getIdeaStep(projectId: string) {
+  async getIdeaStep(projectId: string) {
     return this.steps.get(projectId)?.get('IDEA') ?? null;
   }
 
-  getSettingStep(projectId: string) {
+  async getSettingStep(projectId: string) {
     return this.steps.get(projectId)?.get('SETTING') ?? null;
   }
 
-  getFactsheet(projectId: string) {
+  async getFactsheet(projectId: string) {
     return this.factsheets.get(projectId) ?? null;
   }
 }
@@ -81,7 +95,7 @@ const STEP_DATA_ACCESS = 'STEP_DATA_ACCESS';
 
 describe('ContextBudgetService', () => {
   let service: ContextBudgetService;
-  let projectService: ProjectService;
+  let projectService: typeof mockProjectService;
   let stepData: StepDataAccessStub;
   let module: TestingModule;
 
@@ -91,14 +105,14 @@ describe('ContextBudgetService', () => {
     module = await Test.createTestingModule({
       providers: [
         ContextBudgetService,
-        ProjectService,
+        { provide: ProjectService, useValue: mockProjectService },
         { provide: AI_MODEL_TOKEN, useValue: mockChatModel },
         { provide: STEP_DATA_ACCESS, useValue: stepData },
       ],
     }).compile();
 
     service = module.get<ContextBudgetService>(ContextBudgetService);
-    projectService = module.get<ProjectService>(ProjectService);
+    projectService = mockProjectService;
   });
 
   // ════════════════════════════════════════════════════════════════
@@ -110,18 +124,25 @@ describe('ContextBudgetService', () => {
       expect(service.estimateTokens('')).toBe(0);
     });
 
-    it('should estimate ~1 token per 4 characters', () => {
+    it('should estimate ~1 token per 4 characters for ASCII', () => {
       const text = 'A'.repeat(400);
       const tokens = service.estimateTokens(text);
       expect(tokens).toBeGreaterThanOrEqual(90);
       expect(tokens).toBeLessThanOrEqual(110);
     });
 
-    it('should handle Chinese text', () => {
+    it('should use ~1.8 chars/token for Chinese text (CJK-aware)', () => {
       const text = '长'.repeat(200);
       const tokens = service.estimateTokens(text);
-      expect(tokens).toBeGreaterThan(40);
-      expect(tokens).toBeLessThan(60);
+      // 200 / 1.8 ≈ 111
+      expect(tokens).toBeGreaterThanOrEqual(105);
+      expect(tokens).toBeLessThanOrEqual(120);
+    });
+
+    it('should return higher token count for Chinese than ASCII of same length', () => {
+      const asciiText = 'A'.repeat(100);
+      const chineseText = '长'.repeat(100);
+      expect(service.estimateTokens(chineseText)).toBeGreaterThan(service.estimateTokens(asciiText));
     });
   });
 
@@ -365,9 +386,9 @@ describe('ContextBudgetService', () => {
       return { projectId: project.id, chapterId: 'chapter-1' };
     }
 
-    it('should return trimmed three-layer context for a given project and chapter', () => {
+    it('should return trimmed three-layer context for a given project and chapter', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       expect(result).toBeDefined();
       expect(result.globalStatic).toBeTruthy();
@@ -380,9 +401,9 @@ describe('ContextBudgetService', () => {
       expect(result.budget.total).toBeLessThanOrEqual(8000);
     });
 
-    it('should assemble globalStatic from SETTING phase data (character cards, world building, power system, relationship graph)', () => {
+    it('should assemble globalStatic from SETTING phase data (character cards, world building, power system, relationship graph)', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       expect(result.globalStatic).toContain('林清音');
       expect(result.globalStatic).toContain('暗影尊者');
@@ -390,23 +411,23 @@ describe('ContextBudgetService', () => {
       expect(result.globalStatic).toContain('异能');
     });
 
-    it('should assemble globalDynamic from FactSheet entries relevant to the chapter', () => {
+    it('should assemble globalDynamic from FactSheet entries relevant to the chapter', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       expect(result.globalDynamic).toBeTruthy();
       expect(result.globalDynamic).toContain('林清音');
     });
 
-    it('should use IDEA synopsis for local context when chapter is #1 (no previous chapter)', () => {
+    it('should use IDEA synopsis for local context when chapter is #1 (no previous chapter)', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       // Chapter 1 should include IDEA one-liner summary in local context
       expect(result.local).toContain('现代女医生');
     });
 
-    it('should use previous chapter content or contextSummary for local context (chapter > 1)', () => {
+    it('should use previous chapter content or contextSummary for local context (chapter > 1)', async () => {
       const { projectId } = setupProjectWithContext();
 
       // Add chapter 2 and set chapter 1 content with summary
@@ -427,45 +448,45 @@ describe('ContextBudgetService', () => {
       ch1.contextSummary =
         '出场角色：林清音\n关键事件：穿越到星际时代，发现医学知识是最大金手指\n情感转折：从迷茫到坚定';
 
-      const result = service.computeBudget(projectId, 'chapter-2');
+      const result = await service.computeBudget(projectId, 'chapter-2');
 
       // Local context should reference previous chapter's summary
       expect(result.local).toContain('林清音');
     });
 
-    it('should inject beat plan into local context', () => {
+    it('should inject beat plan into local context', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       expect(result.local).toContain('主角觉醒');
       expect(result.local).toContain('神秘组织');
     });
 
-    it('should return empty strings for missing optional data (no SETTING step)', () => {
+    it('should return empty strings for missing optional data (no SETTING step)', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
       // Remove SETTING step
       stepData.steps.get(projectId)!.delete('SETTING');
 
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       // Should still return valid result without crashing
       expect(result).toBeDefined();
       expect(result.budget.total).toBeLessThanOrEqual(8000);
     });
 
-    it('should return valid result even with empty FactSheet', () => {
+    it('should return valid result even with empty FactSheet', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
       stepData.factsheets.delete(projectId);
 
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       expect(result).toBeDefined();
       expect(result.budget.total).toBeLessThanOrEqual(8000);
     });
 
-    it('should enforce all three layer limits and total budget ≤ 8000', () => {
+    it('should enforce all three layer limits and total budget ≤ 8000', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       const gsTokens = service.estimateTokens(result.globalStatic);
       const gdTokens = service.estimateTokens(result.globalDynamic);
@@ -477,7 +498,7 @@ describe('ContextBudgetService', () => {
       expect(gsTokens + gdTokens + lcTokens).toBeLessThanOrEqual(8000);
     });
 
-    it('should include warnings when trimming occurs', () => {
+    it('should include warnings when trimming occurs', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
 
       // Create an oversized SETTING step to trigger trimming warnings
@@ -488,15 +509,15 @@ describe('ContextBudgetService', () => {
         output: 'X'.repeat(3000 * 4 + 400), // Over globalStatic limit
       });
 
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       // With oversized data, warnings may be produced
       expect(result.warnings).toBeDefined();
     });
 
-    it('should return consistent budget breakdown with actual content lengths', () => {
+    it('should return consistent budget breakdown with actual content lengths', async () => {
       const { projectId, chapterId } = setupProjectWithContext();
-      const result = service.computeBudget(projectId, chapterId);
+      const result = await service.computeBudget(projectId, chapterId);
 
       // The budget numbers should match actual trimmed content lengths
       const estimatedGs = service.estimateTokens(result.globalStatic);
@@ -507,22 +528,6 @@ describe('ContextBudgetService', () => {
       expect(result.budget.globalDynamic).toBe(estimatedGd);
       expect(result.budget.local).toBe(estimatedLc);
       expect(result.budget.total).toBe(estimatedGs + estimatedGd + estimatedLc);
-    });
-
-    describe('computeBudgetPrecise (Token pre-calculation)', () => {
-      it('should provide accurate budget via countTokens', async () => {
-        const { projectId, chapterId } = setupProjectWithContext();
-        const result = await service.computeBudgetPrecise(projectId, chapterId);
-
-        expect(result).toBeDefined();
-        expect(result.budget.globalStatic).toBeGreaterThan(0);
-        expect(result.budget.globalDynamic).toBeGreaterThan(0);
-        expect(result.budget.local).toBeGreaterThan(0);
-        expect(result.budget.globalStatic).toBeLessThanOrEqual(3000);
-        expect(result.budget.globalDynamic).toBeLessThanOrEqual(2000);
-        expect(result.budget.local).toBeLessThanOrEqual(3000);
-        expect(result.budget.total).toBeLessThanOrEqual(8000);
-      });
     });
   });
 
@@ -577,36 +582,4 @@ describe('ContextBudgetService', () => {
     });
   });
 
-  // ════════════════════════════════════════════════════════════════
-  // countTokens — OpenRouter API token counting (NEW — Token pre-calculation)
-  // ════════════════════════════════════════════════════════════════
-
-  describe('countTokens', () => {
-    it('should return 0 for empty string', async () => {
-      const count = await service.countTokens('');
-      expect(count).toBe(0);
-    });
-
-    it('should return a positive token count for text', async () => {
-      const count = await service.countTokens('Hello world');
-      expect(count).toBeGreaterThan(0);
-    });
-
-    it('should return higher token count for Chinese text than heuristic estimateTokens', async () => {
-      // 4 chars/token heuristic underestimates Chinese tokens (real ratio ~1.5-2.5 chars/token)
-      const chineseText = '星际医妃传是一部融合现代医学与异能战斗的创新之作';
-      const heuristicCount = service.estimateTokens(chineseText);
-      const preciseCount = await service.countTokens(chineseText);
-
-      // Precise tokenizer should count more tokens than 4 chars/token heuristic
-      expect(preciseCount).toBeGreaterThan(heuristicCount);
-    });
-
-    it('should be consistent across calls for the same text', async () => {
-      const text = '林清音站在城墙之上，面对着整个异能军团';
-      const count1 = await service.countTokens(text);
-      const count2 = await service.countTokens(text);
-      expect(count1).toBe(count2);
-    });
-  });
 });

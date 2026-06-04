@@ -18,6 +18,7 @@ import {
   AIGenerateChunk,
 } from '../ai-gateway/ai-gateway.service';
 import { PromptTemplateLoaderService } from '../ai-gateway/prompt-template-loader.service';
+import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { FactsheetService } from './factsheet.service';
 import { ReviewService } from './review.service';
@@ -44,6 +45,7 @@ export class StepService {
     private readonly projectService: ProjectService,
     private readonly aiGateway: AIGatewayService,
     private readonly promptLoader: PromptTemplateLoaderService,
+    private readonly contextBudgetService: ContextBudgetService,
     private readonly factsheetCompensation: FactsheetCompensationService,
     private readonly factsheetService: FactsheetService,
     private readonly reviewService: ReviewService,
@@ -538,6 +540,9 @@ export class StepService {
       );
     }
 
+    // Issue #21: compute three-layer context budget before constructing prompt
+    const budget = await this.contextBudgetService.computeBudget(projectId, chapterId);
+
     const chResult = await this.collectAiOutput(
       await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
@@ -546,6 +551,9 @@ export class StepService {
         targetWordCount: String(chapter.targetWordCount),
         feedback: opts.feedback ?? '',
         previousSummary: previous?.contextSummary ?? '',
+        globalStatic: budget.globalStatic,
+        globalDynamic: budget.globalDynamic,
+        localContext: budget.local,
       }),
     );
 
@@ -595,6 +603,9 @@ export class StepService {
       throw new BadRequestException('No paused generation to continue');
     }
 
+    // Issue #21: compute three-layer context budget before constructing prompt
+    const budget = await this.contextBudgetService.computeBudget(projectId, chapterId);
+
     const continuation = await this.collectAiOutput(
       await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
@@ -602,6 +613,9 @@ export class StepService {
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
         targetWordCount: String(chapter.targetWordCount),
         currentContent: opts.currentContent,
+        globalStatic: budget.globalStatic,
+        globalDynamic: budget.globalDynamic,
+        localContext: budget.local,
       }),
     );
 

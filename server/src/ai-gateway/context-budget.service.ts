@@ -1,9 +1,10 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { AI_MODEL_TOKEN, IChatModel } from './ai-gateway.service';
 
-const CHARS_PER_TOKEN = 4;
 const SUMMARY_THRESHOLD = 2500;
 const SUMMARY_TARGET_TOKENS = 400;
+// Rough character count hint for AI prompts (display only, not used for budget math)
+const CHARS_PER_TOKEN_HINT = 4;
 
 const LIMITS = {
   globalStatic: 3000,
@@ -30,34 +31,34 @@ export interface BudgetResult {
 // ─── Step data access interface for computeBudget ──────────────
 
 export interface IStepDataAccess {
-  getChapter(projectId: string, chapterId: string): {
+  getChapter(projectId: string, chapterId: string): Promise<{
     chapterNumber: number;
     beatPlan: Record<string, unknown> | null;
     content: string | null;
     contextSummary: string | null;
-  } | null;
+  } | null>;
 
   getPreviousChapter(
     projectId: string,
     chapterNumber: number,
-  ): { content: string | null; contextSummary: string | null } | null;
+  ): Promise<{ content: string | null; contextSummary: string | null } | null>;
 
   getBeat(
     projectId: string,
     chapterNumber: number,
-  ): { plan: Record<string, unknown> } | null;
+  ): Promise<{ plan: Record<string, unknown> } | null>;
 
   getIdeaStep(
     projectId: string,
-  ): { output: string | null } | null;
+  ): Promise<{ output: string | null } | null>;
 
   getSettingStep(
     projectId: string,
-  ): { output: string | null } | null;
+  ): Promise<{ output: string | null } | null>;
 
   getFactsheet(
     projectId: string,
-  ): { entries: Record<string, string> } | null;
+  ): Promise<{ entries: Record<string, string> } | null>;
 }
 
 export const STEP_DATA_ACCESS = 'STEP_DATA_ACCESS';
@@ -92,13 +93,21 @@ export class ContextBudgetService {
   // ════════════════════════════════════════════════════════════════
 
   estimateTokens(text: string): number {
+    // CJK-aware heuristic: Chinese ~1.8 chars/token, ASCII ~4 chars/token.
+    // Synchronous path used by calculateBudget / computeBudget / trimToBudget.
+    // IChatModel.getNumTokens() provides the async counterpart for future
+    // real-tokenizer integration.
     if (!text) return 0;
-    return Math.round(text.length / CHARS_PER_TOKEN);
-  }
-
-  async countTokens(text: string): Promise<number> {
-    if (!text) return 0;
-    return this.chatModel.getNumTokens(text);
+    let asciiCount = 0;
+    let cjkCount = 0;
+    for (const ch of text) {
+      if (/[一-鿿　-〿＀-￯]/.test(ch)) {
+        cjkCount++;
+      } else {
+        asciiCount++;
+      }
+    }
+    return Math.round(asciiCount / 4 + cjkCount / 1.8);
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -107,9 +116,21 @@ export class ContextBudgetService {
 
   trimToBudget(text: string, maxTokens: number): string {
     if (!text || maxTokens <= 0) return '';
-    const maxChars = maxTokens * CHARS_PER_TOKEN;
-    if (text.length <= maxChars) return text;
-    return text.slice(0, maxChars);
+    if (this.estimateTokens(text) <= maxTokens) return text;
+
+    // Binary search for the cut point where estimateTokens ≤ maxTokens.
+    // O(n log n) — text is bounded by context window limits (~12K chars max).
+    let lo = 0;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (this.estimateTokens(text.slice(0, mid)) <= maxTokens) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return text.slice(0, lo);
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -189,48 +210,27 @@ export class ContextBudgetService {
   }
 
   // ════════════════════════════════════════════════════════════════
-  // computeBudget — assemble three layers from project data (Issue #17)
+  // computeBudget — assemble three layers from project data (Issue #17 / #21)
   // ════════════════════════════════════════════════════════════════
 
-  computeBudget(projectId: string, chapterId: string): BudgetResult {
-    const chapter = this.stepData?.getChapter(projectId, chapterId);
+  async computeBudget(projectId: string, chapterId: string): Promise<BudgetResult> {
+    const chapter = await this.stepData?.getChapter(projectId, chapterId);
     if (!chapter) return emptyBudgetResult('Chapter not found');
 
     // Layer 1: Global Static (SETTING phase)
-    const setting = this.stepData?.getSettingStep(projectId);
+    const setting = await this.stepData?.getSettingStep(projectId);
     const globalStatic = setting?.output ?? '';
 
     // Layer 2: Global Dynamic (FactSheet entries)
-    const factsheet = this.stepData?.getFactsheet(projectId);
+    const factsheet = await this.stepData?.getFactsheet(projectId);
     const globalDynamic = factsheet?.entries
       ? entriesToString(factsheet.entries)
       : '';
 
     // Layer 3: Local Context (Beat + previous chapter)
-    const local = this.assembleLocalLayer(projectId, chapter);
+    const local = await this.assembleLocalLayer(projectId, chapter);
 
     return this.calculateBudget(globalStatic, globalDynamic, local);
-  }
-
-  async computeBudgetPrecise(projectId: string, chapterId: string): Promise<BudgetResult> {
-    const result = this.computeBudget(projectId, chapterId);
-    if (!result.globalStatic && !result.globalDynamic && !result.local) return result;
-
-    const [gsTokens, gdTokens, lcTokens] = await Promise.all([
-      this.countTokens(result.globalStatic),
-      this.countTokens(result.globalDynamic),
-      this.countTokens(result.local),
-    ]);
-
-    return {
-      ...result,
-      budget: {
-        globalStatic: gsTokens,
-        globalDynamic: gdTokens,
-        local: lcTokens,
-        total: gsTokens + gdTokens + lcTokens,
-      },
-    };
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -244,7 +244,7 @@ export class ContextBudgetService {
     if (tokenCount <= SUMMARY_THRESHOLD) return null;
 
     const prompt = [
-      `你是一位专业的小说编辑。请为以下章节内容生成一个结构化的上下文摘要，约 ${SUMMARY_TARGET_TOKENS} tokens（约 ${SUMMARY_TARGET_TOKENS * CHARS_PER_TOKEN} 字符）。`,
+      `你是一位专业的小说编辑。请为以下章节内容生成一个结构化的上下文摘要，约 ${SUMMARY_TARGET_TOKENS} tokens（约 ${SUMMARY_TARGET_TOKENS * CHARS_PER_TOKEN_HINT} 字符）。`,
       '',
       '摘要必须包含以下三个维度：',
       '- 出场角色：列出本章出现的主要角色及其当前状态',
@@ -272,22 +272,22 @@ export class ContextBudgetService {
   // Private helpers
   // ════════════════════════════════════════════════════════════════
 
-  private assembleLocalLayer(
+  private async assembleLocalLayer(
     projectId: string,
     chapter: { chapterNumber: number; beatPlan: Record<string, unknown> | null },
-  ): string {
+  ): Promise<string> {
     const parts: string[] = [];
 
-    const beat = this.stepData?.getBeat(projectId, chapter.chapterNumber);
+    const beat = await this.stepData?.getBeat(projectId, chapter.chapterNumber);
     if (beat?.plan) {
       parts.push(entriesToString(beat.plan));
     }
 
     if (chapter.chapterNumber <= 1) {
-      const idea = this.stepData?.getIdeaStep(projectId);
+      const idea = await this.stepData?.getIdeaStep(projectId);
       if (idea?.output) parts.push(idea.output);
     } else {
-      const prev = this.stepData?.getPreviousChapter(projectId, chapter.chapterNumber);
+      const prev = await this.stepData?.getPreviousChapter(projectId, chapter.chapterNumber);
       if (prev?.contextSummary) {
         parts.push(prev.contextSummary);
       } else if (prev?.content) {
