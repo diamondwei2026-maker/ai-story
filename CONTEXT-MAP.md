@@ -7,6 +7,10 @@ NovelCraft Pro — AI 长篇小说分步创作系统
 - [project](src/project/CONTEXT.md) — 项目管理：Project 实体、CRUD、状态流转、里程碑
 - [step](src/step/CONTEXT.md) — 创作管道：Phase 流转、Chapter 生命周期、审核、FactSheet、ChangeAnalysis、完结
 
+## System-wide Documents
+
+- [CONTEXT.md](CONTEXT.md) — 领域术语表、术语关系、Example Dialogue、实施状态总览
+
 ## System-wide ADRs
 
 | ADR | 主题 |

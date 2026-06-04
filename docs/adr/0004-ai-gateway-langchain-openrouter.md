@@ -10,6 +10,14 @@ AI 调用层从「DeepSeek 代理 + OpenAI 兼容 SDK」切换为「OpenRouter �
 **Consequences**：
 - 模型分配由代码中的 `TaskType → ModelName` 集中映射（非模板文件声明），便于审计和测试。
 - Prompt 模板存放在 `prompts/` 目录的独立 `.md` 文件中，与模型路由解耦。
-- SSE 流式路径：NestJS `@Sse()` + RxJS Observable 包装 LangChain `.stream()` 的 AsyncIterable。
+- SSE 流式路径：NestJS `@Sse()` + RxJS Observable 包装 ChatModel `.stream()` 的 AsyncIterable（当前实现使用 OpenAI SDK 的 stream，`IChatModel` 接口抽象保留了 LangChain/OpenRouter 替换能力）。
 - 断点续传策略：已生成 ≥ 60% 回传全部内容续写，< 60% 直接重试，最多 3 次。（*Phase 1 已实现 `pauseChapterGeneration`/`continueChapterGeneration` 暂停续写流程；指数退避重试留待后续迭代。*）
 - 未来切换到非 DeepSeek 模型只需修改路由 Map，不改 Prompt 文件。
+
+---
+
+## Implementation Note
+
+**2026-06-04 后记**：Phase 1 实际落地时选择了 **OpenAI SDK (`openai`) 直连 DeepSeek API**（`api.deepseek.com`），未引入 LangChain 或 OpenRouter。原因：(1) DeepSeek API 兼容 OpenAI SDK 接口，额外引入 OpenRouter 中间层增加延迟和故障面；(2) LangChain ChatModel 抽象层在当前线性管道场景下收益为负——多一层依赖和抽象泄漏，且 `.stream()` 的 AsyncIterable 包装在 NestJS/RxJS 下与 OpenAI SDK 原生 stream 无异；(3) Prompt 模板管理通过自建 `PromptTemplateLoaderService`（`prompts/` 目录 .md 模板 + `{{variable}}` 渲染）实现，无需依赖 LangChain `PromptTemplate`。
+
+**当前状态**：`IChatModel` 接口作为抽象层保留，`DeepSeekChatModel` 为其 OpenAI SDK 实现。若未来需要多供应商切换，实现新的 `IChatModel` 适配器即可——无需引入框架依赖。

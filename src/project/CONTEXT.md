@@ -11,7 +11,7 @@
 | id | string (UUID) | 主键 |
 | title | string | 作品标题 |
 | status | ProjectStatus | 当前阶段状态 |
-| config | { style?, platform?, genre? } | 创作配置 |
+| config | { style?, platform?, genre?, defaultChapterWordCount? } | 创作配置（含全局默认章节字数） |
 | pendingFactUpdates | PendingFactUpdate[] | FactSheet 补偿队列 |
 | statusHistory | StatusHistoryEntry[] | 状态变更里程碑 |
 | createdAt | Date | 创建时间 |

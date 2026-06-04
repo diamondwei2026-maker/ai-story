@@ -59,7 +59,7 @@ BLOCKED → 手动修改/上诉 → 重新审核
 
 ### Chapter 生命周期
 
-- `generateChapter()` — 流式生成 + 后处理管道（指纹提取 → FactSheet 更新 → ChangeAnalysis → 审核）
+- `generateChapter()` — 流式生成 + 后处理管道（指纹提取 → FactSheet 更新 → 审核 → 摘要）
 - `pauseChapterGeneration()` / `continueChapterGeneration()` — 暂停/继续
 - `retryChapterGeneration()` — 重试
 - `confirmChapter()` → COMPLETED
@@ -117,8 +117,8 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - **`computeBudget(projectId, chapterId)`** — 从 Project 数据自动组装三层上下文
 - **`generateContextSummary(chapterContent)`** — 长章 AI 摘要生成（>2500t 触发，目标 400t），含出场角色/关键事件/情感转折三维度
 - **`trimToBudget(text, maxTokens)`** — 单层裁剪
-- **`estimateTokens(text)`** — Token 估算（4 chars/token）
-- **`countTokens(text)`** — 精确 Token 计数，委托 `IChatModel.getNumTokens()`（字符估算 4 chars/token），用于 `computeBudgetPrecise()` 预算预计算
+- **`estimateTokens(text)`** — Token 估算（CJK 感知启发式：中文 ~1.8 / ASCII ~4 chars/token，Unicode 范围判断）
+- **`countTokens(text)`** — Token 计数，委托 `IChatModel.getNumTokens()`（CJK 感知启发式），用于预算预计算
 - 第 1 章特殊处理：用 IDEA 简介替代前一章
 - 前一章优先使用 contextSummary（若有），否则使用全文
 - **当前状态**：`ContextBudgetService` 的 `computeBudget`/`computeBudgetPrecise` 已实现并通过测试，但 `STEP_DATA_ACCESS` provider 尚未注册——Chapter 生成管道（`generateChapter`/`continueChapterGeneration`）暂未调用预算裁剪。当前直接通过 Prompt 模板变量构造上下文，三层硬上限待后续迭代连线
@@ -133,4 +133,4 @@ BLOCKED → 手动修改/上诉 → 重新审核
 
 ## 尚未实现（来自 PRD）
 
-（无——所有 PRD 规划的领域功能均已实现）
+- **拖拽重排大纲 / Beat 顺序**（PRD stories #18 / #18a）：大纲节点拖拽调整顺序 + AI 自动补全衔接；Beat 拖拽交换 chapterNumber + 标记 STALE。前端交互组件 + 服务端重排逻辑均待实现。

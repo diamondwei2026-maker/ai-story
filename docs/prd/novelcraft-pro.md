@@ -488,7 +488,7 @@ prompts/
 
 **总预算控制**：三层各自独立上限后再合计——超 8000 tokens 时从第三层开始进一步压缩，再到第二层，第一层最后。
 
-**Token 计数**：使用 DeepSeek tokenizer（通过 OpenRouter API），在注入前做预计算。
+**Token 计数**：使用 CJK 感知启发式估算（中文字符 ~1.8 chars/token、ASCII ~4 chars/token），在注入前做预计算。精确 tokenizer 集成留待后续迭代（DeepSeek API 当前不暴露 token 计数端点）。
 
 **FactSheet 初始种子**：BEATS 确认后、第 1 章生成前，从 SETTING Phase 的角色卡和世界观中提取 FactSheet 初始条目，确保首章生成时全局动态层已有内容可检索注入。
 

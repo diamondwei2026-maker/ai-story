@@ -33,7 +33,7 @@
   第 1 章特殊处理：IDEA Phase 的一句话简介 + 500 字简介替代"前一章"，总上限 800 tokens
 ```
 
-**Token 计数**：使用 DeepSeek tokenizer（通过 OpenRouter API 的 token counting 端点），在注入前做预计算。若三层各自裁剪后总和仍超 8K → 从第三层（局部上下文）开始进一步压缩，再到第二层（全局动态），第一层（全局静态）最后。
+**Token 计数**：使用 CJK 感知启发式估算——中文字符 ~1.8 chars/token、ASCII ~4 chars/token（Unicode 范围判断），在注入前做预计算。*精确 tokenizer 已放弃：DeepSeek API 不暴露 token 计数端点，OpenRouter 亦无可用端点。若后续 DeepSeek 开放 tokenizer API，可接入 `IChatModel.getNumTokens()` 替换启发式。*若三层各自裁剪后总和仍超 8K → 从第三层（局部上下文）开始进一步压缩，再到第二层（全局动态），第一层（全局静态）最后。
 
 **理由**：
 - 每层独立上限防止某一层消耗全部预算。三层预算分配基于"全局静态变化最小可缓存、局部上下文每章不同"的特性
@@ -138,7 +138,7 @@
 
 ## Consequences
 
-- 上下文注入需要 Token 预计算模块（调用 DeepSeek tokenizer），增加一次轻量 API 调用
+- 上下文注入需要 Token 预计算模块（使用 CJK 感知启发式估算），无需额外 API 调用
 - 每章审核通过后需额外 AI 调用来生成长章摘要（存入 Chapter.contextSummary），约增加 200 tokens 消耗
 - FactSheet 更新逻辑需重构：从单次 findOneAndUpdate 扩展为"乐观锁→入队→下次批量消费"三步
 - Project schema 新增 `pendingFactUpdates` 字段
