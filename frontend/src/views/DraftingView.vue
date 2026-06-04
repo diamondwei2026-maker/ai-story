@@ -93,6 +93,33 @@
           </span>
         </div>
 
+        <!-- Beat info (Issue #24) -->
+        <div
+          v-if="getChapterBeat(chapter.chapterNumber)"
+          class="chapter-list__item-beat"
+        >
+          <span
+            data-testid="beat-conflict-summary"
+            class="chapter-list__item-beat-conflict"
+          >
+            {{ getChapterBeat(chapter.chapterNumber)!.plan.conflictPoint || '—' }}
+          </span>
+          <span
+            data-testid="beat-hook-summary"
+            class="chapter-list__item-beat-hooks"
+          >
+            钩子 ×{{ getChapterBeat(chapter.chapterNumber)!.hookCount }}
+          </span>
+          <a-tag
+            v-if="getChapterBeat(chapter.chapterNumber)!.status === 'STALE'"
+            data-testid="beat-stale-badge"
+            color="red"
+            size="small"
+          >
+            待更新
+          </a-tag>
+        </div>
+
         <div class="chapter-list__item-actions">
           <a-button
             v-if="showGenerateButton(chapter)"
@@ -121,6 +148,8 @@
 import { ref, computed, onMounted } from "vue";
 import * as chapterApi from "@/api/chapter";
 import * as projectApi from "@/api/project";
+import * as beatsApi from "@/api/beats";
+import type { BeatDataResponse } from "@/api/beats";
 import type { Chapter } from "@/stores/useChapterStore";
 import CompletionBanner from "@/components/CompletionBanner.vue";
 import EditorWorkspace from "@/components/EditorWorkspace.vue";
@@ -141,6 +170,7 @@ const props = defineProps<{
 // ─── State ──────────────────────────────────────────────────────────
 
 const chapters = ref<Chapter[]>([]);
+const beats = ref<BeatDataResponse[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const selectedChapterId = ref<string | null>(null);
@@ -162,6 +192,19 @@ const selectedChapter = computed(() => {
 const totalWordCount = computed(() =>
   sortedChapters.value.reduce((sum, ch) => sum + wordCount(ch.content), 0)
 );
+
+/** Beat lookup by chapterNumber */
+const beatByChapter = computed(() => {
+  const map = new Map<number, BeatDataResponse>();
+  for (const b of beats.value) {
+    map.set(b.chapterNumber, b);
+  }
+  return map;
+});
+
+function getChapterBeat(chapterNumber: number): BeatDataResponse | undefined {
+  return beatByChapter.value.get(chapterNumber);
+}
 
 const allChaptersCompleted = computed(() => {
   const list = sortedChapters.value;
@@ -294,6 +337,14 @@ async function fetchChapters() {
   }
 }
 
+async function fetchBeats() {
+  try {
+    beats.value = await beatsApi.getBeats(props.projectId);
+  } catch {
+    // silently ignore — beat info is supplementary, not critical
+  }
+}
+
 async function handleGenerate(chapter: Chapter) {
   try {
     await chapterApi.generateChapter(props.projectId, chapter.id, {
@@ -318,6 +369,7 @@ async function handleConfirmCompletion(payload: { action: string }) {
 
 onMounted(() => {
   fetchChapters();
+  fetchBeats();
 });
 </script>
 
@@ -403,6 +455,27 @@ onMounted(() => {
 
 .chapter-list__item-word-count,
 .chapter-list__item-target {
+  white-space: nowrap;
+}
+
+.chapter-list__item-beat {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.chapter-list__item-beat-conflict {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-list__item-beat-hooks {
   white-space: nowrap;
 }
 

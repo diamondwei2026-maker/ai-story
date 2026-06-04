@@ -49,3 +49,25 @@ export async function rejectBeats(
     method: 'POST',
   });
 }
+
+// ─── Issue #23 / #24: Lightweight Beat Modifications ─────────────
+
+export async function updateBeatWordCount(
+  beatId: string,
+  wordCount: number,
+): Promise<BeatDataResponse> {
+  return request(`/beats/${beatId}/wordcount`, {
+    method: 'PATCH',
+    body: JSON.stringify({ wordCount }),
+  });
+}
+
+export async function updateBeatStructure(
+  beatId: string,
+  plan: Record<string, unknown>,
+): Promise<BeatDataResponse> {
+  return request(`/beats/${beatId}/structure`, {
+    method: 'PATCH',
+    body: JSON.stringify(plan),
+  });
+}

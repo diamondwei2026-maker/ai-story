@@ -31,6 +31,16 @@ vi.mock("@/api/project", () => ({
   reopenProject: (...args: any[]) => mockReopenProject(...args),
 }));
 
+const mockGetBeats = vi.fn().mockResolvedValue([]);
+vi.mock("@/api/beats", () => ({
+  getBeats: (...args: any[]) => mockGetBeats(...args),
+  generateBeats: vi.fn(),
+  confirmBeats: vi.fn(),
+  rejectBeats: vi.fn(),
+  updateBeatWordCount: vi.fn(),
+  updateBeatStructure: vi.fn(),
+}));
+
 // ─── Fixtures ────────────────────────────────────────────────────────
 
 interface MockChapter {
@@ -841,6 +851,100 @@ describe("DraftingView", () => {
 
       expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="drafting-empty-state"]').exists()).toBe(true);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // 10. Beat integration (Issue #24 RED)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe("Beat structure editing (Issue #24)", () => {
+    const beatsFixture = [
+      {
+        id: "beat-1", projectId: "proj-1", chapterNumber: 1,
+        plan: { conflictPoint: "主角初遇敌人", hookPresets: ["身份悬念", "神秘信物"] },
+        targetWordCount: 3000, hookCount: 2, isClimax: false,
+        useR1: true, status: "CONFIRMED" as const,
+        createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      },
+      {
+        id: "beat-2", projectId: "proj-1", chapterNumber: 2,
+        plan: { conflictPoint: "第一次正面交锋", hookPresets: ["能力觉醒"] },
+        targetWordCount: 3500, hookCount: 1, isClimax: false,
+        useR1: false, status: "STALE" as const,
+        createdAt: "2026-01-01", updatedAt: "2026-01-02",
+      },
+      {
+        id: "beat-3", projectId: "proj-1", chapterNumber: 3,
+        plan: { conflictPoint: "揭露幕后黑手", hookPresets: ["反转", "隐藏身份", "意外联盟"] },
+        targetWordCount: 4000, hookCount: 3, isClimax: true,
+        useR1: true, status: "CONFIRMED" as const,
+        createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      },
+    ];
+
+    it("fetches beat data alongside chapters on mount", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockGetBeats.mockResolvedValue(beatsFixture);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // DraftingView should call getBeats to load beat info
+      expect(mockGetBeats).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("displays beat plan conflict point alongside chapter card", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockGetBeats.mockResolvedValue(beatsFixture);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Chapter 1's beat has conflictPoint "主角初遇敌人"
+      const conflictEl = wrapper.find('[data-testid="beat-conflict-summary"]');
+      expect(conflictEl.exists()).toBe(true);
+      expect(conflictEl.text()).toContain("主角初遇敌人");
+    });
+
+    it("shows STALE indicator for chapters whose beat is STALE", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockGetBeats.mockResolvedValue(beatsFixture);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Chapter 2's beat is STALE
+      const staleBadge = wrapper.find('[data-testid="beat-stale-badge"]');
+      expect(staleBadge.exists()).toBe(true);
+    });
+
+    it("does not show STALE indicator when no beat is STALE", async () => {
+      const allConfirmed = beatsFixture.map((b) => ({ ...b, status: "CONFIRMED" as const }));
+      const chapters = allConfirmed.map((b) =>
+        makeChapter({ id: `ch-${b.chapterNumber}`, chapterNumber: b.chapterNumber, status: "COMPLETED" })
+      );
+
+      mockGetChapters.mockResolvedValue(chapters);
+      mockGetBeats.mockResolvedValue(allConfirmed);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-testid="beat-stale-badge"]').exists()).toBe(false);
+    });
+
+    it("shows beat plan summary (hook count) in chapter card", async () => {
+      mockGetChapters.mockResolvedValue(threeChapters);
+      mockGetBeats.mockResolvedValue(beatsFixture);
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Chapter 1 has hookCount=2
+      const hookEl = wrapper.find('[data-testid="beat-hook-summary"]');
+      expect(hookEl.exists()).toBe(true);
+      expect(hookEl.text()).toContain("2");
     });
   });
 });

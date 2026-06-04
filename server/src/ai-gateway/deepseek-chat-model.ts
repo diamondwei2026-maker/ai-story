@@ -57,7 +57,20 @@ export class DeepSeekChatModel implements IChatModel {
   }
 
   async getNumTokens(text: string): Promise<number> {
+    // CJK-aware heuristic: Chinese ~1.8 chars/token, ASCII ~4 chars/token
+    // DeepSeek does not expose a token-counting endpoint; precise tokenizer abandoned
+    // (no official DeepSeek tiktoken config available). This heuristic eliminates the
+    // ~2.2× underestimation bias of the flat 4 chars/token approach for Chinese text.
     if (!text) return 0;
-    return Math.round(text.length / 4);
+    let asciiCount = 0;
+    let cjkCount = 0;
+    for (const ch of text) {
+      if (/[一-鿿　-〿＀-￯]/.test(ch)) {
+        cjkCount++;
+      } else {
+        asciiCount++;
+      }
+    }
+    return Math.round(asciiCount / 4 + cjkCount / 1.8);
   }
 }

@@ -1362,92 +1362,330 @@ describe('StepService', () => {
     });
   });
 
-  describe('updateBeatStructure', () => {
-    it('should update the beat plan and keep Chapter status unchanged (STALE is conceptual)', async () => {
-      const project = projectService.create({ title: '结构修改测试' });
-      project.status = 'BEATS';
-      projectService.update(project.id, {});
+  // ══════════════════════════════════════════════════════════════════
+  // Issue #24: BEATS structural modification in DRAFTING (RED phase)
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('updateBeatStructure — Issue #24 RED', () => {
+    /**
+     * Helper: seed a project through the full pipeline to DRAFTING,
+     * producing confirmed beats + chapter shells.
+     */
+    async function seedDraftingProject(title: string): Promise<{
+      projectId: string;
+      beats: ReturnType<typeof service.getBeatsByProjectId> extends Promise<infer T> ? T : never;
+      chapters: ReturnType<typeof service.getChaptersByProjectId> extends Promise<infer T> ? T : never;
+    }> {
+      const project = await projectService.create({ title });
+      await service.generateIdea(project.id, { idea: '测试灵感' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+      await service.confirmIdea(project.id, { selectedSellPoint: 0 });       // → SETTING
+
+      await service.generateSetting(project.id, { idea: '测试设定' });
+      await service.confirmSetting(project.id);                               // → OUTLINE
+
+      await service.generateOutline(project.id, { setting: '设定', structure: 'three-act' });
+      await service.confirmOutline(project.id);                               // → BEATS
 
       await service.generateBeats(project.id, { outline: '大纲内容' });
-      await service.confirmBeats(project.id);
+      await service.confirmBeats(project.id);                                 // → DRAFTING
 
-      const beats = service.getBeatsByProjectId(project.id);
-      const target = beats[0];
-      const newPlan = {
+      const beats = await service.getBeatsByProjectId(project.id);
+      const chapters = await service.getChaptersByProjectId(project.id);
+      return { projectId: project.id, beats, chapters };
+    }
+
+    // ── R1: Beat status → STALE ────────────────────────────────
+
+    it('R1: should set Beat status to STALE after structural modification', async () => {
+      const { beats } = await seedDraftingProject('R1-结构修改-STALE标记');
+
+      const updated = await service.updateBeatStructure(beats[0].id, {
         conflictPoint: '新的冲突点',
-        hookPreset: '新的钩子预设',
-        readerExpectation: '中',
-      };
-
-      const chapters = service.getChaptersByProjectId(project.id);
-      const matchedChapter = chapters.find(
-        (c) => c.chapterNumber === target.chapterNumber,
-      );
-      const originalChapterStatus = matchedChapter!.status;
-
-      const updated = await service.updateBeatStructure(target.id, newPlan);
+      });
 
       expect(updated.status).toBe('STALE');
-      expect(updated.plan).toMatchObject(newPlan);
+    });
 
-      // Chapter keeps original status — STALE is a conceptual marker, not a status value (ADR-0005)
-      const chaptersAfter = service.getChaptersByProjectId(project.id);
+    // ── R2: plan merge correctness ─────────────────────────────
+
+    it('R2: should merge new plan fields into existing plan (shallow overlay)', async () => {
+      const { beats } = await seedDraftingProject('R2-计划合并');
+
+      const originalPlan = { ...beats[0].plan };
+      const patch = { conflictPoint: '修改后的冲突点', pov: '第一人称' };
+
+      const updated = await service.updateBeatStructure(beats[0].id, patch);
+
+      // New fields override
+      expect(updated.plan).toMatchObject(patch);
+      // Existing fields preserved unless overridden
+      for (const [key, value] of Object.entries(originalPlan)) {
+        if (!(key in patch)) {
+          expect(updated.plan[key]).toEqual(value);
+        }
+      }
+    });
+
+    it('R2b: should completely replace hookPresets when provided in plan', async () => {
+      const { beats } = await seedDraftingProject('R2b-钩子完全替换');
+
+      const newHooks = ['惊天反转', '隐藏身份暴露', '宿敌现身'];
+      const updated = await service.updateBeatStructure(beats[0].id, {
+        hookPresets: newHooks,
+      });
+
+      expect(updated.plan.hookPresets).toEqual(newHooks);
+    });
+
+    // ── R3: hookCount recalculation ────────────────────────────
+
+    it('R3: should recalculate hookCount from merged plan hookPresets', async () => {
+      const { beats } = await seedDraftingProject('R3-钩子计数重算');
+
+      const updated = await service.updateBeatStructure(beats[0].id, {
+        hookPresets: ['钩子A', '钩子B', '钩子C', '钩子D'],
+      });
+
+      expect(updated.hookCount).toBe(4);
+    });
+
+    it('R3b: should set hookCount to 0 when hookPresets is empty', async () => {
+      const { beats } = await seedDraftingProject('R3b-空钩子计数');
+
+      const updated = await service.updateBeatStructure(beats[0].id, {
+        hookPresets: [],
+      });
+
+      expect(updated.hookCount).toBe(0);
+    });
+
+    // ── R4: isClimax handling ──────────────────────────────────
+
+    it('R4: should set isClimax to true when plan includes isClimax=true', async () => {
+      const { beats } = await seedDraftingProject('R4-高潮标记设置');
+
+      const updated = await service.updateBeatStructure(beats[1].id, {
+        isClimax: true,
+      });
+
+      expect(updated.isClimax).toBe(true);
+    });
+
+    it('R4b: should preserve existing isClimax=true when not explicitly set to false', async () => {
+      const { beats } = await seedDraftingProject('R4b-高潮标记保留');
+
+      // First, set isClimax
+      await service.updateBeatStructure(beats[2].id, { isClimax: true });
+      // Then do a second structural update without mentioning isClimax
+      const updated = await service.updateBeatStructure(beats[2].id, {
+        conflictPoint: '另一个修改',
+      });
+
+      expect(updated.isClimax).toBe(true);
+    });
+
+    // ── R5: useR1 recalculation ────────────────────────────────
+
+    it('R5: should recalculate useR1 to true when hookCount reaches threshold (≥3)', async () => {
+      const { projectId, beats } = await seedDraftingProject('R5-R1重算');
+      // 5-chapter project: structural position gives ALL beats useR1=true.
+      // Build extra beats via the in-memory prisma mock so we have a beat
+      // that is NOT in first 3 / last 3 of a larger set (total ≥ 9).
+      for (let i = 6; i <= 9; i++) {
+        await mockPrisma.beat.create({
+          data: {
+            projectId,
+            chapterNumber: i,
+            plan: { conflictPoint: `第${i}章冲突`, hookPresets: ['钩子1'] },
+            targetWordCount: 3000,
+            hookCount: 1,
+            isClimax: false,
+            useR1: false,
+            status: 'CONFIRMED',
+          },
+        });
+      }
+
+      const allBeats = await service.getBeatsByProjectId(projectId);
+      // Chapter 6 is > 3 and < (9 - 2 = 7), so it's truly "middle"
+      const middleBeat = allBeats.find((b) => b.chapterNumber === 6);
+      expect(middleBeat).toBeDefined();
+      expect(middleBeat!.useR1).toBe(false);
+
+      // Give it 3+ hooks → useR1 should flip to true
+      const updated = await service.updateBeatStructure(middleBeat!.id, {
+        hookPresets: ['钩子A', '钩子B', '钩子C'],
+      });
+
+      expect(updated.useR1).toBe(true);
+    });
+
+    it('R5b: should set useR1=true when isClimax=true even if hooks are low', async () => {
+      const { projectId, beats } = await seedDraftingProject('R5b-高潮R1');
+      // Build extra beats so we have a middle beat
+      for (let i = 6; i <= 9; i++) {
+        await mockPrisma.beat.create({
+          data: {
+            projectId,
+            chapterNumber: i,
+            plan: { conflictPoint: `第${i}章冲突`, hookPresets: ['钩子1'] },
+            targetWordCount: 3000,
+            hookCount: 1,
+            isClimax: false,
+            useR1: false,
+            status: 'CONFIRMED',
+          },
+        });
+      }
+
+      const allBeats = await service.getBeatsByProjectId(projectId);
+      const middleBeat = allBeats.find((b) => b.chapterNumber === 6);
+      expect(middleBeat).toBeDefined();
+      expect(middleBeat!.useR1).toBe(false);
+
+      const updated = await service.updateBeatStructure(middleBeat!.id, {
+        isClimax: true,
+      });
+
+      expect(updated.useR1).toBe(true);
+    });
+
+    // ── R6: Chapter beatPlan synchronization ───────────────────
+
+    it('R6: should synchronize merged plan to corresponding Chapter beatPlan', async () => {
+      const { beats, chapters } = await seedDraftingProject('R6-章节同步');
+
+      const targetBeat = beats[0];
+      const targetChapter = chapters.find(
+        (c) => c.chapterNumber === targetBeat.chapterNumber,
+      );
+      expect(targetChapter).toBeDefined();
+
+      const patch = { conflictPoint: '同步测试冲突点', pov: '第三人称' };
+      await service.updateBeatStructure(targetBeat.id, patch);
+
+      const chaptersAfter = await service.getChaptersByProjectId(targetBeat.projectId);
       const chapterAfter = chaptersAfter.find(
-        (c) => c.chapterNumber === target.chapterNumber,
+        (c) => c.chapterNumber === targetBeat.chapterNumber,
       );
       expect(chapterAfter).toBeDefined();
-      expect(chapterAfter!.status).toBe(originalChapterStatus);
-      expect(chapterAfter!.beatPlan).toMatchObject(newPlan);
+      expect(chapterAfter!.beatPlan).toMatchObject(patch);
     });
 
-    it('should not trigger cross-Phase rollback', async () => {
-      const project = projectService.create({ title: '结构修改不回退' });
-      project.status = 'BEATS';
-      projectService.update(project.id, {});
+    // ── R7: Chapter status preserved (ADR-0005 conceptual STALE) ─
 
-      await service.generateBeats(project.id, { outline: '大纲内容' });
-      await service.confirmBeats(project.id);
+    it('R7: should NOT change Chapter status after structural modification', async () => {
+      const { beats, chapters } = await seedDraftingProject('R7-章节状态不变');
 
-      const beats = service.getBeatsByProjectId(project.id);
-      const target = beats[0];
+      const targetBeat = beats[0];
+      const targetChapter = chapters.find(
+        (c) => c.chapterNumber === targetBeat.chapterNumber,
+      );
+      const originalStatus = targetChapter!.status;
 
-      await service.updateBeatStructure(target.id, {
-        conflictPoint: '变动',
-        hookPreset: '新钩子',
+      await service.updateBeatStructure(targetBeat.id, {
+        conflictPoint: '新的冲突',
+        hookPresets: ['钩子A', '钩子B'],
       });
 
-      const p = projectService.findById(project.id);
-      expect(p!.status).toBe('DRAFTING');
+      const chaptersAfter = await service.getChaptersByProjectId(targetBeat.projectId);
+      const chapterAfter = chaptersAfter.find(
+        (c) => c.chapterNumber === targetBeat.chapterNumber,
+      );
+      expect(chapterAfter!.status).toBe(originalStatus);
     });
 
-    it('should not affect upstream/downstream beats', async () => {
-      const project = projectService.create({ title: '隔离测试' });
-      project.status = 'BEATS';
-      projectService.update(project.id, {});
+    it('R7b: should preserve Chapter status even when Chapter was previously COMPLETED', async () => {
+      const { beats, chapters, projectId } = await seedDraftingProject('R7b-已完成章节');
+      // First complete the chapter
+      await service.generateChapter(projectId, chapters[0].id, { mode: 'new-continue' });
+      await service.confirmChapter(projectId, chapters[0].id);
 
-      await service.generateBeats(project.id, { outline: '大纲内容' });
-      await service.confirmBeats(project.id);
+      const chapterBefore = (await service.getChaptersByProjectId(projectId))
+        .find((c) => c.chapterNumber === beats[0].chapterNumber);
+      expect(chapterBefore!.status).toBe('COMPLETED');
 
-      const beats = service.getBeatsByProjectId(project.id);
-      const target = beats[1]; // chapter 2
-
-      await service.updateBeatStructure(target.id, {
-        conflictPoint: '变动',
-        hookPreset: '新钩子',
+      await service.updateBeatStructure(beats[0].id, {
+        conflictPoint: '修改已完成章节的Beat结构',
       });
 
-      const after = service.getBeatsByProjectId(project.id);
-      // Beat 1 and 3 should remain CONFIRMED
-      const beat1 = after.find((b) => b.chapterNumber === 1);
-      const beat3 = after.find((b) => b.chapterNumber === 3);
-      expect(beat1!.status).toBe('CONFIRMED');
-      if (beat3) expect(beat3.status).toBe('CONFIRMED');
+      const chapterAfter = (await service.getChaptersByProjectId(projectId))
+        .find((c) => c.chapterNumber === beats[0].chapterNumber);
+      // ADR-0005: STALE is conceptual — status stays COMPLETED
+      expect(chapterAfter!.status).toBe('COMPLETED');
     });
 
-    it('should throw when beat does not exist', async () => {
+    // ── R8: no side-effects on other chapters ──────────────────
+
+    it('R8: should not modify any other Beat statuses', async () => {
+      const { beats } = await seedDraftingProject('R8-隔离性验证');
+
+      const targetBeat = beats[1]; // chapter 2
+      await service.updateBeatStructure(targetBeat.id, {
+        conflictPoint: '修改',
+      });
+
+      const afterBeats = await service.getBeatsByProjectId(targetBeat.projectId);
+      for (const b of afterBeats) {
+        if (b.id === targetBeat.id) {
+          expect(b.status).toBe('STALE');
+        } else {
+          expect(b.status).toBe('CONFIRMED');
+        }
+      }
+    });
+
+    it('R8b: should not modify any other Chapter data', async () => {
+      const { beats, chapters } = await seedDraftingProject('R8b-章节隔离');
+
+      const targetBeat = beats[0];
+      const otherChapterIds = chapters
+        .filter((c) => c.chapterNumber !== targetBeat.chapterNumber)
+        .map((c) => c.id);
+
+      // Snapshot other chapters before modification
+      const chaptersBefore = await service.getChaptersByProjectId(targetBeat.projectId);
+      const snapshots = new Map(
+        chaptersBefore
+          .filter((c) => c.chapterNumber !== targetBeat.chapterNumber)
+          .map((c) => [c.id, { status: c.status, beatPlan: JSON.stringify(c.beatPlan) }]),
+      );
+
+      await service.updateBeatStructure(targetBeat.id, {
+        conflictPoint: '修改内容',
+        hookPresets: ['新钩子'],
+      });
+
+      const chaptersAfter = await service.getChaptersByProjectId(targetBeat.projectId);
+      for (const ch of chaptersAfter) {
+        if (otherChapterIds.includes(ch.id)) {
+          const snap = snapshots.get(ch.id);
+          expect(ch.status).toBe(snap!.status);
+          expect(JSON.stringify(ch.beatPlan)).toBe(snap!.beatPlan);
+        }
+      }
+    });
+
+    // ── R9: no cross-Phase rollback ────────────────────────────
+
+    it('R9: should keep Project in DRAFTING after structural modification', async () => {
+      const { projectId, beats } = await seedDraftingProject('R9-无跨阶段回退');
+
+      await service.updateBeatStructure(beats[0].id, {
+        conflictPoint: '修改',
+      });
+
+      const project = await projectService.findById(projectId);
+      expect(project!.status).toBe('DRAFTING');
+    });
+
+    // ── R10: error handling ────────────────────────────────────
+
+    it('R10: should throw NotFoundException when Beat does not exist', async () => {
       await expect(
-        service.updateBeatStructure('nonexistent-id', {
-          conflictPoint: 'test',
+        service.updateBeatStructure('000000000000000000000000', {
+          conflictPoint: '不存在的Beat',
         }),
       ).rejects.toThrow(/Beat not found/);
     });

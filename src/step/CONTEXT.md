@@ -51,8 +51,9 @@ BLOCKED → 手动修改/上诉 → 重新审核
 - **剧情大纲 (OUTLINE)**: `generateOutline()` → `confirmOutline()` / `rejectOutline()`；`switchStructure()` 切换大纲格式
 - **细纲拆解 (BEATS)**: `generateBeats()` → `confirmBeats()` / `rejectBeats()`；`updateBeatWordCount()` / `updateBeatStructure()` 轻量修改
   - `updateBeatWordCount()` — 仅改字数：该 Beat 标记 STALE，AI 重平衡前后 Beat 字数配额。邻居 Beat 不标 STALE，已生成 Chapter 不标 STALE（仅更新 targetWordCount）
-  - `updateBeatStructure()` — 改结构内容（冲突点/钩子/POV）：该 Beat 标记 STALE，对应 Chapter（如已生成）标记 STALE。上下游 Beat 不受影响
+  - `updateBeatStructure()` — 改结构内容（冲突点/钩子/POV）：该 Beat 标记 STALE，对应 Chapter beatPlan 同步更新，但 Chapter.status 保持不变（ADR-0005 概念性 STALE）。上下游 Beat 不受影响
   - 两种修改均不触发跨 Phase 回退（Project.status 保持 DRAFTING）
+  - **前端集成**（#24）：`api/beats.ts` 含 `updateBeatWordCount(id, wordCount)` 和 `updateBeatStructure(id, plan)`；DraftingView 展示 beat 冲突点摘要 + 钩子计数 + STALE 标记
   - `shouldUseR1()` — 关键章节双重判定（ADR-0007 Decision 3）：结构位置（开篇 1-3 章 / 结局最后 3 章）|| hookCount ≥ 3 || isClimax → 满足任一即标记 `useR1`。在 `confirmBeats()` 中批量计算并固化到 Beat 文档
   - `resolveChapterTaskType()` — 生成管道读取 `Beat.useR1` 路由模型：useR1=true → `CRITICAL_CHAPTER`（deepseek-r1），false → `CHAPTER_GENERATION`（deepseek-v3）。`generateChapter()` 和 `continueChapterGeneration()` 均应用此路由
 - **正文迭代 (DRAFTING)**: `generateChapter()` → `confirmChapter()` / `disputeChapter()`；支持三种模式（new-continue / paragraph-rewrite / style-upgrade）
