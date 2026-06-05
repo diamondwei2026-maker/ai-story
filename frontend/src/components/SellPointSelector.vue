@@ -8,6 +8,23 @@
       <a-spin tip="卖点方案生成中..." />
     </div>
 
+    <!-- P2 空态提示：数据返回但解析为空 -->
+    <a-alert
+      v-else-if="sellPoints.length === 0"
+      data-testid="sellpoint-empty-warning"
+      type="warning"
+      message="卖点方案数据解析异常"
+      description="AI 返回了数据但无法解析，请尝试重新生成。"
+      show-icon
+      class="sellpoint-selector__empty-warning"
+    >
+      <template #action>
+        <a-button size="small" @click="$emit('regenerate', '')">
+          重新生成
+        </a-button>
+      </template>
+    </a-alert>
+
     <div v-else class="sellpoint-selector__cards">
       <MarketAnalysisCard
         v-for="sp in sellPoints"
@@ -98,6 +115,10 @@ function onRegenerate() {
 .sellpoint-selector__loading {
   text-align: center;
   padding: 40px;
+}
+
+.sellpoint-selector__empty-warning {
+  margin-bottom: 16px;
 }
 
 .sellpoint-selector__cards {

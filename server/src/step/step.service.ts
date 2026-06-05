@@ -223,6 +223,17 @@ export class StepService {
     // 剥离 AI 可能自发输出的简介段落，确保只保留卖点方案
     const sanitizedOutput = output.replace(/\n#+ (一句话简介|500字简介)[\s\S]*$/i, '');
 
+    // 诊断日志：记录 AI 输出清洗前后的状态，便于排查卖点解析失败问题
+    console.log(
+      `[IDEA-DIAG] projectId=${projectId} rawLen=${output.length} sanitizedLen=${sanitizedOutput.length} ` +
+      `hasHeader=${/##\s*卖点方案/.test(sanitizedOutput)} hasSellPointLabel=${/核心卖点/.test(sanitizedOutput)}`,
+    );
+    if (sanitizedOutput.length === 0) {
+      console.warn(`[IDEA-DIAG] ⚠️ 清洗后 output 为空！raw 前 300 字符: ${output.substring(0, 300)}`);
+    } else if (!/##\s*卖点方案/.test(sanitizedOutput)) {
+      console.warn(`[IDEA-DIAG] ⚠️ 清洗后 output 缺少 '## 卖点方案' 标题！前 300 字符: ${sanitizedOutput.substring(0, 300)}`);
+    }
+
     const updated = await this.prisma.stepData.update({
       where: { id: step.id },
       data: {
@@ -429,7 +440,7 @@ export class StepService {
     const existingStep = await this.getStepByProjectId(projectId, 'BEATS');
     const step = existingStep ?? (await this.createPendingStep(projectId, 'BEATS'));
 
-    const templateVars: Record<string, unknown> = {
+    const templateVars: Record<string, string> = {
       outline,
       currentContent,
       defaultWordCount: String(defaultWordCount),
