@@ -52,7 +52,7 @@ export interface DegradationLogEntry {
 export const AI_MODEL_TOKEN = 'AI_MODEL_TOKEN';
 
 export interface IChatModel {
-  stream(input: string, model?: string): AsyncIterable<{ content: string }>;
+  stream(input: string, model?: string, maxTokens?: number): AsyncIterable<{ content: string }>;
   getNumTokens(text: string): Promise<number>;
 }
 
@@ -69,6 +69,10 @@ const MODEL_MAP: Record<TaskType, string> = {
   [TaskType.FINGERPRINT_EXTRACTION]: 'deepseek-chat-v3',
   [TaskType.FACTSHEET_UPDATE]: 'deepseek-chat-v3',
   [TaskType.CHANGE_ANALYSIS]: 'deepseek-chat-v3',
+};
+
+const TASK_MAX_TOKENS: Partial<Record<TaskType, number>> = {
+  [TaskType.BEATS]: 32768,
 };
 
 const FALLBACK_MAP: Record<string, string> = {
@@ -112,6 +116,7 @@ export class AIGatewayService {
 
   generate(request: AIGenerateRequest): Observable<AIGenerateChunk> {
     const primaryModel = this.getModelForTask(request.taskType);
+    const effectiveMaxTokens = request.maxTokens ?? TASK_MAX_TOKENS[request.taskType];
 
     return new Observable<AIGenerateChunk>((subscriber) => {
       this.streamGenerateCore(
@@ -122,12 +127,13 @@ export class AIGatewayService {
         false,
         subscriber,
         false,
+        effectiveMaxTokens,
       );
     });
   }
 
-  callWithFallback(taskType: TaskType, prompt: string): Observable<AIGenerateChunk> {
-    const primaryModel = this.getModelForTask(taskType);
+  callWithFallback(taskType: TaskType, prompt: string, modelOverride?: string): Observable<AIGenerateChunk> {
+    const primaryModel = modelOverride ?? this.getModelForTask(taskType);
 
     return new Observable<AIGenerateChunk>((subscriber) => {
       this.streamGenerateCore(
@@ -150,9 +156,9 @@ export class AIGatewayService {
    * 通用 AI 输出收集器 —— 将 Observable 流合并为完整字符串，同时返回模型元信息。
    * 替代各 Service 中重复出现的 lastValueFrom + toArray 模式。
    */
-  async collectFullOutput(taskType: TaskType, prompt: string): Promise<AiStreamResult> {
+  async collectFullOutput(taskType: TaskType, prompt: string, modelOverride?: string): Promise<AiStreamResult> {
     try {
-      const chunks$ = this.callWithFallback(taskType, prompt);
+      const chunks$ = this.callWithFallback(taskType, prompt, modelOverride);
       const chunks = await lastValueFrom(chunks$.pipe(toArray()));
       const lastChunk = chunks[chunks.length - 1];
       const content = chunks
@@ -181,9 +187,10 @@ export class AIGatewayService {
     degraded: boolean,
     subscriber: Subscriber<AIGenerateChunk>,
     logDegradation: boolean,
+    maxTokens?: number,
   ): Promise<void> {
     try {
-      await this.safeStreamIteration(subscriber, modelUsed, degraded, model, prompt);
+      await this.safeStreamIteration(subscriber, modelUsed, degraded, model, prompt, maxTokens);
     } catch (err) {
       const failureReason = err instanceof Error ? err.message : String(err);
       const fallback = this.getFallbackModel(model);
@@ -205,6 +212,7 @@ export class AIGatewayService {
           true,
           subscriber,
           logDegradation,
+          maxTokens,
         );
         return;
       }
@@ -218,6 +226,7 @@ export class AIGatewayService {
     degraded: boolean,
     model: string,
     prompt: string,
+    maxTokens?: number,
   ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -226,7 +235,9 @@ export class AIGatewayService {
 
       (async () => {
         try {
-          const stream = this.chatModel.stream(prompt, model);
+          const stream = maxTokens != null
+            ? this.chatModel.stream(prompt, model, maxTokens)
+            : this.chatModel.stream(prompt, model);
           for await (const chunk of stream) {
             subscriber.next({ content: chunk.content, done: false });
           }

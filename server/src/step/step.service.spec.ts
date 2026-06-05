@@ -769,9 +769,8 @@ describe('StepService', () => {
 
   describe('confirmOutline', () => {
     it('should confirm outline and transition project from OUTLINE to BEATS', async () => {
-      const project = projectService.create({ title: '确认测试' });
-      project.status = 'OUTLINE';
-      projectService.update(project.id, {});
+      const project = await projectService.create({ title: '确认测试' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
 
       await service.generateOutline(project.id, {
         setting: '设定内容',
@@ -784,14 +783,13 @@ describe('StepService', () => {
       expect(result.status).toBe('CONFIRMED');
       expect(result.confirmedAt).toBeInstanceOf(Date);
 
-      const updated = projectService.findById(project.id);
+      const updated = await projectService.findById(project.id);
       expect(updated!.status).toBe('BEATS');
     });
 
     it('should throw when no generated outline exists to confirm', async () => {
-      const project = projectService.create({ title: '无大纲' });
-      project.status = 'OUTLINE';
-      projectService.update(project.id, {});
+      const project = await projectService.create({ title: '无大纲' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
 
       await expect(service.confirmOutline(project.id)).rejects.toThrow(
         /No generated outline/,
@@ -799,9 +797,8 @@ describe('StepService', () => {
     });
 
     it('should throw when outline is already confirmed', async () => {
-      const project = projectService.create({ title: '重复确认' });
-      project.status = 'OUTLINE';
-      projectService.update(project.id, {});
+      const project = await projectService.create({ title: '重复确认' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
 
       await service.generateOutline(project.id, {
         setting: '设定内容',
@@ -814,10 +811,64 @@ describe('StepService', () => {
       );
     });
 
+    it('should throw when project does not exist (orphaned step)', async () => {
+      const project = await projectService.create({ title: '孤儿步骤' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
+
+      await service.generateOutline(project.id, {
+        setting: '设定',
+        structure: 'three-act',
+      });
+
+      // Delete the project BEFORE confirming — simulates orphaned step
+      await mockPrisma.project.delete({ where: { id: project.id } });
+
+      await expect(service.confirmOutline(project.id)).rejects.toThrow(
+        /Project .+ not found/,
+      );
+    });
+
+    it('should throw InternalServerErrorException when project update fails', async () => {
+      const project = await projectService.create({ title: '更新失败' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
+
+      await service.generateOutline(project.id, {
+        setting: '设定',
+        structure: 'three-act',
+      });
+
+      // Simulate project.update throwing a DB error (project exists but write fails)
+      mockPrisma.project.update.mockImplementationOnce(async () => {
+        throw new Error('Database error during project update');
+      });
+
+      await expect(service.confirmOutline(project.id)).rejects.toThrow(
+        /Failed to update project/,
+      );
+    });
+
+    it('should throw InternalServerErrorException when stepData update fails', async () => {
+      const project = await projectService.create({ title: 'DB失败' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
+
+      await service.generateOutline(project.id, {
+        setting: '设定',
+        structure: 'three-act',
+      });
+
+      // Force stepData.update to throw a Prisma-like error
+      mockPrisma.stepData.update.mockImplementationOnce(async () => {
+        throw new Error('Simulated database write failure');
+      });
+
+      await expect(service.confirmOutline(project.id)).rejects.toThrow(
+        /Failed to confirm outline/,
+      );
+    });
+
     it('should throw when outline is rejected (not AWAITING_REVIEW)', async () => {
-      const project = projectService.create({ title: '驳回后确认' });
-      project.status = 'OUTLINE';
-      projectService.update(project.id, {});
+      const project = await projectService.create({ title: '驳回后确认' });
+      await projectService.update(project.id, { status: 'OUTLINE' as any });
 
       await service.generateOutline(project.id, {
         setting: '设定',
@@ -1374,6 +1425,60 @@ describe('StepService', () => {
       expect(callArgs[1]).toBe('beats-generation');
       // targetChapterCount should not be injected when not provided
       expect(callArgs[2].targetChapterCount).toBeUndefined();
+    });
+  });
+
+  describe('generateBeats — high volume adaptive strategy', () => {
+    it('should use default R1 model when targetChapterCount ≤ 35', async () => {
+      const project = await projectService.create({ title: '低篇幅-R1' });
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const spy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.generateBeats(project.id, {
+        outline: '大纲',
+        targetChapterCount: 35,
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        TaskType.BEATS,
+        expect.any(String),
+      );
+      spy.mockRestore();
+    });
+
+    it('should route to V3 model when targetChapterCount > 35', async () => {
+      const project = await projectService.create({ title: '高篇幅-V3' });
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const spy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.generateBeats(project.id, {
+        outline: '大纲',
+        targetChapterCount: 36,
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        TaskType.BEATS,
+        expect.any(String),
+        'deepseek-chat-v3',
+      );
+      spy.mockRestore();
+    });
+
+    it('should use default model when targetChapterCount is not specified', async () => {
+      const project = await projectService.create({ title: '未指定-默认' });
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const spy = jest.spyOn(service as any, 'collectAiOutput');
+
+      await service.generateBeats(project.id, { outline: '大纲' });
+
+      expect(spy).toHaveBeenCalledWith(
+        TaskType.BEATS,
+        expect.any(String),
+      );
+      spy.mockRestore();
     });
   });
 

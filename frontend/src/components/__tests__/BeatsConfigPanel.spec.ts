@@ -39,6 +39,54 @@ describe('BeatsConfigPanel', () => {
     expect(hintText).toContain('25');
   });
 
+  it('renders a-input-number when "自定义..." is selected', async () => {
+    const wrapper = await mountPanel({});
+    // Select "自定义..." (value 0)
+    (wrapper.vm as any).targetChapterCount = 0;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="config-custom-chapters"]').exists()).toBe(true);
+  });
+
+  it('hides a-input-number when switching back to preset from custom', async () => {
+    const wrapper = await mountPanel({});
+    // First select custom
+    (wrapper.vm as any).targetChapterCount = 0;
+    await wrapper.vm.$nextTick();
+    // Then switch to a preset
+    (wrapper.vm as any).targetChapterCount = 40;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="config-custom-chapters"]').exists()).toBe(false);
+  });
+
+  it('emits custom chapter count on start-generation', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 3000 });
+    // Select custom and set value
+    (wrapper.vm as any).targetChapterCount = 0;
+    (wrapper.vm as any).customChapterCount = 55;
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="config-start-generation-btn"]').trigger('click');
+
+    const emitted = wrapper.emitted('start-generation');
+    expect(emitted).toBeTruthy();
+    expect(emitted![0]).toEqual([{
+      targetChapterCount: 55,
+      defaultWordCount: 3000,
+    }]);
+  });
+
+  it('emits preset chapter count when preset is active (not custom)', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 3000 });
+    (wrapper.vm as any).targetChapterCount = 40;
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="config-start-generation-btn"]').trigger('click');
+
+    const emitted = wrapper.emitted('start-generation');
+    expect(emitted![0]).toEqual([{
+      targetChapterCount: 40,
+      defaultWordCount: 3000,
+    }]);
+  });
+
   // ── Word count segmented ──────────────────────────
 
   it('renders the word count segmented control when not confirmed', async () => {

@@ -136,6 +136,121 @@ describe('AIGatewayService', () => {
       const chunks = await collectChunks(chunks$);
       expect(chunks.length).toBeGreaterThan(0);
     });
+
+    it('should forward maxTokens from request to chatModel.stream()', async () => {
+      const streamSpy = jest.fn(async function* () {
+        yield { content: 'ok' };
+      });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          {
+            provide: AI_MODEL_TOKEN,
+            useValue: { stream: streamSpy, getNumTokens: async () => 0 },
+          },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      await collectChunks(svc.generate({
+        taskType: TaskType.BEATS,
+        prompt: 'test',
+        maxTokens: 32768,
+      }));
+
+      expect(streamSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        32768,
+      );
+    });
+
+    it('should apply default maxTokens for BEATS task when not specified in request', async () => {
+      const streamSpy = jest.fn(async function* () {
+        yield { content: 'ok' };
+      });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          {
+            provide: AI_MODEL_TOKEN,
+            useValue: { stream: streamSpy, getNumTokens: async () => 0 },
+          },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      // No maxTokens in request — task default should kick in
+      await collectChunks(svc.generate({
+        taskType: TaskType.BEATS,
+        prompt: 'test',
+      }));
+
+      expect(streamSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        32768,
+      );
+    });
+
+    it('should let explicit maxTokens override task default', async () => {
+      const streamSpy = jest.fn(async function* () {
+        yield { content: 'ok' };
+      });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          {
+            provide: AI_MODEL_TOKEN,
+            useValue: { stream: streamSpy, getNumTokens: async () => 0 },
+          },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      await collectChunks(svc.generate({
+        taskType: TaskType.BEATS,
+        prompt: 'test',
+        maxTokens: 2048,
+      }));
+
+      expect(streamSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        2048,
+      );
+    });
+
+    it('should not inject maxTokens for tasks without default config', async () => {
+      const streamSpy = jest.fn(async function* () {
+        yield { content: 'ok' };
+      });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AIGatewayService,
+          {
+            provide: AI_MODEL_TOKEN,
+            useValue: { stream: streamSpy, getNumTokens: async () => 0 },
+          },
+        ],
+      }).compile();
+      const svc = module.get<AIGatewayService>(AIGatewayService);
+
+      await collectChunks(svc.generate({
+        taskType: TaskType.CHAPTER_GENERATION,
+        prompt: 'test',
+      }));
+
+      // CHAPTER_GENERATION has no default maxTokens — should not pass third arg
+      expect(streamSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+      );
+    });
   });
 
   describe('generate — degradation chain', () => {

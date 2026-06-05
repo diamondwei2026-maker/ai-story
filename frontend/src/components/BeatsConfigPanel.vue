@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = withDefaults(defineProps<{
@@ -18,8 +18,11 @@ const volumeOptions = [
   { value: 15, label: '短篇' },
   { value: 25, label: '中篇' },
   { value: 40, label: '长篇' },
+  { value: 0, label: '自定义...' },
 ];
 const targetChapterCount = ref(25);
+const customChapterCount = ref(50);
+const isCustomChapter = computed(() => targetChapterCount.value === 0);
 
 const wordCountOptions = [
   { value: 2000, label: '2000字' },
@@ -31,8 +34,11 @@ const localWordCount = ref(props.defaultWordCount);
 
 function handleStartGeneration() {
   emit('update:wordCount', localWordCount.value);
+  const effectiveChapters = isCustomChapter.value
+    ? customChapterCount.value
+    : targetChapterCount.value;
   emit('start-generation', {
-    targetChapterCount: targetChapterCount.value,
+    targetChapterCount: effectiveChapters,
     defaultWordCount: localWordCount.value,
   });
 }
@@ -54,7 +60,16 @@ function handleStartGeneration() {
           :options="volumeOptions"
           data-testid="config-volume-segmented"
         />
-        <span class="config-hint">约{{ targetChapterCount }}章（可浮动10%）</span>
+        <a-input-number
+          v-if="isCustomChapter"
+          v-model:value="customChapterCount"
+          :min="10"
+          :max="120"
+          :step="5"
+          data-testid="config-custom-chapters"
+          class="config-custom-input"
+        />
+        <span class="config-hint">约{{ isCustomChapter ? customChapterCount : targetChapterCount }}章（可浮动10%）</span>
       </div>
 
       <!-- Word count -->
@@ -96,6 +111,7 @@ function handleStartGeneration() {
 .config-field { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); flex-wrap: wrap; }
 .config-label { font-size: 13px; color: var(--color-text-secondary); min-width: 70px; flex-shrink: 0; }
 .config-hint { font-size: 11px; color: var(--color-text-secondary); }
+.config-custom-input { width: 100px; }
 .config-collapse { margin-bottom: var(--space-md); }
 .outline-preview-wrapper {
   max-height: 400px;

@@ -3,7 +3,7 @@
 **Issue**: [#20](https://github.com/diamondwei2026-maker/ai-story/issues/20)
 **状态**: ready-for-agent
 **创建日期**: 2026-06-03
-**最后更新**: 2026-06-05（grill-with-docs 决策沉淀，ADR-0008）
+**最后更新**: 2026-06-05（grill-with-docs 决策沉淀，ADR-0008；高篇幅策略：自适应模型选择 + max_tokens 方案）
 
 ---
 
@@ -46,11 +46,60 @@ BEATS 细纲拆解阶段的当前实现存在三个核心问题：
 ### 篇幅控制（方案 B 落地，grill Q1/Q4/Q23）
 
 进入 BEATS 后，用户首先看到参数配置面板，而非直接自动生成：
-- **篇幅预设**：a-segmented 三档自然语言选项——短篇（~15章）/ 中篇（~25章）/ 长篇（~40章）。系统根据大纲段数给出建议值（前端解析大纲文本中"第X幕"数量 × 3）。AI 接收具体数字（如 25），允许 ±10% 浮动。
+- **篇幅预设**：a-segmented 三档自然语言选项——短篇（~15章）/ 中篇（~25章）/ 长篇（~40章）——外加"自定义..."入口，展开 `a-input-number` 支持 10-120 的精确章数（step=5）。系统根据大纲段数给出建议值（前端解析大纲文本中"第X幕"数量 × 3）。AI 接收具体数字（如 25），允许 ±10% 浮动。
 - **默认每章字数**：a-segmented 四档选择（2000 / 3000 / 4000 / 5000），默认读取 `Project.config.defaultChapterWordCount`。
 - **大纲预览**：a-collapse 折叠区显示大纲结构化摘要（每幕一行标题），帮助用户确认拆解基础。
 - **两个参数** `targetChapterCount`（number）和 `defaultWordCount`（number）注入 `generateBeats` Prompt，替代当前硬编码的"20-30章"和"默认3000字"。
 - 参数传递链路：Config Panel a-segmented → `beats.ts` API → `step.service.generateBeats()` → `beats-generation.md` `{{targetChapterCount}}` / `{{defaultWordCount}}`。
+
+### 高篇幅策略：超模型输出 token 上限的解决方案
+
+**问题**：篇幅预设 ≥ 60 章时，AI 单次输出的全部 beat 条目总 token 量可能超过模型上限。当前 BEATS 阶段使用 `deepseek-r1`（→ `deepseek-reasoner`），输出上限约 8K tokens。每章 beat 条目约 220 tokens（叙事摘要 150 字 + 冲突描述 100 字 + 钩子链 100 字 + 元数据），导致：
+
+| 章数 | 预估输出 tokens | R1 (8K 上限) | V3 (32K 上限) |
+|------|:----------:|:----------:|:----------:|
+| 15章 | 3,300 | ✅ | ✅ |
+| 25章 | 5,500 | ✅ | ✅ |
+| 40章 | 8,800 | ⚠️ 临界 | ✅ |
+| 60章 | 13,200 | ❌ 截断 | ✅ |
+| 80章 | 17,600 | ❌ 截断 | ✅ |
+| 120章 | 26,400 | ❌ 截断 | ⚠️ 临界 |
+
+**结论**：40 章预设恰好是 R1 的极限边缘，再往上必然截断。
+
+**解决方案：自适应生成策略**。在 `step.service.generateBeats()` 内部，根据 `targetChapterCount` 自动选择生成策略——对用户完全透明，前端无需感知。
+
+```
+章数 ≤ 35  → R1 单次调用（当前行为，创意质量优先）
+章数 36-90 → V3 单次调用 + max_tokens=32768（覆盖绝大多数长篇需求）
+章数 > 90  → 分批生成，每批 ≤ 35 章，批次间提供前一章叙事锚点保证衔接
+```
+
+**策略一：V3 模型切换（36-90 章）**
+
+将模型从 `deepseek-r1` 切换为 `deepseek-chat-v3`，并在 API 调用中显式设置 `max_tokens: 32768`。V3 的 32K 输出上限可容纳约 145 章（145 × 220 ≈ 31,900 tokens）。结构化 beat 格式对创意推理要求较低，V3 与 R1 的质量差异在此场景可接受。
+
+改动点：
+- `IChatModel.stream()` 接口新增 `maxTokens?: number` 参数
+- `deepseek-chat-model.ts` 将 `max_tokens` 透传到 OpenAI client
+- `ai-gateway.service.ts` 新增任务级 `max_tokens` 配置 + BEATS 高篇幅模型策略常量
+- `step.service.ts` 在 `generateBeats()` 中根据章数选择模型和 max_tokens
+
+**策略二：分批生成（91+ 章，按需实施）**
+
+将目标章数切分为多批（每批 ≤ 35 章），每批独立调用 AI，批次间通过前一章叙事锚点保证上下文衔接。新增 `beats-generation-batched.md` prompt 模板，包含：大纲 + 当前批次范围 + 上一批最后一章的 beat 数据（叙事摘要 + 冲突描述 + 钩子链）。
+
+```
+// 分批生成伪代码
+allBeats = []
+anchorBeat = null
+for each batch (batchStart, batchEnd):
+    batchBeats = AI.generate(prompt + anchorBeat + batchRange)
+    allBeats += batchBeats
+    anchorBeat = formatBeatForPrompt(batchBeats.last)
+```
+
+**当前实施阶段**：策略一（V3 切换 + max_tokens）覆盖 ≤ 90 章需求，满足 95% 用户场景。策略二（分批生成）作为后续迭代，当用户确实需要 90+ 章时再实施。
 
 ### 调整操作的自然语言化（grill Q2/Q3/Q8/Q9）
 
@@ -135,12 +184,21 @@ BEATS 细纲拆解阶段的当前实现存在三个核心问题：
 | **useBeatsAdjustment** | 封装三种调整操作状态管理：单章 adjust（`POST /beats/:beatId/adjust`）、字数修改（`PATCH /beats/:beatId/wordcount`）、结构修改（`PATCH /beats/:beatId/structure`）。统一 loading/error/success 状态。集成影响检测逻辑（纯前端结构化集合差分——比较 `hookCausalChain` 新旧差异，输出 `affectedChapterNumbers` + `warnings`，非持久化）。 | Q3, Q14 |
 
 ### 后端改动（grill Q1/Q2/Q8/Q12/Q13/Q20）
+
+**Step Service（step.service.ts）**：
 - `generateBeats()` 新增参数 `targetChapterCount: number`。与 `defaultWordCount` 一起注入 Prompt 模板。可选——不传时回退到旧版 AI 自决行为（20-30章）。
+- `generateBeats()` 新增自适应模型选择逻辑：章数 ≤ 35 走 R1（质量优先），36-90 走 V3 + `max_tokens=32768`，> 90 走分批生成（按需）。
 - 新增 `POST /projects/:pid/steps/beats/:beatId/adjust` 端点。接收自然语言反馈 + 相邻章节叙事锚点 → AI 重新生成该 Beat → 返回 `{ beat, impact }`。
 - 新增 `POST /projects/:pid/steps/beats/batch-adjust` 端点。接收章节区间 + 问题描述 + 边界锚点 → AI 批量优化整段 Beat → 返回 `{ beats, impact }`。
 - `parseBeatsFromOutput()` 扩展：从 AI 输出中解析 5 个新字段（`narrativeSummary`、`pacingLabel`、`hookCausalChain`、`conflictIntensity`、`readerExpectation`）。
 - `toBeat()` 映射函数新增 V1→V2 降级逻辑：若顶层列为默认值，从 `plan.conflictPoint` / `plan.hookPresets` 推导展示值（仅前端渲染，不写回 DB）。
 - 现有轻量修改端点（`PATCH /beats/:beatId/wordcount`、`PATCH /beats/:beatId/structure`）保留不变。
+
+**AI Gateway（ai-gateway.service.ts / deepseek-chat-model.ts）**：
+- `IChatModel.stream()` 接口新增 `maxTokens?: number` 参数，支持调用方显式控制模型输出上限。
+- `deepseek-chat-model.ts` 将 `max_tokens` 透传到 OpenAI `chat.completions.create()` 调用。
+- 新增任务级 `max_tokens` 配置常量 `TASK_MAX_TOKENS`，BEATS 默认 32768。
+- 新增 BEATS 高篇幅策略常量：`BEATS_HIGH_VOLUME_MODEL = 'deepseek-chat-v3'`、`BEATS_HIGH_VOLUME_THRESHOLD = 35`。
 
 ### Schema 变更（详见 ADR-0008，grill Q7/Q10/Q21/Q25）
 
@@ -209,6 +267,8 @@ Beat 模型新增 5 个**顶层列**（非塞入 `plan` JSON），`plan` 列保�
 | **改造** | `prisma/schema.prisma`（Beat 模型新增 5 列） |
 | **改造** | `beats.ts`（前端 API：新增 `targetChapterCount`、`adjustBeat`、`batchAdjustBeats`） |
 | **改造** | `useBeatStore.ts`（新字段类型） |
+| **改造** | `ai-gateway.service.ts`（任务级 `max_tokens` 配置 + BEATS 高篇幅模型策略常量） |
+| **改造** | `deepseek-chat-model.ts`（`stream()` 新增 `maxTokens` 参数透传） |
 | **改造** | `BeatsView.spec.ts`（约 70% 测试需重写以匹配新行为） |
 | **删除** | `BeatList.vue`（卡片列表由 BeatsView 内 v-for 直接渲染） |
 | **删除** | `BeatEditor.vue`（编辑逻辑内嵌入 BeatNarrativeCard） |
@@ -242,7 +302,7 @@ Beat 模型新增 5 个**顶层列**（非塞入 `plan` JSON），`plan` 列保�
 ## Out of Scope
 
 - DRAFTING 阶段的 Chapter 正文生成
-- 模型降级逻辑（AIGatewayService 职责）
+- BEATS 分批生成（> 90 章场景）——待策略一（V3 切换）上线后根据用户需求按需实施
 - FactSheet 初始化和增量更新
 - 跨 Phase 回退后的 BEATS 重新拆解
 - 大纲叙事结构切换（OUTLINE Phase 范围）
@@ -281,6 +341,6 @@ Beat 模型新增 5 个**顶层列**（非塞入 `plan` JSON），`plan` 列保�
 | 阶段 | 内容 | 依赖 |
 |------|------|------|
 | **Phase 0 — Schema & 类型** | Prisma 迁移（5 新列）、beat.types.ts、useBeatStore.ts、beats.ts 类型、Prompt 模板更新 | 无 |
-| **Phase 1 — 后端核心** | `targetChapterCount` 参数、`adjustBeat` + `/adjust` 端点、`batchAdjustBeats` + `/batch-adjust` 端点、`parseBeatsFromOutput` 扩展、`toBeat` V1 降级 | Phase 0 |
-| **Phase 2 — 前端组件** | BeatsConfigPanel（a-segmented 重写）、BeatNarrativeCard（新建，替代旧 BeatChapterCard+BeatEditor）、BeatsRhythmChart（冲突/期待值重写）、BeatsStatsBar（新建）、useBeatsAdjustment（新建）、BeatsView 重构（布局+状态机）、BeatList/BeatEditor 删除、HookDensityChart 脱离 DOM | Phase 1 |
-| **Phase 3 — 测试** | BeatsView.spec.ts 重写、BeatNarrativeCard/BeatsConfigPanel/BeatsRhythmChart/BeatsStatsBar/useBeatsAdjustment 新建测试、beats.controller.spec.ts 新端点测试 | Phase 2 |
+| **Phase 1 — 后端核心** | `targetChapterCount` 参数、自适应模型选择（≤35 章 R1 / 36-90 章 V3 + max_tokens）、`IChatModel.stream()` maxTokens 接口扩展、`adjustBeat` + `/adjust` 端点、`batchAdjustBeats` + `/batch-adjust` 端点、`parseBeatsFromOutput` 扩展、`toBeat` V1 降级 | Phase 0 |
+| **Phase 2 — 前端组件** | BeatsConfigPanel（篇幅预设新增"自定义..."入口 + a-input-number、a-segmented 重写）、BeatNarrativeCard（新建，替代旧 BeatChapterCard+BeatEditor）、BeatsRhythmChart（冲突/期待值重写）、BeatsStatsBar（新建）、useBeatsAdjustment（新建）、BeatsView 重构（布局+状态机）、BeatList/BeatEditor 删除、HookDensityChart 脱离 DOM | Phase 1 |
+| **Phase 3 — 测试** | BeatsView.spec.ts 重写、BeatNarrativeCard/BeatsConfigPanel/BeatsRhythmChart/BeatsStatsBar/useBeatsAdjustment 新建测试、beats.controller.spec.ts 新端点测试、ai-gateway 自适应策略单元测试 | Phase 2 |

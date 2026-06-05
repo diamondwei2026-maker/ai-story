@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import {
   StepData,
   PhaseType,
@@ -33,6 +33,8 @@ type OutlineStructure = (typeof VALID_STRUCTURES)[number];
 const R1_STRUCTURAL_FIRST = 3;
 const R1_STRUCTURAL_LAST_OFFSET = 2;
 const R1_HOOK_THRESHOLD = 3;
+const BEATS_HIGH_VOLUME_THRESHOLD = 35;
+const BEATS_HIGH_VOLUME_MODEL = 'deepseek-chat-v3';
 
 // ─── V2 Beat field defaults ───────────────────────────────────
 const DEFAULT_INTENSITY = 3;
@@ -450,7 +452,13 @@ export class StepService {
     }
     const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', templateVars);
 
-    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.BEATS, prompt);
+    const effectiveTarget = targetChapterCount ?? 25;
+    const modelOverride = effectiveTarget > BEATS_HIGH_VOLUME_THRESHOLD
+      ? BEATS_HIGH_VOLUME_MODEL
+      : undefined;
+    const { content: output, aiMeta } = modelOverride
+      ? await this.collectAiOutput(TaskType.BEATS, prompt, modelOverride)
+      : await this.collectAiOutput(TaskType.BEATS, prompt);
 
     const existingBeats = await this.getBeatsByProjectId(projectId);
     const newBeats = this.parseBeatsFromOutput(output, projectId, defaultWordCount);
@@ -1278,11 +1286,32 @@ export class StepService {
       throw new BadRequestException(`${label} must be AWAITING_REVIEW to confirm (current: ${existing.status})`);
     }
 
-    await this.prisma.stepData.update({
-      where: { id: existing.id },
-      data: { status: 'CONFIRMED', confirmedAt: new Date() },
-    });
-    await this.projectService.update(projectId, { status: nextStatus });
+    // Verify project exists before mutating step (avoid orphaned confirmed step)
+    const project = await this.projectService.findById(projectId);
+    if (!project) {
+      throw new BadRequestException(`Project ${projectId} not found — cannot confirm ${label} with missing project`);
+    }
+
+    try {
+      await this.prisma.stepData.update({
+        where: { id: existing.id },
+        data: { status: 'CONFIRMED', confirmedAt: new Date() },
+      });
+    } catch (e) {
+      console.error(`[confirmPhase] Failed to update stepData ${existing.id}:`, e);
+      throw new InternalServerErrorException(`Failed to confirm ${label}: database write error`);
+    }
+    try {
+      const updatedProject = await this.projectService.update(projectId, { status: nextStatus });
+      if (!updatedProject) {
+        console.error(`[confirmPhase] Project ${projectId} vanished during confirm of ${label}`);
+        throw new InternalServerErrorException(`Failed to update project status to ${nextStatus}`);
+      }
+    } catch (e) {
+      if (e instanceof InternalServerErrorException) throw e;
+      console.error(`[confirmPhase] Failed to update project ${projectId}:`, e);
+      throw new InternalServerErrorException(`Failed to update project status to ${nextStatus}`);
+    }
 
     existing.status = 'CONFIRMED';
     existing.confirmedAt = new Date();
@@ -1326,8 +1355,9 @@ export class StepService {
   private async collectAiOutput(
     taskType: TaskType,
     prompt: string,
+    modelOverride?: string,
   ): Promise<{ content: string; aiMeta: AiMeta }> {
-    return this.aiGateway.collectFullOutput(taskType, prompt);
+    return this.aiGateway.collectFullOutput(taskType, prompt, modelOverride);
   }
 
   private extractKeyPlotPoints(output: string): string {

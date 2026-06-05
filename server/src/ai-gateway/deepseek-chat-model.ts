@@ -32,13 +32,14 @@ export class DeepSeekChatModel implements IChatModel {
     return MODEL_ALIASES[key] ?? key;
   }
 
-  async *stream(input: string, model?: string): AsyncIterable<{ content: string }> {
+  async *stream(input: string, model?: string, maxTokens?: number): AsyncIterable<{ content: string }> {
     const resolvedModel = this.resolveModel(model);
 
     const stream = await this.client.chat.completions.create({
       model: resolvedModel,
       messages: [{ role: 'user', content: input }],
       stream: true,
+      ...(maxTokens != null ? { max_tokens: maxTokens } : {}),
     });
 
     let hasContent = false;
