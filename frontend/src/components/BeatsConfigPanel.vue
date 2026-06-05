@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = withDefaults(defineProps<{
   defaultWordCount: number;
@@ -35,14 +36,6 @@ function handleStartGeneration() {
     defaultWordCount: localWordCount.value,
   });
 }
-
-const outlinePreview = computed(() => {
-  if (!props.outlineText) return '';
-  // Extract first 300 chars for preview
-  return props.outlineText.length > 300
-    ? props.outlineText.substring(0, 300) + '...'
-    : props.outlineText;
-});
 </script>
 
 <template>
@@ -76,8 +69,10 @@ const outlinePreview = computed(() => {
 
       <!-- Outline preview -->
       <a-collapse v-if="outlineText" :bordered="false" class="config-collapse">
-        <a-collapse-panel key="outline" header="大纲预览">
-          <p data-testid="config-outline-preview" class="outline-preview">{{ outlinePreview }}</p>
+        <a-collapse-panel key="outline" header="大纲预览（点击展开）">
+          <div data-testid="config-outline-preview" class="outline-preview-wrapper">
+            <MarkdownRenderer :content="outlineText" />
+          </div>
         </a-collapse-panel>
       </a-collapse>
 
@@ -102,7 +97,14 @@ const outlinePreview = computed(() => {
 .config-label { font-size: 13px; color: var(--color-text-secondary); min-width: 70px; flex-shrink: 0; }
 .config-hint { font-size: 11px; color: var(--color-text-secondary); }
 .config-collapse { margin-bottom: var(--space-md); }
-.outline-preview { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; white-space: pre-wrap; margin: 0; }
+.outline-preview-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-warm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
 .config-action { text-align: center; padding-top: var(--space-sm); }
 .config-confirmed-text { font-size: 13px; color: var(--color-text-secondary); margin-left: var(--space-sm); }
 </style>
