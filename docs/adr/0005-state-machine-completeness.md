@@ -33,7 +33,13 @@
 
 **理由**：创作是迭代过程，即使"完本"后也可能回头修改。COMPLETED 应是一个可逆的里程碑而非终点锁。ARCHIVED 独立于继续创作路径，用于用户主动清理活跃项目列表，避免 COMPLETED 作品长期占据 ProjectHub。
 
-**完结前检查**：用户点击"确认完本"时，系统检查 Project.pendingFactUpdates 队列——若队列非空，展示提示"有 N 条待处理的事实簿更新，建议同步后再完本"，提供三个选项："立即同步并完本"（触发 forceSync → 消费队列 → 完结）、"跳过并完本"（队列保留，下次"继续创作"时消费）、"取消"（回到 DRAFTING）。若用户选择跳过，队列中的条目不丢失，仅在 COMPLETED 只读期间暂不消费。
+**完结前检查**：用户点击"确认完本"时，系统检查两项——
+
+1. **FactSheet 队列检查**：若 `Project.pendingFactUpdates` 队列非空，展示提示"有 N 条待处理的事实簿更新，建议同步后再完本"，提供三个选项："立即同步并完本"（触发 forceSync → 消费队列 → 完结）、"跳过并完本"（队列保留，下次"继续创作"时消费）、"取消"（回到 DRAFTING）。若用户选择跳过，队列中的条目不丢失，仅在 COMPLETED 只读期间暂不消费。
+
+2. **DEFERRED ChangeAnalysis 检查**：跨所有源 Chapter 扫描 `changeAnalysis.impactedChapters` 中 `status === 'DEFERRED'` 的条目。若有未处理的 DEFERRED → 展示提示"有 N 条待处理的变更影响（来自之前的章节修改）"，提供两个选项："查看并处理"（回到 DRAFTING 逐条解决）和"跳过并完本"（DEFERRED 条目保留，下次"继续创作"时重新提醒）。此检查防止已推迟的中等影响在完本后永久静默丢失。
+
+**归档时的队列处理**：用户归档（ARCHIVED）Project 时，`pendingFactUpdates` 队列和 DEFERRED ChangeAnalysis 条目**保留不清理**，归档操作不因队列非空而阻止。恢复（`restore()`→DRAFTING）时队列监控和 DEFERRED 提醒自动恢复——理由：归档是用户主动清理工作区的操作，不应被系统状态阻塞，队列数据不会因归档而过时（FactSheet 最终一致性由下次消费保证）。
 
 ## Decision 3 — 审核结论的完整用户决策路径
 

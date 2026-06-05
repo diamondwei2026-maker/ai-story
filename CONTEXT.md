@@ -8,11 +8,14 @@
 |------|------|
 | **Project（小说项目）** | 用户创建的一本小说的完整创作容器，包含所有 Phase、Chapter 和审核记录。Project 状态：IDEA → SETTING → OUTLINE → BEATS → DRAFTING → COMPLETED，可从 DRAFTING/COMPLETED 归档（ARCHIVED）。 |
 | **Phase（创作阶段）** | 用户视角的 5 个顶层进度节点，顺序固定，不可跳过。五个 Phase：IDEA（灵感提取）、SETTING（设定集）、OUTLINE（剧情大纲）、BEATS（细纲拆解）、DRAFTING（正文迭代）。 |
+| **三幕式（Three-Act）** | 经典叙事结构：第一幕建置（引出冲突）→ 第二幕对抗（逐级升级）→ 第三幕解决（高潮+收束）。适合节奏紧凑的中短篇作品，分段少、节点边界清晰。 |
+| **网文十段（Web-Novel-Ten）** | 网文市场主流节奏骨架：将故事拆为十个叙事段落（开篇钩子→金手指觉醒→首次打脸→中期转折→高潮铺垫→大高潮→余韵→新地图→终极对决→完本收束），每段含明确的"爽点/悬念/转折"分布要求。适合追求追读率和日更节奏的连载作品。 |
+| **四幕八段（Four-Act-Eight）** | 扩展型叙事结构：四幕（开端/发展/高潮/结局）各拆两段共八段。比三幕式更细粒度，比网文十段更接近传统戏剧结构。适合世界观复杂、多线叙事的中长篇。 |
 | **归档（Archive）** | 将不再活跃创作的小说项目从仪表盘隐藏的操作。归档保留全部数据（Phase、Beat、Chapter、FactSheet），可随时恢复为 DRAFTING 继续创作。 |
 | **Step（阶段内步骤）** | 单个 Phase 内部的子状态流转。**后端 StepData.status**（Prisma 枚举定义 7 种，代码实际使用 5 种：`PENDING` → `AI_GENERATING`（AI 返回中）→ `AWAITING_REVIEW`（AI 完成，等待用户确认）→ `CONFIRMED` / `REJECTED`。`IN_PROGRESS` 和 `REVIEWING` 为枚举冗余值，未在 Step 状态流中使用）（驳回后需重新生成，后台 `generate` 接口自动重置为 `PENDING` 后再次进入 `AI_GENERATING`）。**前端 StepStatus**（派生类型，4 种）：`PENDING`（待开始）/ `IN_PROGRESS`（进行中——合并映射 `AI_GENERATING` + `AWAITING_REVIEW`）/ `CONFIRMED`（已完成）/ `REJECTED`（需修改）。StepData 为独立 MongoDB 文档，通过 `projectId` 关联 Project，记录每个 Phase 的输入、输出、审核结果和版本历史。 |
 | **STALE（过时状态）** | 两层语义：**Phase 级别**——用户回退到上游 Phase 修改内容后，下游已确认 Phase 整体标记 STALE，重新推进时提示"复用旧数据"或"基于新上下文重新生成"。STALE 数据不自动删除。**文档级别**（Beat/Chapter）——单条 Beat 或单章因上游变更而过时，但 status 字段保持原值（STALE 非 Chapter.status 枚举值），用户访问时提示"重新生成"或"保留现有内容"。 |
 | **确认（Confirm）** | 用户对当前 Phase 的 AI 输出和审核结果表示认可的动作。确认后 Phase 状态变为 CONFIRMED，允许推进到下一 Phase。 |
-| **Beat（细纲节拍）** | BEATS Phase 的输出单元，描述单章的冲突点、钩子预设、读者期待值和目标字数。每个 Beat 在 DRAFTING Phase 展开为一个 Chapter。Beat 决定了后续 Chapter 的结构密度。 |
+| **Beat（细纲节拍）** | BEATS Phase 的输出单元，描述单章的完整叙事结构。包含：叙事摘要（100-150字剧情概要）、冲突描述（完整段落）、冲突强度（1-5）、读者期待值（1-5）、节奏标签（快/中/慢）、钩子因果链（编号钩子 + 指定回收章节）、高潮标记（用户可勾选）、目标字数。每个 Beat 在 DRAFTING Phase 展开为一个 Chapter。Beat 的结构密度（冲突强度 + 钧子密度 + 期待值）决定后续 Chapter 的叙事质量。 |
 | **Chapter（章节）** | DRAFTING Phase 内部的独立写作单元，每个 Chapter 由一条 Beat 展开而来。Chapter 状态流转：PENDING（空壳）→ DRAFT（AI 生成中）→ REVIEWING（审核中）→ COMPLETED（确认）/ DISPUTED（上诉后保留意见）。第 N 章 COMPLETED 或 DISPUTED 后，第 N+1 章方可生成。目标字数（targetWordCount）继承自 Beat，用户可在 BEATS 阶段逐章覆盖。Chapter 不包含 PUBLISHED 状态——发布功能不在当前范围内。 |
 | **targetWordCount（目标字数）** | 用户对单章的预期字数，分两级：Project.config.defaultChapterWordCount 作为全局默认；Beat 级别可逐条覆盖。BEATS Phase 生成细纲时以此为拆解密度依据，DRAFTING Phase 以此为 AI 生成的内容量目标。 |
 | **ChangeAnalysis（变更分析）** | 用户关闭章节编辑器时经"实质性变更检测"通过后自动触发，AI 合并执行 ChangeFingerprint 提取 + ImpactPropagation 影响评估，输出变更要点及对下游章节的影响分级（HIGH/MEDIUM/LOW/NONE）。结果持久化嵌入源 Chapter 的 changeAnalysis 字段。 |
@@ -31,14 +34,23 @@
 | **GenerationContext（生成上下文）** | 每章正文生成时注入 AI Prompt 的完整信息窗口，分三层硬上限：全局静态（≤3000 tokens，来自 SETTING Phase，超限按优先级裁剪）、全局动态（≤2000 tokens，FactSheet 检索条目按匹配度取前 N 条）、局部上下文（≤3000 tokens，当前 Beat + 上下文衔接）。上下文衔接：第 2 章起为前一章全文（超 2500 tokens 则用 AI 摘要替代），第 1 章用 IDEA Phase 的一句简介和 500 字简介替代。三层各自独立预算，总预算 ≤8000 tokens。 |
 | **ContextSummary（章节摘要）** | 当章节正文超过 2500 tokens 时，Chapter 生成管道步骤 5 在审核通过后自动生成的约 400 tokens 结构化摘要（出场角色、关键事件、情感转折），存入 Chapter.contextSummary。用于下一章生成时替代全文注入，控制上下文预算。 |
 | **完本确认（Complete）** | DRAFTING Phase 的特殊终点动作。所有 Chapter ∈ {COMPLETED, DISPUTED} 时 UI 展示"完本"提示横幅，但 Project 不自动变为 COMPLETED——用户必须显式点击"确认完本"。COMPLETED 后为只读模式，用户可通过"继续创作"退回 DRAFTING。 |
-| **BEATS 轻量修改** | 在已确认的 BEATS Phase 中对单条 Beat 做局部修改，不触发跨 Phase 回退。分两级：仅改字数（targetWordCount）→ 仅该 Beat 标记 STALE，不影响 DRAFTING 下游；改结构内容（冲突点/钩子/POV 等）→ 该 Beat 及对应 Chapter 标记 STALE。若需全局重构 BEATS，应使用正式的"回退到 BEATS"触发跨 Phase 回退。 |
+| **BEATS 轻量修改** | 在已确认的 BEATS Phase 中对单条 Beat 做局部修改，不触发跨 Phase 回退。分两级：仅改字数（targetWordCount）→ 仅该 Beat 标记 STALE，不影响 DRAFTING 下游；改结构内容（冲突描述/钩子/高潮标记等）→ 该 Beat 及对应 Chapter 标记 STALE。操作前弹确认对话框警告下游影响。若需全局重构 BEATS，应使用"开始拆解"（Config Panel 触发）而非逐章 adjust。 |
+| **Beat Adjust（单章调整）** | 用户通过自然语言反馈（预定义选项或自由文本）要求 AI 重新生成单章 Beat 的操作。终点 `POST /beats/:beatId/adjust`，传入相邻章节叙事锚点作为最小区间上下文以维持连贯性。返回更新后的 Beat + 影响分析（受影响章节号 + 自然语言警告），影响分析由前端结构化匹配计算（非 AI），结果非持久化。 |
+| **Batch Adjust（区间优化）** | 用户对节奏诊断图表标注的低质量区间（如"第 8-12 章期待值持续偏低"）触发的一键批量优化。终点 `POST /beats/batch-adjust`，传入整段 Beat 数据 + 边界锚点 + 问题描述 → AI 一次性优化所有章节的冲突强度和期待值分布。 |
+| **Impact Detection（影响检测）** | 单章调整后，前端通过比较调整前后钩子因果链的结构化集合差分，检测哪些章节引用了被删除或变更的钩子。纯前端计算，零 AI 调用。受影响章节在 UI 标黄提示，页面刷新后提示消失。 |
 | **ChangeAnalysis 持久化** | ChangeAnalysis 的分析结果（lastAnalyzedAt、ChangeFingerprint、受影响章节列表及处理状态）嵌入源 Chapter 文档的 changeAnalysis 字段。用户刷新页面后结果不丢失，可通过源 Chapter 编辑器的影响分析面板重新查看。 |
 | **实质性变更检测** | 关闭编辑器时前端计算编辑内容与 Chapter.content 的差异。仅空白变更或 Levenshtein 距离 < 50 字符且无段落新增/删除 → 跳过 ChangeAnalysis。防止改标点或微调措辞触发完整 AI 管道。 |
 | **DEFERRED（延期处理）** | 受影响章节的一种处理状态。MEDIUM/LOW severity 的受影响章节可标记 DEFERRED——下次打开任意已确认章节编辑器并关闭时重新提醒。HIGH severity 不可推迟，必须当场决策。处理状态持久化在源 Chapter 的 changeAnalysis 中。 |
 | **targetedFixHistory（修补记录）** | 每个 Chapter 的可选数组字段，记录该章被 TargetedFix 修补的历史。每条包含：修补时间、触发修补的源 Chapter、变更指纹、AI 生成的修补摘要。为每次修补保留完整溯源链。 |
 | **pendingFactUpdates（事实簿待处理队列）** | 存储在 Project 文档中的 FactSheet 更新补偿队列。当 FactSheet 乐观锁写冲突两次均失败时，待合并条目入队而非丢失。下次任意 Chapter 成功更新 FactSheet 时批量消费队列（去重 + 冲突裁决）。三级队列深度监控：≥5 → 下次 AI 调用 Prompt 加优先级标记；≥10 → UI 展示告警横幅 + 手动强制同步按钮；≥50 → 拒绝入队并强制触发同步。 |
 | **关键章节（Critical Chapter）** | 需要 DeepSeek-R1 模型生成的章节，统一通过双重判定——满足任一条件：结构位置（开篇第 1-3 章 / 结局最后 3 章，BEATS 确认时自动计算）、钩子密度（Beat.hookCount ≥ 3，AI 自动提取）、高潮标记（Beat.isClimax = true，用户手动标记）。判定结果固化到 Beat.useR1。*小章节数边界：总章数 ≤ 3 时全部标记为关键章节（开篇与结局范围完全重叠）；总章数 4-5 时重叠章节按 R1 生成（无负面影响）。* |
-| **hookCount（钩子计数）** | Beat 的属性字段，BEATS 生成时 AI 自动提取。计数范围通常 1-5，代表本章内悬念点 + 冲突转折点合计。≥3 的章节被自动识别为关键章节，使用 R1 模型生成正文。 |
+| **hookCount（钩子计数）** | Beat 的属性字段，BEATS 生成时 AI 自动提取。计数范围通常 1-5，代表本章内悬念点 + 冲突转折点合计。≥3 的章节被自动识别为关键章节，使用 R1 模型生成正文。自 Beat V2 起，钩子的完整语义由 `hookCausalChain` 承载（含编号和回收章节），`hookCount` 为 `hookCausalChain.length` 的缓存值，用于 `shouldUseR1()` 快速判定。 |
+| **hookCausalChain（钩子因果链）** | Beat V2 新增字段。每个钩子分配唯一编号（"钩子1"、"钩子2"）以避免跨章引用歧义，附带目标回收章节号（`resolvesInChapter`）形成完整因果链。AI 在 generateBeats 和 adjust 时输出，前端用编号精确匹配钩子回收关系做影响检测。 |
+| **narrativeSummary（叙事摘要）** | Beat V2 新增字段。AI 生成的 100-150 字场景摘要，为 BEATS 第一层信息架构的核心读取单位——用户无需理解技术概念即可判断章节质量。 |
+| **pacingLabel（节奏标签）** | Beat V2 新增字段。AI 指派的本章叙事节奏：快/中/慢。与 `conflictIntensity` 匹配（高强度→快节奏），展示于叙事卡片底部。 |
+| **conflictIntensity（冲突强度）** | Beat V2 新增字段。1-5 数值，1=日常过渡，3=中等对抗，5=生死决战。用于 BeatsRhythmChart 冲突强度曲线。AI 在 generateBeats 时为每章赋值。 |
+| **readerExpectation（读者期待值）** | Beat V2 新增字段。1-5 数值，1=平缓过渡，3=好奇驱使，5=迫不及待。用于 BeatsRhythmChart 读者期待值走势曲线。AI 在 generateBeats 时为每章赋值。 |
+| **targetChapterCount（目综章数）** | BEATS 生成参数，从篇幅预设（短篇~15章 / 中篇~25章 / 长篇~40章）映射而来。传递给 AI 时允许 ±10% 浮动以适配大纲结构。替代旧版硬编码的"20-30章"。前端从大纲段数自动推断推荐值，用户可在 Config Panel 中覆盖。 |
 | **模型单向降级** | AI 调用失败时的容错策略：V3→R1→阻塞用户，R1→V3→阻塞用户。不循环降级。两个模型同时不可用时弹 Modal 告知用户并提供手动重试按钮，不自动轮询。 |
 
 ## Relationships
@@ -47,6 +59,10 @@
 - 一个 **Phase** 包含多个 **Beat**（仅 BEATS Phase）或多个 **Chapter**（仅 DRAFTING Phase）
 - 一个 **Beat** 展开为一个 **Chapter**（一对一）
 - **Beat** 的 `targetWordCount` 继承自 **Project** 的 `defaultChapterWordCount`，可逐条覆盖
+- **Beat** 的 `targetChapterCount` 来自篇幅预设（短篇/中篇/长篇），AI 在 ±10% 范围内浮动以适配大纲
+- **Beat** 的 `hookCausalChain` 编号钩子 → **Impact Detection** 通过集合差分检测跨章钩子断裂
+- **Beat Adjust**（单章调整）→ 仅当前 Beat 重生成 + 影响分析（纯前端）；对应 **Chapter** 标记 STALE 需重新生成
+- **Batch Adjust**（区间优化）→ 整段 Beat 批量优化，AI 一次性调整冲突强度和期待值分布
 - **BEATS 轻量修改**（已确认 BEATS 内）：仅改字数 → 该 Beat STALE，对应 Chapter 仅更新 targetWordCount；改结构内容 → 该 Beat 及对应 Chapter STALE。均不触发跨 Phase 回退
 - 用户正式"回退到 BEATS Phase"（跨 Phase 回退）→ 下游 **DRAFTING** 全部 STALE
 - 用户回退修改任意已确认 **Phase** → 下游所有 Phase 标记 **STALE**；Project.status 回退到该 Phase
@@ -104,9 +120,13 @@
 
 ## 实施状态
 
-> 最后更新：2026-06-04（BEATS 可视化组件补齐 + 剧情大纲网文十段）
+> 最后更新：2026-06-05（BEATS 交互重构 Grill-with-Docs 完成，ADR-0008 创建）
 
-### 近期更新（2026-06-01 ~ 2026-06-04）
+### 近期更新（2026-06-01 ~ 2026-06-05）
+
+| 日期 | 变更 | 影响范围 |
+|------|------|----------|
+| 06-05 | **BEATS 交互重构 Grill-with-Docs** — 对 `docs/prd/beats-interaction-redesign.md` 进行全面代码对照审查。产出 25 项决策（Q1-Q25）、ADR-0008（Beat 数据模型 V2：强类型顶层列）、CONTEXT.md 术语更新（新增 10 个领域术语：narrativeSummary/pacingLabel/hookCausalChain/conflictIntensity/readerExpectation/targetChapterCount/Beat Adjust/Batch Adjust/Impact Detection）。识别 9 个阻断性缺口和 6 个主要缺口——所有新组件已创建但为桩形式，需按阶段 0→1→2→3 实施填充。 | CONTEXT.md / ADR-0008 |
 
 | 日期 | 变更 | 影响范围 |
 |------|------|----------|

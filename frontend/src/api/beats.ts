@@ -23,13 +23,14 @@ export async function getBeats(
 
 export async function generateBeats(
   projectId: string,
-  opts: { outline?: string; currentContent?: string },
+  opts: { outline?: string; currentContent?: string; defaultWordCount?: number },
 ): Promise<BeatDataResponse[]> {
   return request(`/projects/${projectId}/steps/beats/generate`, {
     method: 'POST',
     body: JSON.stringify({
       outline: opts.outline ?? '',
       currentContent: opts.currentContent ?? '',
+      defaultWordCount: opts.defaultWordCount,
     }),
   });
 }

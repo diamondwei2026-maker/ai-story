@@ -7,7 +7,7 @@ export interface Project {
   id: string;
   title: string;
   status: 'IDEA' | 'SETTING' | 'OUTLINE' | 'BEATS' | 'DRAFTING' | 'COMPLETED' | 'ARCHIVED';
-  config: { style?: string; platform?: string; genre?: string };
+  config: { style?: string; platform?: string; genre?: string; defaultChapterWordCount?: number };
   createdAt: string;
   updatedAt: string;
 }

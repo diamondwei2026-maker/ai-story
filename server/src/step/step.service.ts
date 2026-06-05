@@ -335,7 +335,7 @@ export class StepService {
 
   async generateBeats(
     projectId: string,
-    opts: { outline?: string; currentContent?: string },
+    opts: { outline?: string; currentContent?: string; defaultWordCount?: number },
   ): Promise<BeatData[]> {
     const project = await this.projectService.findById(projectId);
     if (!project) throw new NotFoundException('Project not found');
@@ -343,16 +343,21 @@ export class StepService {
 
     const outline = opts.outline ?? '';
     const currentContent = opts.currentContent ?? '';
+    const defaultWordCount = opts.defaultWordCount ?? (project.config as any)?.defaultChapterWordCount ?? 3000;
 
     const existingStep = await this.getStepByProjectId(projectId, 'BEATS');
     const step = existingStep ?? (await this.createPendingStep(projectId, 'BEATS'));
 
-    const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', { outline, currentContent });
+    const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', {
+      outline,
+      currentContent,
+      defaultWordCount: String(defaultWordCount),
+    });
 
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.BEATS, prompt);
 
     const existingBeats = await this.getBeatsByProjectId(projectId);
-    const newBeats = this.parseBeatsFromOutput(output, projectId);
+    const newBeats = this.parseBeatsFromOutput(output, projectId, defaultWordCount);
 
     // Merge IDs for beats that match by chapter number
     if (existingBeats.length > 0) {
@@ -815,7 +820,7 @@ export class StepService {
     );
   }
 
-  private parseBeatsFromOutput(output: string, projectId: string): BeatData[] {
+  private parseBeatsFromOutput(output: string, projectId: string, defaultWordCount = 3000): BeatData[] {
     const beats: BeatData[] = [];
     const sections = output.split(/## Chapter \d+:/g).slice(1);
     const headerMatches = output.match(/## Chapter (\d+):/g);
@@ -849,7 +854,7 @@ export class StepService {
         projectId,
         chapterNumber,
         plan,
-        targetWordCount: wordCountMatch ? parseInt(wordCountMatch[1], 10) : 3000,
+        targetWordCount: wordCountMatch ? parseInt(wordCountMatch[1], 10) : defaultWordCount,
         hookCount,
         isClimax: false,
         useR1: false,

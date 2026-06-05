@@ -94,14 +94,17 @@ export class ContextBudgetService {
 
   estimateTokens(text: string): number {
     // CJK-aware heuristic: Chinese ~1.8 chars/token, ASCII ~4 chars/token.
-    // Synchronous path used by calculateBudget / computeBudget / trimToBudget.
-    // IChatModel.getNumTokens() provides the async counterpart for future
-    // real-tokenizer integration.
+    // Uses codePoint comparisons to prevent tsc compilation corruption of CJK literals.
     if (!text) return 0;
     let asciiCount = 0;
     let cjkCount = 0;
     for (const ch of text) {
-      if (/[一-鿿　-〿＀-￯]/.test(ch)) {
+      const cp = ch.codePointAt(0);
+      if (cp !== undefined && (
+        (cp >= 0x4E00 && cp <= 0x9FFF) ||   // CJK Unified Ideographs
+        (cp >= 0x3000 && cp <= 0x303F) ||   // CJK Symbols & Punctuation
+        (cp >= 0xFF00 && cp <= 0xFFEF)       // Halfwidth & Fullwidth Forms
+      )) {
         cjkCount++;
       } else {
         asciiCount++;

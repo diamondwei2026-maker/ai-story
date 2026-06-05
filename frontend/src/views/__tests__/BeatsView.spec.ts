@@ -102,7 +102,7 @@ describe('BeatsView', () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(mockGenerateBeats).toHaveBeenCalledWith('test-project-1', {
-        outline: '大纲内容测试', currentContent: '',
+        outline: '大纲内容测试', currentContent: '', defaultWordCount: 3000,
       });
     });
 

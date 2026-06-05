@@ -26,6 +26,7 @@ export interface Project {
     style?: string;
     platform?: string;
     genre?: string;
+    defaultChapterWordCount?: number;
   };
   pendingFactUpdates?: PendingFactUpdate[];
   statusHistory?: StatusHistoryEntry[];

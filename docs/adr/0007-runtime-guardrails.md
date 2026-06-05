@@ -119,12 +119,13 @@
   失败 → 自动降级到 DeepSeek-R1
   R1 也失败 → 根据 TaskType 决定:
     - 正文生成/改写/润色: 暂停，通知用户"AI 服务暂时不可用，请稍后重试"
+    - BEATS 单章调整/区间优化: 暂停，通知用户"AI 服务暂时不可用，请稍后重试"（用户显式触发生成型操作，不可静默跳过）
     - 合规审核: 暂停，Chapter 保持在 REVIEWING 状态，不自动通过
-    - 指纹/FactSheet 提取: 跳过本次更新，记录到 pendingFactUpdates
+    - 指纹/FactSheet 提取/变更分析: 跳过本次更新，记录到 pendingFactUpdates
 
 调用 DeepSeek-R1 的任务:
   失败 → 自动降级到 DeepSeek-V3
-  V3 也失败 → 同上处理
+  V3 也失败 → 同上处理（按 TaskType 差异化终端）
 ```
 
 - 不循环降级：V3→R1→阻塞，R1→V3→阻塞。终点始终是用户可见的暂停
@@ -144,6 +145,7 @@
 - Project schema 新增 `pendingFactUpdates` 字段
 - Beat schema 新增 `hookCount`, `isClimax`, `useR1` 三个字段
 - BEATS 生成 Prompt 需增加钩子计数输出（结构化 JSON 字段）
+- `BEATS_ADJUST`（单章调整）和 `BEATS_BATCH_ADJUST`（区间优化）为 V3 路由的 BLOCKING 任务——失败时阻塞用户并提示重试，不静默跳过
 - AIGatewayModule 的降级逻辑需重构为单向链
 - 前端新增"模型状态指示器"组件和"AI 不可用"错误 Modal
 - **跨 Phase 回退后的 FactSheet 处理**：当跨 Phase 回退导致章节数变更（如大纲从 30 章变为 40 章）时，旧章节的 ChapterFingerprint 随文档标记 STALE 后不再参与 ChangeAnalysis 匹配；旧 FactSheet 条目保留——它们代表历史有效状态。新章节生成后，FactSheet 增量更新自然覆盖或合并旧条目，不执行批量清理以防误删跨结构仍然有效的事实

@@ -8,6 +8,7 @@
       <template #renderItem="{ item: beat }">
         <a-list-item
           data-testid="beat-row"
+          :class="{ 'beat-row--selected': props.selectedId === beat.id }"
           @click="emit('select', beat)"
         >
           <template #actions>
@@ -35,7 +36,7 @@
 <script setup lang="ts">
 import type { Beat } from '@/stores/useBeatStore';
 
-defineProps<{ beats: Beat[] }>();
+const props = defineProps<{ beats: Beat[]; selectedId?: string }>();
 const emit = defineEmits<{ select: [beat: Beat] }>();
 </script>
 
@@ -60,5 +61,10 @@ const emit = defineEmits<{ select: [beat: Beat] }>();
 .beat-hook-count.hook-high {
   color: var(--color-accent-dark);
   font-weight: 600;
+}
+
+.beat-row--selected {
+  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-left: 3px solid var(--color-primary);
 }
 </style>

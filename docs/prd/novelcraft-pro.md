@@ -25,7 +25,7 @@ NovelCraft Pro 是一个**分步确认式 AI 长篇小说创作系统**。它将
 
 ### Step 1: 灵感提取（Idea）
 
-5. 作为一名作者，我想要输入一个模糊的创意想法（如"一个重生到古代的医生"），AI 分析当前网文市场趋势后给出 3-5 个差异化的核心卖点方案，以便我选择最有商业潜力的方向。若所有方案均不满意，可点击"重新生成"并附带简短反馈（如"太套路了"），AI 基于反馈生成新一轮方案。
+5. 作为一名作者，我想要输入一个模糊的创意想法（如"一个重生到古代的医生"），AI 分析当前网文市场趋势后给出 3 个差异化的核心卖点方案，以便我选择最有商业潜力的方向。若所有方案均不满意，可点击"重新生成"并附带简短反馈（如"太套路了"），AI 基于反馈生成新一轮方案。
 6. 作为一名作者，我想要看到每个卖点方案的"市场匹配度评分"和"类似爆款参考"，以便做出有数据支撑的决策。
 7. 作为一名作者，我想要在选定卖点后 AI 生成该小说的"一句话简介"和"500字简介"，以便后续用于投稿和宣传。
 8. 作为一名作者，我想要看到"资深编辑"对选定灵感的审核意见（含合规风险和商业潜力评级），以便提前规避问题。
@@ -42,7 +42,7 @@ NovelCraft Pro 是一个**分步确认式 AI 长篇小说创作系统**。它将
 
 14. 作为一名作者，我想要 AI 生成符合三幕式结构（或选择网文黄金节奏）的完整剧情大纲，以便把控故事节奏。
 15. 作为一名作者，我想要在大纲中看到每个关键情节节点的"情绪曲线"标注（爽点/虐点/悬念点），以便确保阅读体验起伏。
-16. 作为一名作者，我想要切换大纲格式（三幕式 / 网文十章节奏 / 四幕八段），AI 保留现有大纲中的关键情节点作为种子，按新格式骨架重新组织节点——而非从零重建。切换前系统提示"格式切换将重新组织大纲结构，关键情节点保留但节点间衔接将被重写"，用户确认后执行，以便适配不同平台偏好。
+16. 作为一名作者，我想要切换大纲格式（三幕式 / 网文十段 / 四幕八段），AI 保留现有大纲中的关键情节点作为种子，按新格式骨架重新组织节点——而非从零重建。切换前系统提示"格式切换将重新组织大纲结构，关键情节点保留但节点间衔接将被重写"，用户确认后执行，以便适配不同平台偏好。
 17. 作为一名作者，我想要"资深编辑"审核大纲的节奏是否合理、冲突是否充足、高潮是否足够，以便优化故事张力。
 18. 作为一名作者，我想要通过拖拽调整大纲节点的顺序，AI 自动补全衔接内容，以便灵活调整剧情。
 18a. 作为一名作者，我想要在 BEATS Phase 拖拽调整 Beat 的顺序（交换 chapterNumber），以便在拆解阶段调整章节排列——交换后两个 Beat 均标记 STALE，对应 Chapter（如已生成）标记过时提示。
@@ -146,6 +146,12 @@ NovelCraft Pro 是一个**分步确认式 AI 长篇小说创作系统**。它将
 | AI 框架 | LangChain 薄层 + @langchain/openrouter | 仅用 LangChain 的 ChatModel 抽象（统一调用 OpenRouter）+ PromptTemplate（从 .md 文件加载模板）。不引入 Chain、Memory、Agent 等重概念——AI 调用模式为线性管道，NestJS 模块化 + RxJS 已足够编排 |
 
 ### 模块设计
+
+> **⚠️ 实施注记**（2026-06-05）：此模块设计为 PRD 初版架构蓝图。实际实施中发生了以下关键变更——详见 `CONTEXT.md` 实施状态表：
+> - `WorkflowModule` → `StepModule`（`StepService` 统一编排生成管道，各 Phase 由独立 Controller 处理路由）
+> - `AIGatewayModule` → OpenAI SDK (`openai`) 直连 DeepSeek API，替代 PRD 原设计的 LangChain + OpenRouter（见 ADR-0004 SUPERSEDED）
+> - `ReviewModule` → `ReviewService`（内部服务，无独立 Controller，被 StepService 注入调用）
+> - 模块拆分方案完整记录于 `CONTEXT.md` 实施状态表的各模块行，以下为原始设计供参考。
 
 系统拆分为以下深层模块（Deep Modules）：
 
@@ -386,14 +392,13 @@ PENDING → DRAFT（AI 生成中）→ REVIEWING（审核中）→ COMPLETED（�
 **Phase 内部 Step 状态机**（Project 级别确认流）：
 
 ```
-PENDING → IN_PROGRESS（用户开始输入/触发AI）
-→ AI_GENERATING（AI 返回中）
-→ AWAITING_REVIEW（AI 完成，等待审核）
-→ REVIEWING（审核中）
-→ CONFIRMED（用户确认）或 REJECTED（用户驳回，回到 PENDING）
+PENDING → AI_GENERATING（AI 返回中）→ AWAITING_REVIEW（AI 完成，等待用户确认）
+→ CONFIRMED（用户确认）或 REJECTED（用户驳回→后台 generate 接口自动重置为 PENDING，重新进入 AI_GENERATING）
 ```
 
-所有 Phase 均支持 SSE 流式输出。
+- `IN_PROGRESS` 和 `REVIEWING` 为 Prisma 枚举保留值，未在 Step 实际状态流中使用
+- 前端派生合并 `AI_GENERATING` + `AWAITING_REVIEW` 为前端展示用 `IN_PROGRESS`
+- 所有 Phase 均支持 SSE 流式输出
 
 **DRAFTING → COMPLETED 显式确认**：
 
@@ -432,8 +437,10 @@ AI 调用类型与模型分配通过代码中的 `TaskType → ModelName` 集中
 | 合规审核（独立） | DeepSeek-V3 | DRAFTING 每章强制执行，结构化输出稳定，批量审核成本可控 |
 | 指纹/FactSheet 提取 | DeepSeek-V3 | 极高频率，轻量结构化任务 |
 | ChangeFingerprint + ImpactPropagation（变更分析） | DeepSeek-V3 | 轻量匹配任务，与指纹提取同类 |
+| BEATS 单章调整（Adjust） | DeepSeek-V3 | 局部单 Beat 重新生成，最小区间上下文，成本敏感 |
+| BEATS 区间优化（Batch Adjust） | DeepSeek-V3 | 批量协调调整冲突强度和期待值，与单章调整同级 |
 
-OpenRouter 保留用于未来跨供应商灵活性，当前仅路由到 DeepSeek。
+> **实施注记**（2026-06-05）：当前 AI 调用已改为 OpenAI SDK (`openai`) 直连 DeepSeek API（`api.deepseek.com`），非 PRD 原设计的 OpenRouter。`IChatModel` 接口抽象保留供未来供应商切换。见 ADR-0004 Implementation Note。
 
 ### 关键章节双重判定标准（ADR-0007）
 
