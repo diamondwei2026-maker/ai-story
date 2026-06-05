@@ -500,8 +500,10 @@ export class StepService {
       createDataList.push(createData);
       beatIndexMap.set(i, beat);
     }
-    // Create in parallel batches of 10 for MongoDB compatibility
-    const BATCH_SIZE = 10;
+    // Create in parallel batches.
+    // Batch size: MongoDB handles 50+ documents per batch without issue.
+    // Individual create() is used (over createMany) to capture assigned IDs.
+    const BATCH_SIZE = 50;
     const createdIds: Map<number, string> = new Map();
     for (let i = 0; i < createDataList.length; i += BATCH_SIZE) {
       const batch = createDataList.slice(i, i + BATCH_SIZE);
@@ -598,9 +600,10 @@ export class StepService {
       data: { targetWordCount: wordCount, status: 'STALE' },
     });
 
-    // Also update the chapter if it exists
-    const chapters = await this.getChaptersByProjectId(beat.projectId);
-    const chapter = chapters.find((c) => c.chapterNumber === beat.chapterNumber);
+    // Also update the chapter if it exists (direct query, no N+1 scan)
+    const chapter = await this.prisma.chapter.findFirst({
+      where: { projectId: beat.projectId, chapterNumber: beat.chapterNumber },
+    });
     if (chapter) {
       await this.prisma.chapter.update({
         where: { id: chapter.id },
@@ -632,8 +635,9 @@ export class StepService {
       },
     });
 
-    const chapter = (await this.getChaptersByProjectId(beat.projectId))
-      .find((c) => c.chapterNumber === beat.chapterNumber);
+    const chapter = await this.prisma.chapter.findFirst({
+      where: { projectId: beat.projectId, chapterNumber: beat.chapterNumber },
+    });
     if (chapter) {
       await this.prisma.chapter.update({
         where: { id: chapter.id },
@@ -719,9 +723,10 @@ export class StepService {
       },
     });
 
-    // Sync chapter beatPlan if exists
-    const chapters = await this.getChaptersByProjectId(projectId);
-    const chapter = chapters.find((c) => c.chapterNumber === beat.chapterNumber);
+    // Sync chapter beatPlan if exists (direct query, no N+1 scan)
+    const chapter = await this.prisma.chapter.findFirst({
+      where: { projectId: beat.projectId, chapterNumber: beat.chapterNumber },
+    });
     if (chapter) {
       await this.prisma.chapter.update({
         where: { id: chapter.id },
@@ -805,9 +810,10 @@ export class StepService {
         },
       });
 
-      // Sync chapter beatPlan
-      const chapters = await this.getChaptersByProjectId(projectId);
-      const chapter = chapters.find((c) => c.chapterNumber === newBeat.chapterNumber);
+      // Sync chapter beatPlan (direct query, no N+1 scan)
+      const chapter = await this.prisma.chapter.findFirst({
+        where: { projectId, chapterNumber: newBeat.chapterNumber },
+      });
       if (chapter) {
         await this.prisma.chapter.update({
           where: { id: chapter.id },

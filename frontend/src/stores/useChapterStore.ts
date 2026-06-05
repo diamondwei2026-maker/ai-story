@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { createStorePersistence } from './persist';
 import { sortByChapter } from './sort';
+import * as chapterApi from '@/api/chapter';
 
 export interface Chapter {
   id: string;
@@ -84,6 +85,21 @@ export const useChapterStore = defineStore('chapterStore', () => {
     storePersist.save({ chapters: chapters.value });
   }
 
+  async function loadChapters(projectId: string): Promise<void> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const list = await chapterApi.getChapters(projectId);
+      chapters.value = sortByChapter(list);
+      rebuildIndex();
+      storePersist.save({ chapters: chapters.value });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '加载失败';
+    } finally {
+      loading.value = false;
+    }
+  }
+
   function updateChapterContent(chapterId: string, token: string) {
     const chapter = chapterIndex.value.get(chapterId);
     if (!chapter) return;
@@ -113,6 +129,7 @@ export const useChapterStore = defineStore('chapterStore', () => {
     error,
     generationMode,
     setChapters,
+    loadChapters,
     updateChapterContent,
     updateChapterStatus,
     setGenerationMode,

@@ -12,6 +12,10 @@ export interface AdjustmentState {
 }
 
 /**
+ * @deprecated The server returns impact data in adjustBeat/batchAdjustBeats API responses.
+ * Use the response.impact field instead of re-computing on the client.
+ * This duplicate is kept only for existing tests; prefer server-authoritative impact data.
+ *
  * Pure structural impact detection — zero AI calls.
  * Compares old vs new hookCausalChain to find affected chapters.
  */

@@ -3,14 +3,14 @@
     <h2 data-testid="drafting-title" class="section-title">正文迭代</h2>
 
     <!-- Loading -->
-    <div v-if="loading" data-testid="drafting-loading" class="drafting-loading">
+    <div v-if="chapterStore.loading" data-testid="drafting-loading" class="drafting-loading">
       <a-spin tip="加载章节列表..." />
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" data-testid="drafting-error" class="drafting-error">
-      <a-alert type="error" :message="error" show-icon />
-      <a-button class="drafting-error__retry" @click="fetchChapters">重试</a-button>
+    <div v-else-if="chapterStore.error" data-testid="drafting-error" class="drafting-error">
+      <a-alert type="error" :message="chapterStore.error" show-icon />
+      <a-button class="drafting-error__retry" @click="chapterStore.loadChapters(projectId)">重试</a-button>
     </div>
 
     <!-- Empty state -->
@@ -78,9 +78,9 @@
           </span>
           <a-tag
             data-testid="chapter-status-badge"
-            :color="statusTagColor(chapter.status)"
+            :color="chapterStatusColor(chapter.status)"
           >
-            {{ statusLabel(chapter.status) }}
+            {{ chapterStatusLabel(chapter.status) }}
           </a-tag>
         </div>
 
@@ -151,14 +151,15 @@ import * as projectApi from "@/api/project";
 import * as beatsApi from "@/api/beats";
 import type { BeatDataResponse } from "@/api/beats";
 import type { Chapter } from "@/stores/useChapterStore";
+import { useChapterStore } from "@/stores/useChapterStore";
 import CompletionBanner from "@/components/CompletionBanner.vue";
 import EditorWorkspace from "@/components/EditorWorkspace.vue";
 import type { GenerationMode } from "@/stores/useChapterStore";
 import {
-  CHAPTER_STATUS_LABEL,
-  CHAPTER_STATUS_COLOR,
   TERMINAL_CHAPTER_STATUSES,
   ACTIVE_CHAPTER_STATUSES,
+  chapterStatusLabel,
+  chapterStatusColor,
 } from "@/types";
 
 // ─── Props ──────────────────────────────────────────────────────────
@@ -167,12 +168,13 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-// ─── State ──────────────────────────────────────────────────────────
+// ─── Store ──────────────────────────────────────────────────────────
 
-const chapters = ref<Chapter[]>([]);
+const chapterStore = useChapterStore();
+
+// ─── Local state ────────────────────────────────────────────────────
+
 const beats = ref<BeatDataResponse[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
 const selectedChapterId = ref<string | null>(null);
 const isGenerating = ref(false);
 const isPaused = ref(false);
@@ -181,12 +183,12 @@ const generationMode = ref<GenerationMode>("new-continue");
 // ─── Derived ────────────────────────────────────────────────────────
 
 const sortedChapters = computed(() =>
-  [...chapters.value].sort((a, b) => a.chapterNumber - b.chapterNumber)
+  [...chapterStore.chapters].sort((a, b) => a.chapterNumber - b.chapterNumber)
 );
 
 const selectedChapter = computed(() => {
   if (!selectedChapterId.value) return null;
-  return chapters.value.find((c) => c.id === selectedChapterId.value) ?? null;
+  return chapterStore.chapters.find((c) => c.id === selectedChapterId.value) ?? null;
 });
 
 const totalWordCount = computed(() =>
@@ -219,28 +221,15 @@ function wordCount(content: string | null): number {
   return content.replace(/\s/g, "").length;
 }
 
-function statusLabel(status: string): string {
-  return CHAPTER_STATUS_LABEL[status] ?? status;
-}
-
-function statusTagColor(status: string): string {
-  return CHAPTER_STATUS_COLOR[status] ?? "default";
-}
-
 function showGenerateButton(chapter: Chapter): boolean {
   return !TERMINAL_CHAPTER_STATUSES.has(chapter.status);
 }
 
 function canGenerate(chapter: Chapter): boolean {
   if (ACTIVE_CHAPTER_STATUSES.has(chapter.status)) return false;
-
-  // First chapter is always available
   if (chapter.chapterNumber === 1) return true;
-
-  // Sequential lock: previous chapter must be in terminal state
   const idx = sortedChapters.value.findIndex((c) => c.id === chapter.id);
   if (idx <= 0) return false;
-
   return TERMINAL_CHAPTER_STATUSES.has(sortedChapters.value[idx - 1].status);
 }
 
@@ -270,12 +259,12 @@ async function handlePause(chapterId: string) {
   try {
     await chapterApi.pauseChapter(props.projectId, chapterId);
   } catch (e: any) {
-    error.value = e.message || "暂停失败";
+    chapterStore.error = e.message || "暂停失败";
   }
 }
 
 async function handleContinue(chapterId: string) {
-  const chapter = chapters.value.find((c) => c.id === chapterId);
+  const chapter = chapterStore.chapters.find((c) => c.id === chapterId);
   try {
     isPaused.value = false;
     isGenerating.value = true;
@@ -283,10 +272,10 @@ async function handleContinue(chapterId: string) {
       currentContent: chapter?.content ?? "",
     });
     isGenerating.value = false;
-    await fetchChapters();
+    await chapterStore.loadChapters(props.projectId);
   } catch (e: any) {
     isGenerating.value = false;
-    error.value = e.message || "继续生成失败";
+    chapterStore.error = e.message || "继续生成失败";
   }
 }
 
@@ -298,50 +287,38 @@ async function handleRetry(chapterId: string, feedback: string) {
       feedback: feedback || undefined,
     });
     isGenerating.value = false;
-    await fetchChapters();
+    await chapterStore.loadChapters(props.projectId);
   } catch (e: any) {
     isGenerating.value = false;
-    error.value = e.message || "重试失败";
+    chapterStore.error = e.message || "重试失败";
   }
 }
 
 async function handleConfirm(chapterId: string) {
   try {
     await chapterApi.confirmChapter(props.projectId, chapterId);
-    await fetchChapters();
+    chapterStore.updateChapterStatus(chapterId, 'COMPLETED');
   } catch (e: any) {
-    error.value = e.message || "确认失败";
+    chapterStore.error = e.message || "确认失败";
   }
 }
 
 async function handleDispute(chapterId: string) {
   try {
     await chapterApi.disputeChapter(props.projectId, chapterId);
-    await fetchChapters();
+    chapterStore.updateChapterStatus(chapterId, 'DISPUTED');
   } catch (e: any) {
-    error.value = e.message || "争议标记失败";
+    chapterStore.error = e.message || "争议标记失败";
   }
 }
 
 // ─── Actions ────────────────────────────────────────────────────────
 
-async function fetchChapters() {
-  loading.value = true;
-  error.value = null;
-  try {
-    chapters.value = await chapterApi.getChapters(props.projectId);
-  } catch (e: any) {
-    error.value = e.message || "加载失败";
-  } finally {
-    loading.value = false;
-  }
-}
-
 async function fetchBeats() {
   try {
     beats.value = await beatsApi.getBeats(props.projectId);
   } catch {
-    // silently ignore — beat info is supplementary, not critical
+    // silently ignore — beat info is supplementary
   }
 }
 
@@ -350,25 +327,25 @@ async function handleGenerate(chapter: Chapter) {
     await chapterApi.generateChapter(props.projectId, chapter.id, {
       mode: "new-continue",
     });
-    await fetchChapters();
+    await chapterStore.loadChapters(props.projectId);
   } catch (e: any) {
-    error.value = e.message || "生成失败";
+    chapterStore.error = e.message || "生成失败";
   }
 }
 
 async function handleConfirmCompletion(payload: { action: string }) {
   try {
     await projectApi.confirmCompletion(props.projectId, { action: payload.action });
-    await fetchChapters();
+    await chapterStore.loadChapters(props.projectId);
   } catch (e: any) {
-    error.value = e.message || "完本操作失败";
+    chapterStore.error = e.message || "完本操作失败";
   }
 }
 
 // ─── Lifecycle ──────────────────────────────────────────────────────
 
 onMounted(() => {
-  fetchChapters();
+  chapterStore.loadChapters(props.projectId);
   fetchBeats();
 });
 </script>

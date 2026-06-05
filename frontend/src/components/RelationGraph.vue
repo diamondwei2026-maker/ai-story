@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { parseSections } from '@/composables/useContentParser';
+import { parseSections } from '@/utils/contentParser';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 const props = defineProps<{

@@ -821,15 +821,16 @@ describe("DraftingView", () => {
       expect(mockDisputeChapter).toHaveBeenCalledWith("proj-1", "ch-1");
     });
 
-    it("refetches chapters after confirm event", async () => {
+    it("confirms via optimistic store update (no re-fetch)", async () => {
       mockGetChapters.mockResolvedValue(threeChapters);
       mockConfirmChapter.mockResolvedValue({});
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      // Clear previous calls
+      // Clear previous calls after initial load
       mockGetChapters.mockClear();
+      mockConfirmChapter.mockClear();
 
       const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
       await chapters[0].trigger("click");
@@ -839,8 +840,10 @@ describe("DraftingView", () => {
       await workspace.vm.$emit("confirm");
       await wrapper.vm.$nextTick();
 
-      // Should refetch after confirm
-      expect(mockGetChapters).toHaveBeenCalledWith("proj-1");
+      // Should call confirmChapter API (not re-fetch all chapters)
+      expect(mockConfirmChapter).toHaveBeenCalledWith("proj-1", "ch-1");
+      // Optimistic store update: should NOT trigger a full re-fetch
+      // (the store updateChapterStatus handles the local state)
     });
 
     it("does not open EditorWorkspace when no chapters exist", async () => {

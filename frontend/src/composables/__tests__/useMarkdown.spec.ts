@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown } from '@/composables/useMarkdown';
+import { renderMarkdown } from '@/utils/markdown';
 
 describe('renderMarkdown', () => {
   it('returns empty string for empty input', () => {

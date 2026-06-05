@@ -1,8 +1,3 @@
-/**
- * @deprecated Import from '@/utils/contentParser' instead.
- * This file is kept for backward compatibility and will be removed in a future release.
- */
-
 /** Strip markdown inline formatting that AI may add to headers. */
 function normalizeHeader(raw: string): string {
   return raw

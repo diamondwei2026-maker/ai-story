@@ -16,9 +16,9 @@
         </span>
         <a-tag
           data-testid="workspace-status-badge"
-          :color="statusTagColor(chapterStatus)"
+          :color="chapterStatusColor(chapterStatus)"
         >
-          {{ statusLabel(chapterStatus) }}
+          {{ chapterStatusLabel(chapterStatus) }}
         </a-tag>
         <span class="editor-workspace__word-count">
           目标字数：{{ targetWordCount }}
@@ -96,6 +96,8 @@ import {
   CHAPTER_STATUS_LABEL,
   CHAPTER_STATUS_COLOR,
   TERMINAL_CHAPTER_STATUSES,
+  chapterStatusLabel,
+  chapterStatusColor,
 } from '@/types';
 import ModeSwitcher from '@/components/ModeSwitcher.vue';
 import StreamingEditor from '@/components/StreamingEditor.vue';
@@ -141,14 +143,6 @@ const isEditable = computed(() => {
 const showRetryFeedback = computed(() => {
   return !props.isGenerating && !TERMINAL_CHAPTER_STATUSES.has(props.chapterStatus);
 });
-
-function statusLabel(status: string): string {
-  return CHAPTER_STATUS_LABEL[status] ?? status;
-}
-
-function statusTagColor(status: string): string {
-  return CHAPTER_STATUS_COLOR[status] ?? 'default';
-}
 
 function openAppealModal() {
   showAppealModal.value = true;

@@ -1,7 +1,4 @@
 /**
- * @deprecated Import from '@/utils/markdown' instead.
- * This file is kept for backward compatibility and will be removed in a future release.
- *
  * Lightweight Markdown → HTML renderer.
  *
  * Handles the subset of Markdown that AI prompt templates are designed to produce:

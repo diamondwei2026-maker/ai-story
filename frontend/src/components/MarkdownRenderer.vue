@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { renderMarkdown } from '@/composables/useMarkdown';
+import { renderMarkdown } from '@/utils/markdown';
 
 const props = withDefaults(defineProps<{
   content?: string;

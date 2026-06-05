@@ -212,29 +212,37 @@ const {
 
 async function handleAdjustBeat(beatId: string, feedback: string) {
   await doAdjustBeat(beatId, feedback);
-  // Refresh beats data
-  const updated = await getBeats(props.projectId);
-  if (updated) { beatsData.value = updated; beatStore.setBeats(updated); }
+  // Incremental patch from store — avoid redundant API call
+  if (beatsData.value) {
+    beatsData.value = beatStore.beats.map(b => ({ ...b, status: b.status }));
+  }
 }
 
 async function handleBatchOptimize(startChapter: number, endChapter: number, description: string) {
   await doBatchAdjust(startChapter, endChapter, description);
-  const updated = await getBeats(props.projectId);
-  if (updated) { beatsData.value = updated; beatStore.setBeats(updated); }
+  if (beatsData.value) {
+    beatsData.value = beatStore.beats.map(b => ({ ...b, status: b.status }));
+  }
 }
 
 async function handleSaveWordCount(beatId: string, wordCount: number) {
   await doWordCountUpdate(beatId, wordCount);
-  const updated = await getBeats(props.projectId);
-  if (updated) { beatsData.value = updated; beatStore.setBeats(updated); }
+  if (!beatsData.value) return;
+  const idx = beatsData.value.findIndex(b => b.id === beatId);
+  if (idx >= 0) {
+    beatsData.value[idx] = { ...beatsData.value[idx], targetWordCount: wordCount, status: 'STALE' as Beat['status'] };
+  }
 }
 
 async function handleToggleClimax(beatId: string, isClimax: boolean) {
   const beat = beats.value.find(b => b.id === beatId);
   if (!beat) return;
   await doStructureUpdate(beatId, { ...beat.plan, isClimax });
-  const updated = await getBeats(props.projectId);
-  if (updated) { beatsData.value = updated; beatStore.setBeats(updated); }
+  if (!beatsData.value) return;
+  const idx = beatsData.value.findIndex(b => b.id === beatId);
+  if (idx >= 0) {
+    beatsData.value[idx] = { ...beatsData.value[idx], plan: { ...beatsData.value[idx].plan, isClimax }, isClimax, status: 'STALE' as Beat['status'] };
+  }
 }
 
 // Confirm/Reject wrappers

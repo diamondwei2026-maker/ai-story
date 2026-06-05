@@ -6,6 +6,7 @@ import { BeatsController, BeatModificationController } from './beats.controller'
 import { ChapterController } from './chapter.controller';
 import { FactsheetController } from './factsheet.controller';
 import { StepService } from './step.service';
+import { StepCoreService } from './services/step-core.service';
 import { ChangeAnalysisService } from './change-analysis.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { FactsheetService } from './factsheet.service';
@@ -28,6 +29,7 @@ import { STEP_DATA_ACCESS } from '../ai-gateway/context-budget.service';
   ],
   providers: [
     StepService,
+    StepCoreService,
     ChangeAnalysisService,
     FactsheetCompensationService,
     FactsheetService,
@@ -35,6 +37,6 @@ import { STEP_DATA_ACCESS } from '../ai-gateway/context-budget.service';
     StepDataAccessAdapter,
     { provide: STEP_DATA_ACCESS, useExisting: StepDataAccessAdapter },
   ],
-  exports: [StepService, ChangeAnalysisService, FactsheetCompensationService],
+  exports: [StepService, StepCoreService, ChangeAnalysisService, FactsheetCompensationService],
 })
 export class StepModule {}
