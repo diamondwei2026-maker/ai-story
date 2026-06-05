@@ -5,7 +5,7 @@
 //   import { ... } from './step.entity/review.entity'
 
 export type { PhaseType, StepStatus, StepData, AiMeta } from './entities/step.types';
-export type { BeatStatus, BeatData } from './entities/beat.types';
+export type { BeatStatus, BeatData, HookCausalLink, ImpactResult } from './entities/beat.types';
 export type { TargetedFixEntry, ChapterData } from './entities/chapter.types';
 export type {
   ReviewVerdict,

@@ -3,6 +3,11 @@ import { ref, computed } from 'vue';
 import { createStorePersistence } from './persist';
 import { sortByChapter } from './sort';
 
+export interface HookCausalLink {
+  hook: string;
+  resolvesInChapter: number | null;
+}
+
 export interface Beat {
   id: string;
   projectId: string;
@@ -13,6 +18,12 @@ export interface Beat {
   isClimax: boolean;
   useR1: boolean;
   status: 'PENDING' | 'STALE' | 'CONFIRMED';
+  narrativeSummary: string;
+  conflictDescription: string;
+  pacingLabel: string;
+  hookCausalChain: HookCausalLink[];
+  conflictIntensity: number;
+  readerExpectation: number;
   createdAt: string;
   updatedAt: string;
 }

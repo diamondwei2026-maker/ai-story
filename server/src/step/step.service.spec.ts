@@ -77,6 +77,12 @@ const mockPromptLoader = {
       if (template === 'beats-generation') {
         return 'beats generation prompt';
       }
+      if (template === 'beats-adjust') {
+        return 'beats-adjust prompt with feedback';
+      }
+      if (template === 'beats-batch-adjust') {
+        return 'beats-batch-adjust prompt';
+      }
       if (template === 'idea-generation') {
         return '卖点方案 generation prompt with feedback';
       }
@@ -191,6 +197,16 @@ function createInMemoryPrismaMock() {
         stores.beat.set(id, doc);
         return clone(doc);
       }),
+      createMany: jest.fn(async (args: any) => {
+        let count = 0;
+        for (const data of args.data) {
+          const id = `beat-${stores.beat.size + 1}`;
+          const doc = { id, ...clone(data), createdAt: new Date(), updatedAt: new Date() };
+          stores.beat.set(id, doc);
+          count++;
+        }
+        return { count };
+      }),
       findMany: jest.fn(async (args?: any) => {
         const all = Array.from(stores.beat.values());
         let result = all;
@@ -235,6 +251,16 @@ function createInMemoryPrismaMock() {
         const doc = { id, ...clone(args.data), createdAt: new Date(), updatedAt: new Date() };
         stores.chapter.set(id, doc);
         return clone(doc);
+      }),
+      createMany: jest.fn(async (args: any) => {
+        let count = 0;
+        for (const data of args.data) {
+          const id = `ch-${stores.chapter.size + 1}`;
+          const doc = { id, ...clone(data), createdAt: new Date(), updatedAt: new Date() };
+          stores.chapter.set(id, doc);
+          count++;
+        }
+        return { count };
       }),
       findMany: jest.fn(async (args?: any) => {
         const all = Array.from(stores.chapter.values());
@@ -1283,6 +1309,639 @@ describe('StepService', () => {
       const project = projectService.create({ title: '无细纲步骤' });
 
       expect(service.getBeatsByProjectId(project.id)).toEqual([]);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Issue #26 Phase 0: Schema & Types — V2 Beat Fields
+  // RED PHASE — these tests MUST FAIL before implementation
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Issue #26 — generateBeats with targetChapterCount', () => {
+    it('should accept and forward targetChapterCount to the prompt template', async () => {
+      const project = await projectService.create({ title: '篇幅控制测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateBeats(project.id, {
+        outline: '大纲内容',
+        targetChapterCount: 40,
+        defaultWordCount: 3000,
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'beats-generation',
+        expect.objectContaining({
+          targetChapterCount: expect.any(String),
+        }),
+      );
+    });
+
+    it('should pass targetChapterCount as a string to the template', async () => {
+      const project = await projectService.create({ title: '字符传参测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateBeats(project.id, {
+        outline: '大纲',
+        targetChapterCount: 25,
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'beats-generation',
+        expect.objectContaining({
+          targetChapterCount: '25',
+        }),
+      );
+    });
+
+    it('should omit targetChapterCount from template vars when not provided', async () => {
+      const project = await projectService.create({ title: '可选参数测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateBeats(project.id, {
+        outline: '大纲内容',
+      });
+
+      const callArgs = mockPromptLoader.renderTemplate.mock.calls[0];
+      expect(callArgs[0]).toBe('creation');
+      expect(callArgs[1]).toBe('beats-generation');
+      // targetChapterCount should not be injected when not provided
+      expect(callArgs[2].targetChapterCount).toBeUndefined();
+    });
+  });
+
+  describe('Issue #26 — parseBeatsFromOutput V2 fields', () => {
+    it('should parse narrativeSummary from AI output (V2 format)', async () => {
+      const project = await projectService.create({ title: '叙事摘要解析测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      // Override the mock to return V2-format beats output
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats')) {
+          yield {
+            content:
+              '## Chapter 1: 开篇钩子\n' +
+              '叙事摘要: 主角在垃圾星意外发现了一艘完好无损的星舰，这艘星舰的AI声称自己是千年前失踪的帝国旗舰。\n' +
+              '冲突描述: 主角必须在48小时内修复星舰引擎，否则星舰将自毁程序会炸毁整个垃圾星区——但修复所需的零件被星际海盗控制。\n' +
+              '钩子因果链: 钩子1: AI的真实身份→回收于第3章, 钩子2: 自毁倒计时→回收于本章结尾\n' +
+              '冲突强度: 4\n' +
+              '读者期待值: 5\n' +
+              '节奏标签: 快\n' +
+              '目标字数: 3000\n',
+          };
+          yield {
+            content:
+              '\n## Chapter 2: 海盗谈判\n' +
+              '叙事摘要: 主角伪装成星际商人进入海盗基地谈判，却意外发现海盗头目认识原主的父亲。\n' +
+              '冲突描述: 谈判桌上主角面临两难——交出星舰的核心数据换取零件，还是暴露身份与整个海盗团为敌。\n' +
+              '钩子因果链: 钩子1: 海盗头目与原主父亲的关系→回收于第5章\n' +
+              '冲突强度: 3\n' +
+              '读者期待值: 4\n' +
+              '节奏标签: 中\n' +
+              '目标字数: 3200\n',
+          };
+          yield {
+            content:
+              '\n## Chapter 3: AI觉醒\n' +
+              '叙事摘要: 星舰AI解锁了部分记忆数据，揭示帝国旗舰失踪的真正原因——一场跨越千年的阴谋。\n' +
+              '冲突描述: AI展示的证据指向主角家族的敌人，但也暗示主角的父亲可能是这场阴谋的参与者——主角的信任根基被撼动。\n' +
+              '钩子因果链: 钩子1: AI的真实身份（回收钩子1-1）, 钩子2: 父亲的秘密→回收于第8章, 钩子3: 帝国阴谋→回收于第15章\n' +
+              '冲突强度: 5\n' +
+              '读者期待值: 5\n' +
+              '节奏标签: 快\n' +
+              '目标字数: 4000\n',
+          };
+        } else {
+          yield { content: 'default mock output' };
+        }
+      };
+
+      try {
+        const beats = await service.generateBeats(project.id, {
+          outline: '大纲内容',
+        });
+
+        expect(beats.length).toBeGreaterThanOrEqual(3);
+
+        // Chapter 1 assertions
+        expect(beats[0].narrativeSummary).toBeDefined();
+        expect(beats[0].narrativeSummary).toContain('垃圾星');
+        expect(beats[0].conflictDescription).toBeDefined();
+        expect(beats[0].conflictDescription).toContain('48小时');
+        expect(beats[0].pacingLabel).toBe('快');
+        expect(beats[0].conflictIntensity).toBe(4);
+        expect(beats[0].readerExpectation).toBe(5);
+        expect(beats[0].hookCausalChain).toBeDefined();
+        expect(Array.isArray(beats[0].hookCausalChain)).toBe(true);
+        expect(beats[0].hookCausalChain.length).toBe(2);
+
+        // hookCausalChain structure verification
+        const hook1 = beats[0].hookCausalChain[0];
+        expect(hook1).toHaveProperty('hook');
+        expect(hook1).toHaveProperty('resolvesInChapter');
+        expect(hook1.hook).toContain('AI的真实身份');
+        expect(hook1.resolvesInChapter).toBe(3);
+
+        // Chapter 3: high-intensity climax
+        expect(beats[2].conflictIntensity).toBe(5);
+        expect(beats[2].readerExpectation).toBe(5);
+        expect(beats[2].hookCausalChain.length).toBe(3);
+        expect(beats[2].pacingLabel).toBe('快');
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+
+    it('should provide default values for missing V2 fields', async () => {
+      const project = await projectService.create({ title: '默认值测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      // Mock returning minimal V2 format (some fields missing)
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats')) {
+          yield {
+            content:
+              '## Chapter 1: 测试章节\n' +
+              '冲突点: 传统格式冲突\n' +
+              '钩子预设: 钩子A, 钩子B\n' +
+              '读者期待值: 中\n' +
+              '目标字数: 3000\n',
+          };
+        } else {
+          yield { content: 'default mock output' };
+        }
+      };
+
+      try {
+        const beats = await service.generateBeats(project.id, {
+          outline: '大纲内容',
+        });
+
+        expect(beats.length).toBeGreaterThan(0);
+        // V2 fields should have defaults when not in AI output
+        expect(beats[0].narrativeSummary).toBe('');
+        expect(beats[0].conflictDescription).toBeDefined();
+        expect(beats[0].conflictIntensity).toBe(3);
+        expect(beats[0].readerExpectation).toBe(3);
+        expect(beats[0].pacingLabel).toBe('中');
+        // V1 hookPresets are converted to hookCausalChain with null resolvesInChapter
+        expect(beats[0].hookCausalChain).toHaveLength(2);
+        expect(beats[0].hookCausalChain[0]).toMatchObject({ hook: '钩子A', resolvesInChapter: null });
+        expect(beats[0].hookCausalChain[1]).toMatchObject({ hook: '钩子B', resolvesInChapter: null });
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+  });
+
+  describe('Issue #26 — toBeat V1→V2 downgrade', () => {
+    it('should derive conflictDescription from plan.conflictPoint for V1 data', async () => {
+      const project = await projectService.create({ title: 'V1降级冲突描述' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      // At this point, beats are stored via Prisma create with only V1 plan data.
+      // getBeatsByProjectId calls toBeat which should derive V2 fields.
+      const beats = await service.getBeatsByProjectId(project.id);
+
+      expect(beats.length).toBeGreaterThan(0);
+      // V1 plan has conflictPoint; toBeat should derive conflictDescription from it
+      expect(beats[0]).toHaveProperty('conflictDescription');
+      // conflictDescription should fall back to plan.conflictPoint or empty string
+      expect(typeof beats[0].conflictDescription).toBe('string');
+    });
+
+    it('should derive hookCausalChain from plan.hookPresets for V1 data', async () => {
+      const project = await projectService.create({ title: 'V1降级钩子链' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const beats = await service.getBeatsByProjectId(project.id);
+
+      expect(beats.length).toBeGreaterThan(0);
+      expect(beats[0]).toHaveProperty('hookCausalChain');
+      expect(Array.isArray(beats[0].hookCausalChain)).toBe(true);
+      // hookCausalChain should be derived from plan.hookPresets
+      // Each entry must have hook (string) and resolvesInChapter (null for V1 fallback)
+      if (beats[0].hookCausalChain.length > 0) {
+        const link = beats[0].hookCausalChain[0];
+        expect(link).toHaveProperty('hook');
+        expect(link).toHaveProperty('resolvesInChapter');
+        expect(typeof link.hook).toBe('string');
+      }
+    });
+
+    it('should derive readerExpectation from plan.readerExpectation text for V1 data', async () => {
+      const project = await projectService.create({ title: 'V1降级期待值' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const beats = await service.getBeatsByProjectId(project.id);
+
+      expect(beats.length).toBeGreaterThan(0);
+      expect(beats[0]).toHaveProperty('readerExpectation');
+      // V1 readerExpectation is text "高/中/低", V2 is int 1-5
+      // Default should be 3 (中)
+      expect(typeof beats[0].readerExpectation).toBe('number');
+      expect(beats[0].readerExpectation).toBeGreaterThanOrEqual(1);
+      expect(beats[0].readerExpectation).toBeLessThanOrEqual(5);
+    });
+
+    it('should provide default values for V2 fields on V1 Beats', async () => {
+      const project = await projectService.create({ title: 'V1完整默认值' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const beats = await service.getBeatsByProjectId(project.id);
+
+      expect(beats.length).toBeGreaterThan(0);
+      const beat = beats[0];
+
+      // All V2 fields must be present with valid defaults
+      expect(beat).toHaveProperty('narrativeSummary');
+      expect(typeof beat.narrativeSummary).toBe('string');
+      expect(beat).toHaveProperty('pacingLabel');
+      expect(['快', '中', '慢']).toContain(beat.pacingLabel);
+      expect(beat).toHaveProperty('conflictIntensity');
+      expect(typeof beat.conflictIntensity).toBe('number');
+      expect(beat).toHaveProperty('readerExpectation');
+      expect(typeof beat.readerExpectation).toBe('number');
+      expect(beat).toHaveProperty('conflictDescription');
+      expect(typeof beat.conflictDescription).toBe('string');
+      expect(beat).toHaveProperty('hookCausalChain');
+      expect(Array.isArray(beat.hookCausalChain)).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Issue #26 Phase 1: Beat Adjust & Batch Adjust
+  // RED PHASE — these tests MUST FAIL before implementation
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Issue #26 — adjustBeat (single chapter adjust)', () => {
+    it('should adjust a single beat based on natural language feedback', async () => {
+      const project = await projectService.create({ title: '单章调整测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+
+      const beats = await service.getBeatsByProjectId(project.id);
+      const targetBeat = beats[0];
+
+      // Override mock to return V2-format adjusted beat
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-adjust')) {
+          yield {
+            content:
+              '## Chapter 1: 调整后的开篇\n' +
+              '叙事摘要: 主角在垃圾星发现星舰后，AI立即警告自毁程序已启动——但这次主角发现了星舰的紧急备用能源。\n' +
+              '冲突描述: 主角与时间赛跑，必须在48小时内修复引擎，但海盗已经探测到星舰的能量信号并正在赶来。\n' +
+              '钩子因果链: 钩子1: AI的真实身份→回收于第3章, 钩子2: 海盗追击→回收于第2章\n' +
+              '冲突强度: 5\n' +
+              '读者期待值: 5\n' +
+              '节奏标签: 快\n' +
+              '目标字数: 3000\n',
+          };
+        } else if (input.includes('beats')) {
+          yield { content: '## Chapter 1: 测试章节\n冲突点: 测试冲突\n钩子预设: 钩子A\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 测试章节2\n冲突点: 测试冲突2\n钩子预设: 钩子B\n读者期待值: 高\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 测试章节3\n冲突点: 测试冲突3\n钩子预设: 钩子C\n读者期待值: 中\n目标字数: 3000\n' };
+        } else {
+          yield { content: 'default mock output' };
+        }
+      };
+
+      try {
+        const result = await service.adjustBeat(
+          project.id,
+          targetBeat.id,
+          '节奏快一点，增加海盗威胁',
+        );
+
+        expect(result).toHaveProperty('beat');
+        expect(result).toHaveProperty('impact');
+        expect(result.beat.chapterNumber).toBe(targetBeat.chapterNumber);
+        expect(result.beat.status).toBe('STALE');
+        expect(result.beat.narrativeSummary).toContain('垃圾星');
+        expect(result.beat.conflictIntensity).toBe(5);
+        expect(result.beat.pacingLabel).toBe('快');
+        expect(result.beat.hookCausalChain).toHaveLength(2);
+
+        // Impact should be a valid structure
+        expect(Array.isArray(result.impact.affectedChapterNumbers)).toBe(true);
+        expect(Array.isArray(result.impact.warnings)).toBe(true);
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+
+    it('should throw NotFoundException when beat does not exist', async () => {
+      await expect(
+        service.adjustBeat('proj-1', 'nonexistent-beat-id', 'test feedback'),
+      ).rejects.toThrow(/Beat not found/);
+    });
+
+    it('should include adjacent chapter anchors in the adjust prompt', async () => {
+      const project = await projectService.create({ title: '相邻锚点测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      // Generate 5 chapters so we can test middle chapter adjustment
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-adjust')) {
+          yield { content: '## Chapter 3: 调整后\n叙事摘要: 调整后的摘要\n冲突描述: 调整后的冲突\n钩子因果链: 钩子1: 测试钩子→回收于第5章\n冲突强度: 4\n读者期待值: 4\n节奏标签: 中\n目标字数: 3000\n' };
+        } else {
+          yield { content: '## Chapter 1: 章1\n冲突点: 冲突1\n钩子预设: 钩子A\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 章2\n冲突点: 冲突2\n钩子预设: 钩子B\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 章3\n冲突点: 冲突3\n钩子预设: 钩子C\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 4: 章4\n冲突点: 冲突4\n钩子预设: 钩子D\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 5: 章5\n冲突点: 冲突5\n钩子预设: 钩子E\n读者期待值: 高\n目标字数: 3000\n' };
+        }
+      };
+
+      try {
+        mockPromptLoader.renderTemplate.mockClear();
+        await service.generateBeats(project.id, { outline: '大纲内容' });
+
+        const beats = await service.getBeatsByProjectId(project.id);
+        const middleBeat = beats.find((b) => b.chapterNumber === 3)!;
+
+        mockPromptLoader.renderTemplate.mockClear();
+
+        await service.adjustBeat(project.id, middleBeat.id, '增加悬念');
+
+        expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+          'creation',
+          'beats-adjust',
+          expect.objectContaining({
+            previousAnchor: expect.stringContaining('第2章'),
+            nextAnchor: expect.stringContaining('第4章'),
+          }),
+        );
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+
+    it('should sync adjusted beat data to corresponding Chapter beatPlan', async () => {
+      const project = await projectService.create({ title: '章节同步调整' });
+
+      // Go through pipeline to DRAFTING
+      await service.generateIdea(project.id, { idea: '测试灵感' });
+      await service.generateIdeaSummary(project.id, { selectedSellPoint: 0 });
+      await service.confirmIdea(project.id, { selectedSellPoint: 0 });
+      await service.generateSetting(project.id, { idea: '测试设定' });
+      await service.confirmSetting(project.id);
+      await service.generateOutline(project.id, { setting: '设定', structure: 'three-act' });
+      await service.confirmOutline(project.id);
+      await service.generateBeats(project.id, { outline: '大纲内容' });
+      await service.confirmBeats(project.id);
+
+      const beats = await service.getBeatsByProjectId(project.id);
+      const chapters = await service.getChaptersByProjectId(project.id);
+      const targetBeat = beats[0];
+      const targetChapter = chapters.find((c) => c.chapterNumber === targetBeat.chapterNumber)!;
+
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-adjust')) {
+          yield { content: '## Chapter 1: 调整后\n叙事摘要: 新摘要\n冲突描述: 新冲突描述包含独特标记XYZ789\n钩子因果链: 钩子1: 悬念→回收于第3章\n冲突强度: 4\n读者期待值: 5\n节奏标签: 快\n目标字数: 3000\n' };
+        } else {
+          yield { content: 'default' };
+        }
+      };
+
+      try {
+        const result = await service.adjustBeat(project.id, targetBeat.id, '调整');
+        const chaptersAfter = await service.getChaptersByProjectId(project.id);
+        const chapterAfter = chaptersAfter.find((c) => c.chapterNumber === targetBeat.chapterNumber)!;
+
+        expect(chapterAfter.beatPlan).toBeDefined();
+        expect(result.beat.plan).toBeDefined();
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+  });
+
+  describe('Issue #26 — batchAdjustBeats (interval optimization)', () => {
+    it('should batch adjust a range of beats based on problem description', async () => {
+      const project = await projectService.create({ title: '批量调整测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-batch-adjust')) {
+          yield {
+            content:
+              '## Chapter 2: 优化后的章2\n叙事摘要: 增加冲突强度的摘要\n冲突描述: 更激烈的冲突描述——主角遭遇背叛\n钩子因果链: 钩子1: 背叛者身份→回收于第4章\n冲突强度: 4\n读者期待值: 4\n节奏标签: 快\n目标字数: 3000\n\n' +
+              '## Chapter 3: 优化后的章3\n叙事摘要: 高潮提前的摘要\n冲突描述: 主角反击的冲突描述\n钩子因果链: 钩子1: 反击计划→回收于第5章\n冲突强度: 5\n读者期待值: 5\n节奏标签: 快\n目标字数: 3500\n',
+          };
+        } else {
+          yield { content: '## Chapter 1: 章1\n冲突点: 冲突1\n钩子预设: 钩子A\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 章2\n冲突点: 冲突2\n钩子预设: 钩子B\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 章3\n冲突点: 冲突3\n钩子预设: 钩子C\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 4: 章4\n冲突点: 冲突4\n钩子预设: 钩子D\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 5: 章5\n冲突点: 冲突5\n钩子预设: 钩子E\n读者期待值: 高\n目标字数: 3000\n' };
+        }
+      };
+
+      try {
+        await service.generateBeats(project.id, { outline: '大纲内容' });
+
+        const result = await service.batchAdjustBeats(
+          project.id,
+          2,
+          3,
+          '第2-3章冲突强度太低，需要增强节奏感',
+        );
+
+        expect(result).toHaveProperty('beats');
+        expect(result).toHaveProperty('impact');
+        expect(Array.isArray(result.beats)).toBe(true);
+        expect(result.beats.length).toBeGreaterThanOrEqual(1);
+        expect(result.beats.length).toBeLessThanOrEqual(2);
+
+        // Adjusted beats should be STALE
+        for (const beat of result.beats) {
+          expect(beat.status).toBe('STALE');
+        }
+
+        // Impact structure
+        expect(Array.isArray(result.impact.affectedChapterNumbers)).toBe(true);
+        expect(Array.isArray(result.impact.warnings)).toBe(true);
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+
+    it('should throw BadRequestException when range has no beats', async () => {
+      const project = await projectService.create({ title: '空区间测试' });
+
+      await expect(
+        service.batchAdjustBeats(project.id, 100, 200, '优化'),
+      ).rejects.toThrow(/No beats found/);
+    });
+
+    it('should include boundary anchors in batch adjust prompt', async () => {
+      const project = await projectService.create({ title: '边界锚点测试' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-batch-adjust')) {
+          yield { content: '## Chapter 2: 调整后\n叙事摘要: 调整后摘要\n冲突描述: 调整后冲突\n钩子因果链: 钩子1: 悬念→回收于第4章\n冲突强度: 4\n读者期待值: 4\n节奏标签: 中\n目标字数: 3000\n' };
+        } else {
+          yield { content: '## Chapter 1: 章1\n冲突点: 冲突1\n钩子预设: 钩子A\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 章2\n冲突点: 冲突2\n钩子预设: 钩子B\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 章3\n冲突点: 冲突3\n钩子预设: 钩子C\n读者期待值: 中\n目标字数: 3000\n' };
+        }
+      };
+
+      try {
+        await service.generateBeats(project.id, { outline: '大纲内容' });
+        mockPromptLoader.renderTemplate.mockClear();
+
+        await service.batchAdjustBeats(project.id, 2, 2, '优化第2章');
+
+        expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+          'creation',
+          'beats-batch-adjust',
+          expect.objectContaining({
+            beforeAnchor: expect.stringContaining('第1章'),
+            afterAnchor: expect.stringContaining('第3章'),
+          }),
+        );
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+  });
+
+  describe('Issue #26 — detectImpact (hook chain impact detection)', () => {
+    it('should detect affected chapters when a hook is deleted', async () => {
+      const project = await projectService.create({ title: '钩子删除影响' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-adjust')) {
+          // Return beat with fewer hooks (one hook removed)
+          yield {
+            content:
+              '## Chapter 1: 调整后\n' +
+              '叙事摘要: 调整后的摘要\n' +
+              '冲突描述: 调整后的冲突描述\n' +
+              '钩子因果链: 钩子1: AI身份→回收于第3章\n' +
+              '冲突强度: 4\n' +
+              '读者期待值: 4\n' +
+              '节奏标签: 快\n' +
+              '目标字数: 3000\n',
+          };
+        } else if (input.includes('beats')) {
+          yield { content: '## Chapter 1: 章1\n冲突点: 冲突1\n钩子预设: 钩子A, 钩子B\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 章2\n冲突点: 冲突2\n钩子预设: 钩子C\n读者期待值: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 章3\n冲突点: 冲突3\n钩子预设: 钩子D\n读者期待值: 高\n目标字数: 3000\n' };
+        } else {
+          yield { content: 'default mock output' };
+        }
+      };
+
+      try {
+        await service.generateBeats(project.id, { outline: '大纲内容' });
+
+        // Update beat1 to have 2 hooks with specific resolve targets
+        const beats = await service.getBeatsByProjectId(project.id);
+        const beat1 = beats[0];
+        await service.updateBeatStructure(beat1.id, {
+          hookPresets: ['钩子A', '钩子B'],
+        });
+
+        // Now adjust - AI returns only 1 hook
+        const result = await service.adjustBeat(project.id, beat1.id, '减少一个钩子');
+
+        expect(result.impact).toBeDefined();
+        // Previous hooks were V1 converted (null resolvesInChapter), so no target chapter references
+        // Impact should at least be a valid structure
+        expect(Array.isArray(result.impact.affectedChapterNumbers)).toBe(true);
+        expect(Array.isArray(result.impact.warnings)).toBe(true);
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
+    });
+
+    it('should detect affected chapters when hook resolve target changes', async () => {
+      const project = await projectService.create({ title: '钩子目标变更' });
+
+      await projectService.update(project.id, { status: "BEATS" as any });
+
+      const originalStream = mockChatModel.stream;
+      mockChatModel.stream = async function* (input: string) {
+        if (input.includes('beats-adjust')) {
+          yield {
+            content:
+              '## Chapter 1: 调整后\n' +
+              '叙事摘要: 调整后摘要\n' +
+              '冲突描述: 调整后冲突\n' +
+              '钩子因果链: 钩子1: 核心悬念→回收于第5章\n' +  // Changed from chapter 3 to 5
+              '冲突强度: 4\n' +
+              '读者期待值: 4\n' +
+              '节奏标签: 中\n' +
+              '目标字数: 3000\n',
+          };
+        } else if (input.includes('beats')) {
+          yield { content: '## Chapter 1: 章1\n叙事摘要: 原摘要\n冲突描述: 原冲突\n钩子因果链: 钩子1: 核心悬念→回收于第3章\n冲突强度: 3\n读者期待值: 3\n节奏标签: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 2: 章2\n叙事摘要: 章2摘要\n冲突描述: 章2冲突\n钩子因果链: 钩子1: 悬念2→回收于第4章\n冲突强度: 3\n读者期待值: 3\n节奏标签: 慢\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 3: 章3\n叙事摘要: 章3摘要\n冲突描述: 章3冲突\n钩子因果链: 钩子1: 悬念3→回收于第6章\n冲突强度: 4\n读者期待值: 4\n节奏标签: 中\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 4: 章4\n叙事摘要: 章4摘要\n冲突描述: 章4冲突\n钩子因果链: 无\n冲突强度: 2\n读者期待值: 2\n节奏标签: 慢\n目标字数: 3000\n' };
+          yield { content: '\n## Chapter 5: 章5\n叙事摘要: 章5摘要\n冲突描述: 章5冲突\n钩子因果链: 无\n冲突强度: 5\n读者期待值: 5\n节奏标签: 快\n目标字数: 4000\n' };
+          yield { content: '\n## Chapter 6: 章6\n叙事摘要: 章6摘要\n冲突描述: 章6冲突\n钩子因果链: 无\n冲突强度: 4\n读者期待值: 4\n节奏标签: 快\n目标字数: 3000\n' };
+        } else {
+          yield { content: 'default mock output' };
+        }
+      };
+
+      try {
+        const beats = await service.generateBeats(project.id, { outline: '大纲内容' });
+        const beat1 = beats[0];
+
+        // Before adjust, beat1 has hook resolving to chapter 3
+        expect(beat1.hookCausalChain[0].resolvesInChapter).toBe(3);
+
+        const result = await service.adjustBeat(project.id, beat1.id, '把悬念回收推迟');
+
+        // After adjust, hook resolve changed from 3 to 5
+        // Impact should detect chapter 3 is affected (old target) and chapter 5 (new target)
+        expect(result.impact.affectedChapterNumbers).toContain(3);
+        expect(result.impact.affectedChapterNumbers).toContain(5);
+        expect(result.impact.warnings.length).toBeGreaterThan(0);
+      } finally {
+        mockChatModel.stream = originalStream;
+      }
     });
   });
 

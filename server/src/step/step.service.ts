@@ -6,6 +6,7 @@ import {
   ChapterData,
   ReviewResult,
   AiMeta,
+  ImpactResult,
 } from './step.entity';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectService } from '../project/project.service';
@@ -32,6 +33,85 @@ type OutlineStructure = (typeof VALID_STRUCTURES)[number];
 const R1_STRUCTURAL_FIRST = 3;
 const R1_STRUCTURAL_LAST_OFFSET = 2;
 const R1_HOOK_THRESHOLD = 3;
+
+// ─── V2 Beat field defaults ───────────────────────────────────
+const DEFAULT_INTENSITY = 3;
+const DEFAULT_EXPECTATION = 3;
+const DEFAULT_PACING = '中';
+const VALID_PACING_LABELS = ['快', '中', '慢'] as const;
+
+function clampIntensity(value: number): number {
+  return Math.max(1, Math.min(5, value));
+}
+
+// ─── Impact Detection (pure structural computation, zero AI calls) ──────
+
+function detectImpact(
+  oldBeat: BeatData,
+  newBeat: BeatData,
+): ImpactResult {
+  const affectedChapterNumbers: number[] = [];
+  const warnings: string[] = [];
+
+  const oldRefs = new Map<string, number | null>();
+  for (const link of oldBeat.hookCausalChain) {
+    oldRefs.set(link.hook, link.resolvesInChapter);
+  }
+
+  const newRefs = new Map<string, number | null>();
+  const newHookNames = new Set<string>();
+  for (const link of newBeat.hookCausalChain) {
+    newRefs.set(link.hook, link.resolvesInChapter);
+    newHookNames.add(link.hook);
+  }
+
+  for (const [hookName, resolveChapter] of oldRefs) {
+    if (!newHookNames.has(hookName)) {
+      if (resolveChapter != null) {
+        affectedChapterNumbers.push(resolveChapter);
+        warnings.push(`第${resolveChapter}章引用了已删除的钩子"${hookName}"`);
+      }
+    } else {
+      const newTarget = newRefs.get(hookName);
+      if (newTarget !== resolveChapter) {
+        if (resolveChapter != null) affectedChapterNumbers.push(resolveChapter);
+        if (newTarget != null) affectedChapterNumbers.push(newTarget);
+        warnings.push(
+          `钩子"${hookName}"的回收章节从第${resolveChapter ?? '未知'}章变更为第${newTarget ?? '未知'}章`,
+        );
+      }
+    }
+  }
+
+  return {
+    affectedChapterNumbers: [...new Set(affectedChapterNumbers)].filter(
+      (n) => n !== oldBeat.chapterNumber && n !== newBeat.chapterNumber,
+    ),
+    warnings,
+  };
+}
+
+function detectBatchImpact(
+  oldBeatsMap: Map<number, BeatData>,
+  newBeats: BeatData[],
+): ImpactResult {
+  const allAffected: number[] = [];
+  const allWarnings: string[] = [];
+
+  for (const newBeat of newBeats) {
+    const oldBeat = oldBeatsMap.get(newBeat.chapterNumber);
+    if (oldBeat) {
+      const impact = detectImpact(oldBeat, newBeat);
+      allAffected.push(...impact.affectedChapterNumbers);
+      allWarnings.push(...impact.warnings);
+    }
+  }
+
+  return {
+    affectedChapterNumbers: [...new Set(allAffected)],
+    warnings: allWarnings,
+  };
+}
 
 @Injectable()
 export class StepService {
@@ -335,7 +415,7 @@ export class StepService {
 
   async generateBeats(
     projectId: string,
-    opts: { outline?: string; currentContent?: string; defaultWordCount?: number },
+    opts: { outline?: string; currentContent?: string; defaultWordCount?: number; targetChapterCount?: number },
   ): Promise<BeatData[]> {
     const project = await this.projectService.findById(projectId);
     if (!project) throw new NotFoundException('Project not found');
@@ -344,15 +424,20 @@ export class StepService {
     const outline = opts.outline ?? '';
     const currentContent = opts.currentContent ?? '';
     const defaultWordCount = opts.defaultWordCount ?? (project.config as any)?.defaultChapterWordCount ?? 3000;
+    const targetChapterCount = opts.targetChapterCount;
 
     const existingStep = await this.getStepByProjectId(projectId, 'BEATS');
     const step = existingStep ?? (await this.createPendingStep(projectId, 'BEATS'));
 
-    const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', {
+    const templateVars: Record<string, unknown> = {
       outline,
       currentContent,
       defaultWordCount: String(defaultWordCount),
-    });
+    };
+    if (targetChapterCount != null) {
+      templateVars.targetChapterCount = String(targetChapterCount);
+    }
+    const prompt = this.promptLoader.renderTemplate('creation', 'beats-generation', templateVars);
 
     const { content: output, aiMeta } = await this.collectAiOutput(TaskType.BEATS, prompt);
 
@@ -383,6 +468,12 @@ export class StepService {
         isClimax: beat.isClimax,
         useR1: beat.useR1,
         status: beat.status,
+        narrativeSummary: beat.narrativeSummary,
+        pacingLabel: beat.pacingLabel,
+        hookCausalChain: beat.hookCausalChain,
+        conflictIntensity: beat.conflictIntensity,
+        readerExpectation: beat.readerExpectation,
+        conflictDescription: beat.conflictDescription,
       };
       if (beat.id) {
         createData.id = beat.id;
@@ -532,6 +623,208 @@ export class StepService {
     }
 
     return this.toBeat(updated);
+  }
+
+  // ─── Issue #26 Phase 1: Beat Adjust & Batch Adjust ────────────
+
+  async adjustBeat(
+    projectId: string,
+    beatId: string,
+    feedback: string,
+  ): Promise<{ beat: BeatData; impact: ImpactResult }> {
+    const beat = await this.findBeatById(beatId);
+    if (!beat) throw new NotFoundException('Beat not found');
+
+    const allBeats = await this.getBeatsByProjectId(projectId);
+    const prevBeat = allBeats.find((b) => b.chapterNumber === beat.chapterNumber - 1);
+    const nextBeat = allBeats.find((b) => b.chapterNumber === beat.chapterNumber + 1);
+
+    const beatDataStr = this.formatBeatForPrompt(beat);
+    const previousAnchor = prevBeat
+      ? `第${prevBeat.chapterNumber}章叙事摘要: ${prevBeat.narrativeSummary || '无'}\n收束钩子: ${this.formatHookChain(prevBeat.hookCausalChain)}`
+      : '（无前一章，本章为开篇）';
+    const nextAnchor = nextBeat
+      ? `第${nextBeat.chapterNumber}章叙事摘要: ${nextBeat.narrativeSummary || '无'}`
+      : '（无后一章，本章为终章）';
+
+    const prompt = this.promptLoader.renderTemplate('creation', 'beats-adjust', {
+      beatData: beatDataStr,
+      feedback,
+      previousAnchor,
+      nextAnchor,
+      chapterNumber: String(beat.chapterNumber),
+      defaultWordCount: String(beat.targetWordCount),
+    });
+
+    const { content: output } = await this.collectAiOutput(TaskType.BEATS, prompt);
+
+    const parsedBeats = this.parseBeatsFromOutput(output, projectId, beat.targetWordCount);
+    const newBeat = parsedBeats.find((b) => b.chapterNumber === beat.chapterNumber);
+    if (!newBeat) {
+      // Fallback: use first beat and override chapter number
+      if (parsedBeats.length === 0) {
+        throw new BadRequestException('AI failed to generate adjusted beat');
+      }
+      parsedBeats[0].chapterNumber = beat.chapterNumber;
+      parsedBeats[0].id = beat.id;
+    } else {
+      newBeat.id = beat.id;
+      newBeat.chapterNumber = beat.chapterNumber;
+    }
+
+    const finalBeat = newBeat ?? parsedBeats[0];
+    finalBeat.useR1 = this.shouldUseR1(finalBeat, allBeats.length);
+    finalBeat.status = 'STALE';
+
+    // Save old hook chain for impact detection
+    const oldHookChain = [...beat.hookCausalChain];
+    const oldBeatSnap: BeatData = { ...beat, hookCausalChain: oldHookChain };
+    const impact = detectImpact(oldBeatSnap, finalBeat);
+
+    // Update beat in DB
+    await this.prisma.beat.update({
+      where: { id: beatId },
+      data: {
+        plan: finalBeat.plan as any,
+        targetWordCount: finalBeat.targetWordCount,
+        hookCount: finalBeat.hookCount,
+        isClimax: finalBeat.isClimax,
+        useR1: finalBeat.useR1,
+        status: 'STALE',
+        narrativeSummary: finalBeat.narrativeSummary,
+        pacingLabel: finalBeat.pacingLabel,
+        hookCausalChain: finalBeat.hookCausalChain as any,
+        conflictIntensity: finalBeat.conflictIntensity,
+        readerExpectation: finalBeat.readerExpectation,
+        conflictDescription: finalBeat.conflictDescription,
+      },
+    });
+
+    // Sync chapter beatPlan if exists
+    const chapters = await this.getChaptersByProjectId(projectId);
+    const chapter = chapters.find((c) => c.chapterNumber === beat.chapterNumber);
+    if (chapter) {
+      await this.prisma.chapter.update({
+        where: { id: chapter.id },
+        data: { beatPlan: finalBeat.plan as any },
+      });
+    }
+
+    return { beat: finalBeat, impact };
+  }
+
+  async batchAdjustBeats(
+    projectId: string,
+    startChapter: number,
+    endChapter: number,
+    problemDescription: string,
+  ): Promise<{ beats: BeatData[]; impact: ImpactResult }> {
+    const allBeats = await this.getBeatsByProjectId(projectId);
+    const rangeBeats = allBeats.filter(
+      (b) => b.chapterNumber >= startChapter && b.chapterNumber <= endChapter,
+    );
+    if (rangeBeats.length === 0) {
+      throw new BadRequestException('No beats found in specified range');
+    }
+
+    const beforeBeat = allBeats.find((b) => b.chapterNumber === startChapter - 1);
+    const afterBeat = allBeats.find((b) => b.chapterNumber === endChapter + 1);
+    const defaultWordCount = rangeBeats[0].targetWordCount;
+
+    const beatsData = rangeBeats.map((b) => this.formatBeatForPrompt(b)).join('\n\n');
+    const beforeAnchor = beforeBeat
+      ? `第${beforeBeat.chapterNumber}章叙事摘要: ${beforeBeat.narrativeSummary || '无'}\n收束钩子: ${this.formatHookChain(beforeBeat.hookCausalChain)}`
+      : '（区间为首段，无前置章节）';
+    const afterAnchor = afterBeat
+      ? `第${afterBeat.chapterNumber}章叙事摘要: ${afterBeat.narrativeSummary || '无'}`
+      : '（区间为末段，无后置章节）';
+
+    const prompt = this.promptLoader.renderTemplate('creation', 'beats-batch-adjust', {
+      beatsData,
+      beforeAnchor,
+      afterAnchor,
+      problemDescription,
+      defaultWordCount: String(defaultWordCount),
+    });
+
+    const { content: output } = await this.collectAiOutput(TaskType.BEATS, prompt);
+    const newBeats = this.parseBeatsFromOutput(output, projectId, defaultWordCount);
+
+    // Build old beat map for ID reuse and impact detection
+    const oldBeatMap = new Map<number, BeatData>();
+    for (const b of rangeBeats) {
+      oldBeatMap.set(b.chapterNumber, b);
+    }
+
+    const impact = detectBatchImpact(oldBeatMap, newBeats);
+
+    // Update matched beats in DB
+    const resultBeats: BeatData[] = [];
+    for (const newBeat of newBeats) {
+      const oldBeat = oldBeatMap.get(newBeat.chapterNumber);
+      if (!oldBeat) continue; // Skip beats outside the adjusted range
+
+      newBeat.id = oldBeat.id;
+      newBeat.useR1 = this.shouldUseR1(newBeat, allBeats.length);
+      newBeat.status = 'STALE';
+
+      await this.prisma.beat.update({
+        where: { id: newBeat.id },
+        data: {
+          plan: newBeat.plan as any,
+          targetWordCount: newBeat.targetWordCount,
+          hookCount: newBeat.hookCount,
+          isClimax: newBeat.isClimax,
+          useR1: newBeat.useR1,
+          status: 'STALE',
+          narrativeSummary: newBeat.narrativeSummary,
+          pacingLabel: newBeat.pacingLabel,
+          hookCausalChain: newBeat.hookCausalChain as any,
+          conflictIntensity: newBeat.conflictIntensity,
+          readerExpectation: newBeat.readerExpectation,
+          conflictDescription: newBeat.conflictDescription,
+        },
+      });
+
+      // Sync chapter beatPlan
+      const chapters = await this.getChaptersByProjectId(projectId);
+      const chapter = chapters.find((c) => c.chapterNumber === newBeat.chapterNumber);
+      if (chapter) {
+        await this.prisma.chapter.update({
+          where: { id: chapter.id },
+          data: { beatPlan: newBeat.plan as any },
+        });
+      }
+
+      resultBeats.push(newBeat);
+    }
+
+    return { beats: resultBeats, impact };
+  }
+
+  // ─── Private helpers for BEATS Phase ──────────────────────────
+
+  private formatHookChain(chain: { hook: string; resolvesInChapter: number | null }[]): string {
+    if (chain.length === 0) return '无';
+    return chain
+      .map((link, i) => {
+        const resolve = link.resolvesInChapter != null ? `→回收于第${link.resolvesInChapter}章` : '';
+        return `钩子${i + 1}: ${link.hook}${resolve}`;
+      })
+      .join(', ');
+  }
+
+  private formatBeatForPrompt(beat: BeatData): string {
+    return [
+      `## Chapter ${beat.chapterNumber}:`,
+      `叙事摘要: ${beat.narrativeSummary || '无'}`,
+      `冲突描述: ${beat.conflictDescription || '无'}`,
+      `钩子因果链: ${this.formatHookChain(beat.hookCausalChain)}`,
+      `冲突强度: ${beat.conflictIntensity}`,
+      `读者期待值: ${beat.readerExpectation}`,
+      `节奏标签: ${beat.pacingLabel}`,
+      `目标字数: ${beat.targetWordCount}`,
+    ].join('\n');
   }
 
   async getChaptersByProjectId(projectId: string): Promise<ChapterData[]> {
@@ -833,20 +1126,88 @@ export class StepService {
       const chapterNumber = parseInt(numMatch[1], 10);
       const body = sections[i] ?? '';
 
+      // ─── V2 fields ──────────────────────────────────────
+      const narrativeMatch = body.match(/叙事摘要:\s*(.+)/);
+      const conflictDescMatch = body.match(/冲突描述:\s*(.+)/);
+      const causalChainMatch = body.match(/钩子因果链:\s*(.+)/);
+      const intensityMatch = body.match(/冲突强度:\s*(\d+)/);
+      const expectationNumMatch = body.match(/读者期待值:\s*(\d+)/);
+      const pacingMatch = body.match(/节奏标签:\s*(.+)/);
+
+      // ─── V1 fields (fallback) ───────────────────────────
       const conflictMatch = body.match(/冲突点:\s*(.+)/);
       const hooksMatch = body.match(/钩子预设:\s*(.+)/);
-      const expectationMatch = body.match(/读者期待值:\s*(.+)/);
+      const expectationTextMatch = body.match(/读者期待值:\s*(.+)/);
       const wordCountMatch = body.match(/目标字数:\s*(\d+)/);
 
-      const hookPresets = hooksMatch
-        ? hooksMatch[1].split(/[,，、]/).map((h) => h.trim()).filter(Boolean)
-        : [];
-      const hookCount = hookPresets.length;
+      // Parse hookCausalChain (V2) or hookPresets (V1)
+      let hookCausalChain: { hook: string; resolvesInChapter: number | null }[] = [];
+      let hookPresets: string[] = [];
+      let hookCount = 0;
 
+      if (causalChainMatch) {
+        // V2: "钩子1: 内容→回收于第3章, 钩子2: 内容→回收于第5章"
+        const chainText = causalChainMatch[1];
+        const links = chainText.split(/[,，]/);
+        for (let j = 0; j < links.length; j++) {
+          const link = links[j].trim();
+          if (!link) continue;
+          // Parse "钩子N: description→回收于第X章" or just "钩子N: description"
+          const resolveMatch = link.match(/(.+?)→回收于第(\d+)章/);
+          if (resolveMatch) {
+            hookCausalChain.push({
+              hook: resolveMatch[1].trim(),
+              resolvesInChapter: parseInt(resolveMatch[2], 10),
+            });
+          } else {
+            // Strip "钩子N: " prefix if present
+            const hookText = link.replace(/^钩子\d+\s*[:：]\s*/, '').trim();
+            hookCausalChain.push({ hook: hookText, resolvesInChapter: null });
+          }
+        }
+        hookCount = hookCausalChain.length;
+      } else if (hooksMatch) {
+        // V1: comma-separated hook names
+        hookPresets = hooksMatch[1].split(/[,，、]/).map((h) => h.trim()).filter(Boolean);
+        hookCount = hookPresets.length;
+        // Convert V1 presets to V2 causal chain (resolvesInChapter unknown)
+        hookCausalChain = hookPresets.map((h) => ({ hook: h, resolvesInChapter: null }));
+      }
+
+      // Parse conflictDescription (V2) or fallback to conflictPoint (V1)
+      const conflictDescription = conflictDescMatch
+        ? conflictDescMatch[1].trim()
+        : (conflictMatch ? conflictMatch[1].trim() : '');
+
+      // Parse narrativeSummary
+      const narrativeSummary = narrativeMatch ? narrativeMatch[1].trim() : '';
+
+      // Parse conflictIntensity (V2) with default
+      const conflictIntensity = intensityMatch
+        ? clampIntensity(parseInt(intensityMatch[1], 10))
+        : DEFAULT_INTENSITY;
+
+      // Parse readerExpectation as number (V2: 1-5, V1: text→number)
+      let readerExpectation = DEFAULT_EXPECTATION;
+      if (expectationNumMatch) {
+        readerExpectation = clampIntensity(parseInt(expectationNumMatch[1], 10));
+      } else if (expectationTextMatch) {
+        readerExpectation = this.textExpectationToNumber(expectationTextMatch[1].trim());
+      }
+
+      // Parse pacingLabel (V2) with default
+      const rawPacing = pacingMatch ? pacingMatch[1].trim() : '';
+      const pacingLabel = (VALID_PACING_LABELS as readonly string[]).includes(rawPacing)
+        ? rawPacing
+        : DEFAULT_PACING;
+
+      // Build plan (V1 fields preserved for backward compatibility)
       const plan: Record<string, unknown> = {
-        conflictPoint: conflictMatch ? conflictMatch[1].trim() : '',
+        conflictPoint: conflictMatch ? conflictMatch[1].trim() : conflictDescription,
         hookPresets,
-        readerExpectation: expectationMatch ? expectationMatch[1].trim() : '中',
+        readerExpectation: expectationTextMatch
+          ? expectationTextMatch[1].trim()
+          : this.numberExpectationToText(readerExpectation),
       };
 
       beats.push({
@@ -859,12 +1220,32 @@ export class StepService {
         isClimax: false,
         useR1: false,
         status: 'PENDING',
+        narrativeSummary,
+        conflictDescription,
+        pacingLabel,
+        hookCausalChain,
+        conflictIntensity,
+        readerExpectation,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
     }
 
     return beats;
+  }
+
+  private textExpectationToNumber(text: string): number {
+    const normalized = text.trim();
+    if (normalized === '高') return 5;
+    if (normalized === '中') return DEFAULT_EXPECTATION;
+    if (normalized === '低') return 1;
+    return DEFAULT_EXPECTATION;
+  }
+
+  private numberExpectationToText(num: number): string {
+    if (num >= 5) return '高';
+    if (num >= 3) return '中';
+    return '低';
   }
 
   private extractHookCount(plan: Record<string, unknown>): number {
@@ -1053,16 +1434,52 @@ export class StepService {
   }
 
   private toBeat(doc: Record<string, unknown>): BeatData {
+    const plan = (doc['plan'] as Record<string, unknown>) ?? {};
+
+    // ─── V2 columns from DB (may be defaults for V1 data) ──────
+    const narrativeSummary = (doc['narrativeSummary'] as string) ?? '';
+    const pacingLabelRaw = (doc['pacingLabel'] as string) ?? '';
+    const pacingLabel = (VALID_PACING_LABELS as readonly string[]).includes(pacingLabelRaw)
+      ? pacingLabelRaw
+      : DEFAULT_PACING;
+    const conflictIntensity = clampIntensity(Number(doc['conflictIntensity'] ?? DEFAULT_INTENSITY));
+    const readerExpectation = clampIntensity(Number(doc['readerExpectation'] ?? DEFAULT_EXPECTATION));
+
+    // ─── hookCausalChain: V2 column or V1 downgrade ─────────
+    let hookCausalChain: { hook: string; resolvesInChapter: number | null }[] = [];
+    const chainFromDb = doc['hookCausalChain'];
+    if (Array.isArray(chainFromDb) && chainFromDb.length > 0) {
+      hookCausalChain = chainFromDb as typeof hookCausalChain;
+    } else if (plan.hookPresets && Array.isArray(plan.hookPresets)) {
+      // V1→V2 downgrade: derive from plan.hookPresets
+      hookCausalChain = (plan.hookPresets as string[]).map((h) => ({
+        hook: h,
+        resolvesInChapter: null,
+      }));
+    }
+
+    // ─── conflictDescription: V2 column or V1 downgrade ──────
+    let conflictDescription = (doc['conflictDescription'] as string) ?? '';
+    if (!conflictDescription && plan.conflictPoint) {
+      conflictDescription = plan.conflictPoint as string;
+    }
+
     return {
       id: doc['id'] as string,
       projectId: doc['projectId'] as string,
       chapterNumber: doc['chapterNumber'] as number,
-      plan: (doc['plan'] as Record<string, unknown>) ?? {},
+      plan,
       targetWordCount: (doc['targetWordCount'] as number) ?? 3000,
       hookCount: (doc['hookCount'] as number) ?? 0,
       isClimax: (doc['isClimax'] as boolean) ?? false,
       useR1: (doc['useR1'] as boolean) ?? false,
       status: (doc['status'] as BeatData['status']) ?? 'PENDING',
+      narrativeSummary,
+      conflictDescription,
+      pacingLabel,
+      hookCausalChain,
+      conflictIntensity,
+      readerExpectation,
       createdAt: new Date(doc['createdAt'] as string),
       updatedAt: new Date(doc['updatedAt'] as string),
     };

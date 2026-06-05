@@ -11,6 +11,12 @@ const mockBeat = {
   isClimax: false,
   useR1: false,
   status: 'PENDING' as const,
+  narrativeSummary: '',
+  conflictDescription: '',
+  pacingLabel: '中',
+  hookCausalChain: [],
+  conflictIntensity: 3,
+  readerExpectation: 3,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -208,6 +214,111 @@ describe('useBeatStore', () => {
 
       expect(store.beats).toHaveLength(3);
       expect(store.beats[0].chapterNumber).toBe(1);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // Issue #26 Phase 0 RED: Beat V2 fields in store
+  // ════════════════════════════════════════════════════════════
+
+  describe('Issue #26 — Beat V2 fields', () => {
+    it('stores narrativeSummary on Beat', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      store.setBeats([{
+        ...mockBeat,
+        narrativeSummary: '主角在废墟中发现了一艘完好无损的星舰',
+      }]);
+
+      expect(store.beats[0].narrativeSummary).toBe('主角在废墟中发现了一艘完好无损的星舰');
+    });
+
+    it('stores conflictDescription on Beat', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      store.setBeats([{
+        ...mockBeat,
+        conflictDescription: '主角必须在48小时内修复星舰引擎，否则整个星区将被自毁程序炸毁',
+      }]);
+
+      expect(store.beats[0].conflictDescription).toContain('48小时');
+    });
+
+    it('stores hookCausalChain as an array of {hook, resolvesInChapter}', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      const chain = [
+        { hook: '钩子1: AI身份之谜', resolvesInChapter: 3 },
+        { hook: '钩子2: 倒计时危机', resolvesInChapter: 1 },
+      ];
+
+      store.setBeats([{ ...mockBeat, hookCausalChain: chain }]);
+
+      expect(store.beats[0].hookCausalChain).toEqual(chain);
+      expect(store.beats[0].hookCausalChain).toHaveLength(2);
+      expect(store.beats[0].hookCausalChain[0]).toHaveProperty('hook');
+      expect(store.beats[0].hookCausalChain[0]).toHaveProperty('resolvesInChapter');
+    });
+
+    it('stores conflictIntensity as a number 1-5', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      store.setBeats([{ ...mockBeat, conflictIntensity: 4 }]);
+
+      expect(typeof store.beats[0].conflictIntensity).toBe('number');
+      expect(store.beats[0].conflictIntensity).toBe(4);
+    });
+
+    it('stores readerExpectation as a number 1-5', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      store.setBeats([{ ...mockBeat, readerExpectation: 5 }]);
+
+      expect(typeof store.beats[0].readerExpectation).toBe('number');
+      expect(store.beats[0].readerExpectation).toBe(5);
+    });
+
+    it('stores pacingLabel as 快/中/慢', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      store.setBeats([{ ...mockBeat, pacingLabel: '快' }]);
+
+      expect(['快', '中', '慢']).toContain(store.beats[0].pacingLabel);
+    });
+
+    it('defaults V2 fields when not provided (backward compatibility)', async () => {
+      const { useBeatStore } = await import('@/stores/useBeatStore');
+      const store = useBeatStore();
+
+      // Simulate receiving V1 data without V2 fields
+      const v1Beat = {
+        id: 'old-beat-1',
+        projectId: 'proj-1',
+        chapterNumber: 1,
+        plan: { conflictPoint: '旧冲突', hookPresets: ['钩A'] },
+        targetWordCount: 3000,
+        hookCount: 1,
+        isClimax: false,
+        useR1: false,
+        status: 'PENDING' as const,
+        // No V2 fields
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      store.setBeats([v1Beat as any]);
+
+      const beat = store.beats[0];
+      // Store should tolerate missing V2 fields (TypeScript would flag these
+      // but at runtime we need graceful defaults)
+      expect(beat).toBeDefined();
+      expect(beat.chapterNumber).toBe(1);
     });
   });
 });

@@ -96,17 +96,23 @@ model StepData {
 }
 
 model Beat {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  projectId       String   @db.ObjectId
-  chapterNumber   Int
-  plan            Json
-  targetWordCount Int      @default(3000)
-  hookCount       Int      @default(0)
-  isClimax        Boolean  @default(false)
-  useR1           Boolean  @default(false)
-  status          String   @default("PENDING")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  projectId          String   @db.ObjectId
+  chapterNumber      Int
+  plan               Json
+  targetWordCount    Int      @default(3000)
+  hookCount          Int      @default(0)
+  isClimax           Boolean  @default(false)
+  useR1              Boolean  @default(false)
+  status             String   @default("PENDING")
+  narrativeSummary   String   @default("")
+  pacingLabel        String   @default("中")
+  hookCausalChain    Json     @default("[]")
+  conflictIntensity  Int      @default(3)
+  readerExpectation  Int      @default(3)
+  conflictDescription String  @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Chapter {

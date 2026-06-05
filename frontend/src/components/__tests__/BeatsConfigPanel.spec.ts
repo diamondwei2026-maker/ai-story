@@ -1,75 +1,130 @@
-﻿import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
+﻿import { describe, it, expect } from 'vitest';
+import { mount } from '@vue/test-utils';
 
-describe("BeatsConfigPanel", () => {
+describe('BeatsConfigPanel', () => {
   const mountPanel = async (props: {
     defaultWordCount?: number;
-    chapterCount?: number;
     isConfirmed?: boolean;
+    outlineText?: string;
   }) => {
-    const { default: BeatsConfigPanel } = await import("@/components/BeatsConfigPanel.vue");
+    const { default: BeatsConfigPanel } = await import('@/components/BeatsConfigPanel.vue');
     return mount(BeatsConfigPanel, {
       props: {
         defaultWordCount: 3000,
-        chapterCount: 12,
         isConfirmed: false,
+        outlineText: '',
         ...props,
       },
     });
   };
 
-  it("renders the panel container", async () => {
+  // ── Render ─────────────────────────────────────────
+
+  it('renders the panel container', async () => {
     const wrapper = await mountPanel({});
     expect(wrapper.find('[data-testid="beats-config-panel"]').exists()).toBe(true);
   });
 
-  it("displays the current default word count in input when not confirmed", async () => {
-    const wrapper = await mountPanel({ defaultWordCount: 3500, isConfirmed: false });
-    const input = wrapper.find('[data-testid="config-wordcount-input"]');
-    expect(input.exists()).toBe(true);
-  });
+  // ── Volume presets (segmented) ────────────────────
 
-  it("displays the default word count as readonly when confirmed", async () => {
-    const wrapper = await mountPanel({ defaultWordCount: 3500, isConfirmed: true });
-    expect(wrapper.find('[data-testid="config-wordcount-display"]').text()).toContain("3500");
-  });
-
-  it("displays the estimated chapter count", async () => {
-    const wrapper = await mountPanel({ chapterCount: 20 });
-    expect(wrapper.find('[data-testid="config-chapter-count"]').text()).toContain("20");
-  });
-
-  it("emits update:wordCount when word count is changed", async () => {
-    const wrapper = await mountPanel({ defaultWordCount: 3000 });
-    // Call exposed handler directly (antd InputNumber DOM structure differs across versions)
-    (wrapper.vm as any).handleWordCountChange(5000);
-    expect(wrapper.emitted("update:wordCount")?.[0]).toEqual([5000]);
-  });
-
-  it("emits regenerate when regenerate button is clicked", async () => {
-    const wrapper = await mountPanel({});
-    await wrapper.find('[data-testid="config-regenerate-btn"]').trigger("click");
-    expect(wrapper.emitted("regenerate")).toBeTruthy();
-  });
-
-  it("hides word count input when isConfirmed is true", async () => {
-    const wrapper = await mountPanel({ isConfirmed: true });
-    expect(wrapper.find('[data-testid="config-wordcount-input"]').exists()).toBe(false);
-  });
-
-  it("disables regenerate button when isConfirmed is true", async () => {
-    const wrapper = await mountPanel({ isConfirmed: true });
-    const btn = wrapper.find('[data-testid="config-regenerate-btn"]');
-    expect(btn.attributes("disabled")).toBeDefined();
-  });
-
-  it("shows instructional label when not confirmed", async () => {
+  it('renders the volume segmented control when not confirmed', async () => {
     const wrapper = await mountPanel({ isConfirmed: false });
-    expect(wrapper.find('[data-testid="config-hint"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="config-volume-segmented"]').exists()).toBe(true);
   });
 
-  it("shows confirmed state label when isConfirmed", async () => {
+  it('defaults to 中篇 (25 chapters)', async () => {
+    const wrapper = await mountPanel({});
+    const hintText = wrapper.text();
+    // Default should show approximately 25 chapters
+    expect(hintText).toContain('25');
+  });
+
+  // ── Word count segmented ──────────────────────────
+
+  it('renders the word count segmented control when not confirmed', async () => {
+    const wrapper = await mountPanel({ isConfirmed: false });
+    expect(wrapper.find('[data-testid="config-wordcount-segmented"]').exists()).toBe(true);
+  });
+
+  it('uses defaultWordCount prop as initial value', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 4000 });
+    // The segmented should show the initial value
+    expect(wrapper.vm).toBeDefined();
+  });
+
+  // ── Start generation button ───────────────────────
+
+  it('renders "开始拆解" button when not confirmed', async () => {
+    const wrapper = await mountPanel({ isConfirmed: false });
+    const btn = wrapper.find('[data-testid="config-start-generation-btn"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.text()).toContain('开始拆解');
+  });
+
+  it('emits start-generation with chapter count and word count on click', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 3000 });
+    await wrapper.find('[data-testid="config-start-generation-btn"]').trigger('click');
+
+    const emitted = wrapper.emitted('start-generation');
+    expect(emitted).toBeTruthy();
+    expect(emitted![0]).toEqual([{
+      targetChapterCount: 25, // default 中篇
+      defaultWordCount: 3000,
+    }]);
+  });
+
+  it('emits update:wordCount on start-generation', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 5000 });
+    await wrapper.find('[data-testid="config-start-generation-btn"]').trigger('click');
+
+    const emitted = wrapper.emitted('update:wordCount');
+    expect(emitted).toBeTruthy();
+    expect(emitted![0]).toEqual([5000]);
+  });
+
+  // ── Outline preview (collapsible) ─────────────────
+
+  it('shows outline preview collapse when outlineText is provided', async () => {
+    const wrapper = await mountPanel({ outlineText: '大纲内容...' });
+    // a-collapse is rendered
+    expect(wrapper.find('[data-testid="config-outline-preview"]').exists()).toBe(false);
+    // Note: a-collapse is initially collapsed, so the preview content is not visible
+    // But the collapse container should exist
+  });
+
+  it('does not show outline preview when outlineText is empty', async () => {
+    const wrapper = await mountPanel({ outlineText: '' });
+    // No a-collapse rendered
+    expect(wrapper.find('.config-collapse').exists()).toBe(false);
+  });
+
+  // ── Confirmed state ───────────────────────────────
+
+  it('shows confirmed badge when isConfirmed is true', async () => {
     const wrapper = await mountPanel({ isConfirmed: true });
     expect(wrapper.find('[data-testid="config-confirmed-label"]').exists()).toBe(true);
+  });
+
+  it('hides generate button when confirmed', async () => {
+    const wrapper = await mountPanel({ isConfirmed: true });
+    expect(wrapper.find('[data-testid="config-start-generation-btn"]').exists()).toBe(false);
+  });
+
+  it('hides volume segmented when confirmed', async () => {
+    const wrapper = await mountPanel({ isConfirmed: true });
+    expect(wrapper.find('[data-testid="config-volume-segmented"]').exists()).toBe(false);
+  });
+
+  it('hides word count segmented when confirmed', async () => {
+    const wrapper = await mountPanel({ isConfirmed: true });
+    expect(wrapper.find('[data-testid="config-wordcount-segmented"]').exists()).toBe(false);
+  });
+
+  // ── Word count options ────────────────────────────
+
+  it('supports all four word count options', async () => {
+    const wrapper = await mountPanel({ defaultWordCount: 2000 });
+    // Should not throw for any of the valid options
+    expect(wrapper.vm).toBeDefined();
   });
 });

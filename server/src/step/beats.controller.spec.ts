@@ -13,6 +13,12 @@ const mockBeat: BeatData = {
   isClimax: false,
   useR1: false,
   status: 'PENDING',
+  narrativeSummary: '',
+  conflictDescription: '',
+  pacingLabel: '中',
+  hookCausalChain: [],
+  conflictIntensity: 3,
+  readerExpectation: 3,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -27,6 +33,11 @@ const mockStep: StepData = {
   review: { beatCount: 5 },
   version: 1,
   confirmedAt: null,
+};
+
+const mockImpact = {
+  affectedChapterNumbers: [3],
+  warnings: ['第3章引用了已删除的钩子"钩子2"'],
 };
 
 const mockStepService = {
@@ -50,6 +61,14 @@ const mockStepService = {
     ...mockBeat,
     plan: { conflictPoint: '新冲突' },
     status: 'STALE',
+  }),
+  adjustBeat: jest.fn().mockResolvedValue({
+    beat: { ...mockBeat, status: 'STALE', narrativeSummary: '调整后的叙事摘要' },
+    impact: mockImpact,
+  }),
+  batchAdjustBeats: jest.fn().mockResolvedValue({
+    beats: [{ ...mockBeat, status: 'STALE' }],
+    impact: { affectedChapterNumbers: [], warnings: [] },
   }),
 };
 
@@ -126,25 +145,58 @@ describe('BeatsController', () => {
   // ─── GET beats ───────────────────────────────────────────
 
   describe('GET /projects/:projectId/steps/beats', () => {
-    it('should delegate to stepService.getBeatsByProjectId', () => {
-      const result = controller.getPhaseData('proj-1');
+    it('should delegate to stepService.getBeatsByProjectId', async () => {
+      const result = await controller.getPhaseData('proj-1');
 
       expect(mockStepService.getBeatsByProjectId).toHaveBeenCalledWith('proj-1');
       expect(result).toHaveLength(1);
     });
 
-    it('should return empty array when no beats exist', () => {
+    it('should return empty array when no beats exist', async () => {
       mockStepService.getBeatsByProjectId.mockReturnValueOnce([]);
 
-      const result = controller.getPhaseData('empty-proj');
+      const result = await controller.getPhaseData('empty-proj');
       expect(result).toEqual([]);
     });
 
-    it('should return BeatData array on success', () => {
-      const result = controller.getPhaseData('proj-1');
+    it('should return BeatData array on success', async () => {
+      const result = await controller.getPhaseData('proj-1');
 
       expect(Array.isArray(result)).toBe(true);
       expect(result[0].projectId).toBe('proj-1');
+    });
+  });
+
+  // ─── Issue #26 Phase 0: Beat V2 fields in responses ──────
+
+  describe('BeatsController — V2 fields', () => {
+    it('should return BeatData with narrativeSummary field on generate', async () => {
+      const result = await controller.generate('proj-1', { outline: 'test' });
+
+      expect(result[0]).toHaveProperty('narrativeSummary');
+      expect(result[0]).toHaveProperty('conflictDescription');
+      expect(result[0]).toHaveProperty('pacingLabel');
+      expect(result[0]).toHaveProperty('hookCausalChain');
+      expect(result[0]).toHaveProperty('conflictIntensity');
+      expect(result[0]).toHaveProperty('readerExpectation');
+    });
+
+    it('should return BeatData with V2 fields on GET', async () => {
+      const result = await controller.getPhaseData('proj-1');
+
+      expect(result[0]).toHaveProperty('narrativeSummary');
+      expect(result[0]).toHaveProperty('conflictDescription');
+      expect(result[0]).toHaveProperty('pacingLabel');
+      expect(result[0]).toHaveProperty('hookCausalChain');
+      expect(result[0]).toHaveProperty('conflictIntensity');
+      expect(result[0]).toHaveProperty('readerExpectation');
+    });
+
+    it('should pass targetChapterCount to generateBeats from request body', async () => {
+      const body = { outline: '大纲', targetChapterCount: 40, defaultWordCount: 3000 };
+      await controller.generate('proj-1', body);
+
+      expect(mockStepService.generateBeats).toHaveBeenCalledWith('proj-1', body);
     });
   });
 });
@@ -197,6 +249,117 @@ describe('BeatModificationController', () => {
 
       expect(result).toHaveProperty('plan');
       expect(result.plan).toHaveProperty('conflictPoint', '新冲突');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Issue #26 Phase 1: Adjust & Batch-Adjust Endpoints
+// ═══════════════════════════════════════════════════════════════
+
+describe('BeatsController — Issue #26 Phase 1', () => {
+  let controller: BeatsController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [BeatsController],
+      providers: [{ provide: StepService, useValue: mockStepService }],
+    }).compile();
+
+    controller = module.get<BeatsController>(BeatsController);
+    jest.clearAllMocks();
+  });
+
+  // ─── POST adjustBeat ────────────────────────────────────────
+
+  describe('POST /projects/:pid/steps/beats/:beatId/adjust', () => {
+    it('should delegate to stepService.adjustBeat with feedback', async () => {
+      const result = await controller.adjustBeat('proj-1', 'beat-1', {
+        feedback: '节奏快一点',
+      });
+
+      expect(mockStepService.adjustBeat).toHaveBeenCalledWith(
+        'proj-1',
+        'beat-1',
+        '节奏快一点',
+      );
+      expect(result).toHaveProperty('beat');
+      expect(result).toHaveProperty('impact');
+    });
+
+    it('should return beat with STALE status', async () => {
+      const result = await controller.adjustBeat('proj-1', 'beat-1', {
+        feedback: '增加冲突',
+      });
+
+      expect(result.beat.status).toBe('STALE');
+    });
+
+    it('should return impact with affectedChapterNumbers and warnings', async () => {
+      const result = await controller.adjustBeat('proj-1', 'beat-1', {
+        feedback: '换了钩子',
+      });
+
+      expect(result.impact).toHaveProperty('affectedChapterNumbers');
+      expect(result.impact).toHaveProperty('warnings');
+      expect(Array.isArray(result.impact.affectedChapterNumbers)).toBe(true);
+      expect(Array.isArray(result.impact.warnings)).toBe(true);
+    });
+
+    it('should pass natural language feedback verbatim', async () => {
+      const feedback = '让反派在这一章提前出场，增加悬念感';
+      await controller.adjustBeat('proj-1', 'beat-1', { feedback });
+
+      expect(mockStepService.adjustBeat).toHaveBeenCalledWith(
+        'proj-1',
+        'beat-1',
+        feedback,
+      );
+    });
+  });
+
+  // ─── POST batchAdjustBeats ──────────────────────────────────
+
+  describe('POST /projects/:pid/steps/beats/batch-adjust', () => {
+    it('should delegate to stepService.batchAdjustBeats with range and problem', async () => {
+      const body = {
+        startChapter: 2,
+        endChapter: 5,
+        problemDescription: '第2-5章冲突强度太低',
+      };
+
+      const result = await controller.batchAdjustBeats('proj-1', body);
+
+      expect(mockStepService.batchAdjustBeats).toHaveBeenCalledWith(
+        'proj-1',
+        2,
+        5,
+        '第2-5章冲突强度太低',
+      );
+      expect(result).toHaveProperty('beats');
+      expect(result).toHaveProperty('impact');
+    });
+
+    it('should return array of beats', async () => {
+      const result = await controller.batchAdjustBeats('proj-1', {
+        startChapter: 1,
+        endChapter: 3,
+        problemDescription: '优化节奏',
+      });
+
+      expect(Array.isArray(result.beats)).toBe(true);
+    });
+
+    it('should return impact with valid structure', async () => {
+      const result = await controller.batchAdjustBeats('proj-1', {
+        startChapter: 1,
+        endChapter: 3,
+        problemDescription: '优化',
+      });
+
+      expect(result.impact).toHaveProperty('affectedChapterNumbers');
+      expect(result.impact).toHaveProperty('warnings');
+      expect(Array.isArray(result.impact.affectedChapterNumbers)).toBe(true);
     });
   });
 });

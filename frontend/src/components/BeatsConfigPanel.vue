@@ -1,154 +1,108 @@
-﻿<script setup lang="ts">
-import { ref, watch } from "vue";
+<script setup lang="ts">
+import { ref, computed } from 'vue';
 
-const props = withDefaults(
-  defineProps<{
-    defaultWordCount: number;
-    chapterCount?: number;
-    isConfirmed: boolean;
-  }>(),
-  {
-    chapterCount: 0,
-  },
-);
+const props = withDefaults(defineProps<{
+  defaultWordCount: number;
+  isConfirmed: boolean;
+  outlineText?: string;
+}>(), { outlineText: '' });
 
 const emit = defineEmits<{
-  "update:wordCount": [value: number];
-  regenerate: [];
+  'start-generation': [opts: { targetChapterCount: number; defaultWordCount: number }];
+  'update:wordCount': [value: number];
 }>();
 
+// Volume presets
+const volumeOptions = [
+  { value: 15, label: '短篇' },
+  { value: 25, label: '中篇' },
+  { value: 40, label: '长篇' },
+];
+const targetChapterCount = ref(25);
+
+const wordCountOptions = [
+  { value: 2000, label: '2000字' },
+  { value: 3000, label: '3000字' },
+  { value: 4000, label: '4000字' },
+  { value: 5000, label: '5000字' },
+];
 const localWordCount = ref(props.defaultWordCount);
 
-watch(
-  () => props.defaultWordCount,
-  (val) => {
-    localWordCount.value = val;
-  },
-);
-
-function handleWordCountChange(value: number | null) {
-  if (value != null && value > 0) {
-    emit("update:wordCount", value);
-  }
+function handleStartGeneration() {
+  emit('update:wordCount', localWordCount.value);
+  emit('start-generation', {
+    targetChapterCount: targetChapterCount.value,
+    defaultWordCount: localWordCount.value,
+  });
 }
 
-function handleRegenerate() {
-  if (!props.isConfirmed) {
-    emit("regenerate");
-  }
-}
-
-defineExpose({ handleWordCountChange });
+const outlinePreview = computed(() => {
+  if (!props.outlineText) return '';
+  // Extract first 300 chars for preview
+  return props.outlineText.length > 300
+    ? props.outlineText.substring(0, 300) + '...'
+    : props.outlineText;
+});
 </script>
 
 <template>
-  <a-card
-    data-testid="beats-config-panel"
-    title="细纲生成配置"
-    size="small"
-    class="beats-config-panel"
-  >
-    <template #extra>
-      <a-tag
-        v-if="isConfirmed"
-        data-testid="config-confirmed-label"
-        color="green"
-      >已确认</a-tag>
+  <a-card data-testid="beats-config-panel" title="细纲生成配置" size="small" class="config-panel">
+    <template v-if="isConfirmed">
+      <a-tag data-testid="config-confirmed-label" color="green">已确认</a-tag>
+      <span class="config-confirmed-text">细纲已确认，进入正文创作阶段</span>
     </template>
 
-    <div class="config-body">
+    <template v-else>
+      <!-- Volume preset -->
       <div class="config-field">
-        <span class="config-label">默认章节字数</span>
-        <a-input-number
-          v-if="!isConfirmed"
-          data-testid="config-wordcount-input"
-          v-model:value="localWordCount"
-          :min="500"
-          :max="50000"
-          :step="100"
-          @change="handleWordCountChange"
+        <span class="config-label">篇幅预设</span>
+        <a-segmented
+          v-model:value="targetChapterCount"
+          :options="volumeOptions"
+          data-testid="config-volume-segmented"
         />
-        <span
-          v-else
-          data-testid="config-wordcount-display"
-          class="config-value-readonly"
-        >{{ defaultWordCount }} 字</span>
+        <span class="config-hint">约{{ targetChapterCount }}章（可浮动10%）</span>
       </div>
 
-      <div v-if="chapterCount > 0" class="config-field">
-        <span class="config-label">预计章节数</span>
-        <span data-testid="config-chapter-count" class="config-value">
-          {{ chapterCount }} 章
-        </span>
-        <span class="config-hint-text">（从大纲自动解析）</span>
+      <!-- Word count -->
+      <div class="config-field">
+        <span class="config-label">每章字数</span>
+        <a-segmented
+          v-model:value="localWordCount"
+          :options="wordCountOptions"
+          data-testid="config-wordcount-segmented"
+        />
       </div>
 
-      <div
-        v-if="!isConfirmed"
-        data-testid="config-hint"
-        class="config-hint"
-      >
-        修改字数后重新生成细纲，AI 将按新字数目标重新拆解各章节的节拍密度。
-      </div>
+      <!-- Outline preview -->
+      <a-collapse v-if="outlineText" :bordered="false" class="config-collapse">
+        <a-collapse-panel key="outline" header="大纲预览">
+          <p data-testid="config-outline-preview" class="outline-preview">{{ outlinePreview }}</p>
+        </a-collapse-panel>
+      </a-collapse>
 
-      <a-button
-        data-testid="config-regenerate-btn"
-        :disabled="isConfirmed"
-        @click="handleRegenerate"
-      >
-        重新生成细纲
-      </a-button>
-    </div>
+      <div class="config-action">
+        <a-button
+          type="primary"
+          size="large"
+          data-testid="config-start-generation-btn"
+          class="amber-btn"
+          @click="handleStartGeneration"
+        >
+          开始拆解
+        </a-button>
+      </div>
+    </template>
   </a-card>
 </template>
 
 <style scoped>
-.beats-config-panel {
-  margin-bottom: var(--space-md);
-}
-
-.config-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.config-field {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.config-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  min-width: 90px;
-  flex-shrink: 0;
-}
-
-.config-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.config-value-readonly {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.config-hint-text {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-
-.config-hint {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  padding: var(--space-sm);
-  background: var(--color-surface-warm);
-  border-radius: var(--radius-sm);
-  line-height: 1.5;
-}
+.config-panel { margin-bottom: var(--space-md); }
+.config-field { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); flex-wrap: wrap; }
+.config-label { font-size: 13px; color: var(--color-text-secondary); min-width: 70px; flex-shrink: 0; }
+.config-hint { font-size: 11px; color: var(--color-text-secondary); }
+.config-collapse { margin-bottom: var(--space-md); }
+.outline-preview { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; white-space: pre-wrap; margin: 0; }
+.config-action { text-align: center; padding-top: var(--space-sm); }
+.config-confirmed-text { font-size: 13px; color: var(--color-text-secondary); margin-left: var(--space-sm); }
 </style>

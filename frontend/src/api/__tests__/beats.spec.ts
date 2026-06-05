@@ -259,4 +259,270 @@ describe('beats API', () => {
       expect(result.status).toBe('STALE');
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Issue #26 Phase 0 RED: V2 Beat fields in API types & targetChapterCount
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Issue #26 — generateBeats with targetChapterCount', () => {
+    it('sends targetChapterCount in request body when provided', async () => {
+      const mockBeats = [
+        {
+          id: 'beat-1', projectId: 'proj-1', chapterNumber: 1,
+          plan: {}, targetWordCount: 3000, hookCount: 2,
+          isClimax: false, useR1: false, status: 'PENDING',
+          narrativeSummary: '摘要', conflictDescription: '冲突描述',
+          pacingLabel: '快', hookCausalChain: [],
+          conflictIntensity: 4, readerExpectation: 5,
+          createdAt: '2026-01-01', updatedAt: '2026-01-01',
+        },
+      ];
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockBeats),
+      });
+
+      const { generateBeats } = await import('@/api/beats');
+      await generateBeats('proj-1', {
+        outline: '大纲内容',
+        targetChapterCount: 25,
+        defaultWordCount: 3000,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/steps/beats/generate',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      // Verify targetChapterCount is in the serialized body
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(requestBody.targetChapterCount).toBe(25);
+      expect(requestBody.defaultWordCount).toBe(3000);
+    });
+
+    it('omits targetChapterCount from body when not provided', async () => {
+      const mockBeats = [{ id: 'beat-1', projectId: 'proj-1', chapterNumber: 1, plan: {}, targetWordCount: 3000, hookCount: 0, isClimax: false, useR1: false, status: 'PENDING', narrativeSummary: '', conflictDescription: '', pacingLabel: '中', hookCausalChain: [], conflictIntensity: 3, readerExpectation: 3, createdAt: '2026-01-01', updatedAt: '2026-01-01' }];
+
+      mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockBeats) });
+
+      const { generateBeats } = await import('@/api/beats');
+      await generateBeats('proj-1', { outline: '大纲' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).not.toHaveProperty('targetChapterCount');
+    });
+  });
+
+  describe('Issue #26 — BeatDataResponse V2 fields', () => {
+    const mockV2Beat = {
+      id: 'beat-1',
+      projectId: 'proj-1',
+      chapterNumber: 1,
+      plan: {},
+      targetWordCount: 3000,
+      hookCount: 2,
+      isClimax: false,
+      useR1: false,
+      status: 'PENDING',
+      narrativeSummary: '一艘星舰的AI觉醒，主角踏上寻找真相的旅程',
+      conflictDescription: '主角必须在48小时内修复星舰引擎，否则整个星区将被炸毁',
+      pacingLabel: '快',
+      hookCausalChain: [
+        { hook: 'AI的真实身份', resolvesInChapter: 3 },
+      ],
+      conflictIntensity: 4,
+      readerExpectation: 5,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('getBeats returns V2 fields on each beat', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([mockV2Beat]),
+      });
+
+      const { getBeats } = await import('@/api/beats');
+      const result = await getBeats('proj-1');
+
+      expect(result[0]).toHaveProperty('narrativeSummary');
+      expect(result[0]).toHaveProperty('conflictDescription');
+      expect(result[0]).toHaveProperty('pacingLabel');
+      expect(result[0]).toHaveProperty('hookCausalChain');
+      expect(result[0]).toHaveProperty('conflictIntensity');
+      expect(result[0]).toHaveProperty('readerExpectation');
+    });
+
+    it('serializes hookCausalChain as an array of {hook, resolvesInChapter}', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([mockV2Beat]),
+      });
+
+      const { getBeats } = await import('@/api/beats');
+      const result = await getBeats('proj-1');
+
+      const chain = result[0].hookCausalChain;
+      expect(Array.isArray(chain)).toBe(true);
+      expect(chain[0]).toHaveProperty('hook');
+      expect(chain[0]).toHaveProperty('resolvesInChapter');
+      expect(typeof chain[0].hook).toBe('string');
+      expect(typeof chain[0].resolvesInChapter).toBe('number');
+    });
+
+    it('conflictIntensity and readerExpectation are numbers', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([mockV2Beat]),
+      });
+
+      const { getBeats } = await import('@/api/beats');
+      const result = await getBeats('proj-1');
+
+      expect(typeof result[0].conflictIntensity).toBe('number');
+      expect(typeof result[0].readerExpectation).toBe('number');
+      expect(result[0].conflictIntensity).toBeGreaterThanOrEqual(1);
+      expect(result[0].conflictIntensity).toBeLessThanOrEqual(5);
+      expect(result[0].readerExpectation).toBeGreaterThanOrEqual(1);
+      expect(result[0].readerExpectation).toBeLessThanOrEqual(5);
+    });
+
+    it('pacingLabel is one of 快/中/慢', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([mockV2Beat]),
+      });
+
+      const { getBeats } = await import('@/api/beats');
+      const result = await getBeats('proj-1');
+
+      expect(['快', '中', '慢']).toContain(result[0].pacingLabel);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Issue #26 Phase 1 RED: adjustBeat & batchAdjustBeats API
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Issue #26 — adjustBeat', () => {
+    const mockAdjustResponse = {
+      beat: {
+        id: 'beat-1', projectId: 'proj-1', chapterNumber: 1,
+        plan: {}, targetWordCount: 3000, hookCount: 1,
+        isClimax: false, useR1: false, status: 'STALE',
+        narrativeSummary: '调整后的摘要',
+        conflictDescription: '调整后的冲突描述',
+        pacingLabel: '快', hookCausalChain: [],
+        conflictIntensity: 4, readerExpectation: 5,
+        createdAt: '2026-01-01', updatedAt: '2026-01-02',
+      },
+      impact: {
+        affectedChapterNumbers: [3],
+        warnings: ['第3章引用了已删除的钩子"钩子2"'],
+      },
+    };
+
+    it('calls POST /projects/:pid/steps/beats/:beatId/adjust with feedback', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAdjustResponse),
+      });
+
+      const { adjustBeat } = await import('@/api/beats');
+      const result = await adjustBeat('proj-1', 'beat-1', '节奏快一点');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/steps/beats/beat-1/adjust',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ feedback: '节奏快一点' }),
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      expect(result.beat.status).toBe('STALE');
+      expect(result.beat.narrativeSummary).toBe('调整后的摘要');
+    });
+
+    it('returns impact with affectedChapterNumbers and warnings', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAdjustResponse),
+      });
+
+      const { adjustBeat } = await import('@/api/beats');
+      const result = await adjustBeat('proj-1', 'beat-1', '调整钩子');
+
+      expect(result.impact.affectedChapterNumbers).toEqual([3]);
+      expect(result.impact.warnings).toHaveLength(1);
+    });
+  });
+
+  describe('Issue #26 — batchAdjustBeats', () => {
+    const mockBatchResponse = {
+      beats: [
+        {
+          id: 'beat-2', projectId: 'proj-1', chapterNumber: 2,
+          plan: {}, targetWordCount: 3000, hookCount: 1,
+          isClimax: false, useR1: false, status: 'STALE',
+          narrativeSummary: '批量优化后的摘要',
+          conflictDescription: '批量优化后的冲突',
+          pacingLabel: '快', hookCausalChain: [],
+          conflictIntensity: 4, readerExpectation: 4,
+          createdAt: '2026-01-01', updatedAt: '2026-01-02',
+        },
+        {
+          id: 'beat-3', projectId: 'proj-1', chapterNumber: 3,
+          plan: {}, targetWordCount: 3500, hookCount: 2,
+          isClimax: true, useR1: true, status: 'STALE',
+          narrativeSummary: '批量优化后摘要2',
+          conflictDescription: '批量优化后冲突2',
+          pacingLabel: '快', hookCausalChain: [],
+          conflictIntensity: 5, readerExpectation: 5,
+          createdAt: '2026-01-01', updatedAt: '2026-01-02',
+        },
+      ],
+      impact: {
+        affectedChapterNumbers: [4],
+        warnings: ['钩子回收章节变更'],
+      },
+    };
+
+    it('calls POST /projects/:pid/steps/beats/batch-adjust with range and problem', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockBatchResponse),
+      });
+
+      const { batchAdjustBeats } = await import('@/api/beats');
+      const result = await batchAdjustBeats('proj-1', 2, 3, '节奏优化');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/steps/beats/batch-adjust',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            startChapter: 2,
+            endChapter: 3,
+            problemDescription: '节奏优化',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      expect(result.beats).toHaveLength(2);
+      expect(result.beats[0].status).toBe('STALE');
+    });
+
+    it('returns impact with affectedChapterNumbers', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockBatchResponse),
+      });
+
+      const { batchAdjustBeats } = await import('@/api/beats');
+      const result = await batchAdjustBeats('proj-1', 2, 3, '优化');
+
+      expect(result.impact.affectedChapterNumbers).toEqual([4]);
+      expect(result.impact.warnings).toHaveLength(1);
+    });
+  });
 });

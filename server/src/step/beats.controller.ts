@@ -1,4 +1,4 @@
-import { Controller, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Patch, Post, Body, Param, HttpCode } from '@nestjs/common';
 import { StepService } from './step.service';
 import { PhaseControllerBase } from './phase.controller.base';
 
@@ -22,6 +22,32 @@ export class BeatsController extends PhaseControllerBase {
 
   protected async doGet(projectId: string) {
     return this.stepService.getBeatsByProjectId(projectId);
+  }
+
+  // ─── Issue #26 Phase 1: Beat Adjust & Batch Adjust ──────────
+
+  @Post(':beatId/adjust')
+  @HttpCode(200)
+  async adjustBeat(
+    @Param('projectId') projectId: string,
+    @Param('beatId') beatId: string,
+    @Body() body: { feedback: string },
+  ) {
+    return this.stepService.adjustBeat(projectId, beatId, body.feedback);
+  }
+
+  @Post('batch-adjust')
+  @HttpCode(200)
+  async batchAdjustBeats(
+    @Param('projectId') projectId: string,
+    @Body() body: { startChapter: number; endChapter: number; problemDescription: string },
+  ) {
+    return this.stepService.batchAdjustBeats(
+      projectId,
+      body.startChapter,
+      body.endChapter,
+      body.problemDescription,
+    );
   }
 }
 
