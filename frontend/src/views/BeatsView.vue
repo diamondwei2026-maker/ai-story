@@ -40,7 +40,14 @@
 
       <!-- Rhythm Chart (collapsible) -->
       <a-collapse v-model:activeKey="chartCollapsed" :bordered="false" class="beats-view__collapse">
-        <a-collapse-panel key="rhythm" header="叙事节奏诊断">
+        <a-collapse-panel key="rhythm">
+          <template #header>
+            <span>叙事节奏诊断</span>
+            <template v-if="beats.length > 0">
+              <a-tag :color="rhythmScore.gradeColor" size="small" style="margin-left:8px">{{ rhythmScore.score }}分 {{ rhythmScore.gradeLabel }}</a-tag>
+              <span v-if="rhythmScore.warnings.length > 0" style="margin-left:4px;font-size:11px;color:#d97706">{{ rhythmScore.warnings.length }}处可优化</span>
+            </template>
+          </template>
           <BeatsRhythmChart :beats="beats" @batch-optimize="handleBatchOptimize" />
         </a-collapse-panel>
       </a-collapse>
@@ -107,6 +114,7 @@ import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { useWorkflowStore } from '@/stores/useWorkflowStore';
 import { useBeatStore } from '@/stores/useBeatStore';
 import { useBeatsAdjustment } from '@/composables/useBeatsAdjustment';
+import { useRhythmScore } from '@/composables/useRhythmScore';
 import type { Beat } from '@/stores/useBeatStore';
 import {
   getBeats,
@@ -129,7 +137,6 @@ const beatStore = useBeatStore();
 const outlineText = ref('');
 const configWordCount = ref(3000);
 const configTargetChapters = ref<number | undefined>(undefined);
-const chartCollapsed = ref<string[]>([]);
 
 onMounted(async () => {
   try {
@@ -176,6 +183,17 @@ watch(beatsData, (val) => {
 });
 
 const beats = computed(() => beatsData.value ?? []);
+
+// ── 节奏评分（供 collapse header 显示） ──
+const { score: rhythmScore } = useRhythmScore(beats);
+
+// Collapse 默认行为：有预警时展开
+const chartCollapsed = ref<string[]>([]);
+watch(rhythmScore, (s) => {
+  if (s.warnings.length > 0 && chartCollapsed.value.length === 0) {
+    chartCollapsed.value = ['rhythm'];
+  }
+}, { immediate: true });
 
 // State machine
 type ViewState = 'CONFIG' | 'GENERATING' | 'REVIEWING' | 'CONFIRMED';

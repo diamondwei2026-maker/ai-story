@@ -2,6 +2,8 @@
 import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import * as echarts from 'echarts';
 import type { Beat } from '@/stores/useBeatStore';
+import { useRhythmScore } from '@/composables/useRhythmScore';
+import RhythmHelpDrawer from '@/components/RhythmHelpDrawer.vue';
 
 const props = defineProps<{ beats: Beat[] }>();
 const emit = defineEmits<{
@@ -11,50 +13,26 @@ const emit = defineEmits<{
 const chartContainer = ref<HTMLDivElement | null>(null);
 let chartInstance: echarts.ECharts | null = null;
 
-// Detect low-quality intervals
-interface QualityWarning {
-  startChapter: number;
-  endChapter: number;
-  message: string;
+// ── 节奏评分 ──
+const beatsRef = computed(() => props.beats);
+const { score: rhythmScore } = useRhythmScore(beatsRef);
+
+// ── 帮助面板 ──
+const showHelp = ref(false);
+
+// ── 工具函数：数值 → 大白话标签 ──
+function intensityLabel(v: number): string {
+  if (v >= 4) return '激烈';
+  if (v >= 3) return '适中';
+  return '偏低';
 }
-const warnings = computed<QualityWarning[]>(() => {
-  const result: QualityWarning[] = [];
-  if (props.beats.length < 3) return result;
-
-  let lowStart = -1;
-  for (let i = 1; i < props.beats.length - 1; i++) {
-    const b = props.beats[i];
-    if (b.readerExpectation <= 2 && b.conflictIntensity <= 2) {
-      if (lowStart === -1) lowStart = b.chapterNumber;
-    } else {
-      if (lowStart !== -1) {
-        const endChapter = props.beats[i - 1].chapterNumber;
-        if (endChapter - lowStart >= 2) {
-          result.push({
-            startChapter: lowStart,
-            endChapter,
-            message: '第' + lowStart + '-' + endChapter + '章期待值与冲突强度持续偏低，可能导致读者中途弃书',
-          });
-        }
-        lowStart = -1;
-      }
-    }
-  }
-  if (lowStart !== -1) {
-    const endChapter = props.beats[props.beats.length - 1].chapterNumber;
-    if (endChapter - lowStart >= 2) {
-      result.push({ startChapter: lowStart, endChapter, message: '第' + lowStart + '-' + endChapter + '章期待值与冲突强度持续偏低' });
-    }
-  }
-
-  return result;
-});
-
-function handleOptimize(w: QualityWarning) {
-  emit('batch-optimize', w.startChapter, w.endChapter, w.message);
+function expectationLabel(v: number): string {
+  if (v >= 4) return '强';
+  if (v >= 3) return '适中';
+  return '偏低';
 }
 
-// Build ECharts option with dual y-axis
+// ── ECharts option（含背景色带 + 警戒线 + 大白话 tooltip） ──
 function buildOption(beats: Beat[]): echarts.EChartsOption {
   const chapters = beats.map(b => '第' + b.chapterNumber + '章');
   const intensityData = beats.map(b => b.conflictIntensity);
@@ -64,16 +42,40 @@ function buildOption(beats: Beat[]): echarts.EChartsOption {
   if (beats.length === 0) return {};
 
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: ['冲突强度', '读者期待值', '高潮'], bottom: 0, textStyle: { fontSize: 11 } },
-    grid: { left: 48, right: 48, top: 16, bottom: 36 },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params: any) => {
+        if (!Array.isArray(params)) return '';
+        let html = '';
+        for (const p of params) {
+          if (p.seriesName === '冲突强度') {
+            html += p.marker + ' 冲突强度: <b>' + p.value + '/5</b>（' + intensityLabel(p.value) + '）<br/>';
+          } else if (p.seriesName === '读者期待值') {
+            html += p.marker + ' 读者期待值: <b>' + p.value + '/5</b>（' + expectationLabel(p.value) + '）<br/>';
+          }
+        }
+        const chapterName = (params[0] as any)?.axisValue ?? '';
+        html += '<span style="color:#9ca3af;font-size:11px">' + chapterName + '</span>';
+        return html;
+      },
+    },
+    legend: {
+      data: ['冲突强度', '读者期待值', '高潮'],
+      bottom: 0,
+      textStyle: { fontSize: 11 },
+    },
+    grid: { left: 48, right: 48, top: 20, bottom: 40 },
     xAxis: {
-      type: 'category', data: chapters,
+      type: 'category',
+      data: chapters,
       axisLabel: { fontSize: 10, rotate: chapters.length > 8 ? 45 : 0 },
     },
     yAxis: {
-      type: 'value', name: '强度/期待值',
-      min: 0, max: 5,
+      type: 'value',
+      name: '强度/期待值',
+      min: 0,
+      max: 5,
       interval: 1,
       axisLabel: { fontSize: 10 },
     },
@@ -83,14 +85,46 @@ function buildOption(beats: Beat[]): echarts.EChartsOption {
         type: 'line',
         data: intensityData,
         smooth: true,
-        symbol: 'circle', symbolSize: 8,
+        symbol: 'circle',
+        symbolSize: 8,
         lineStyle: { color: '#ef4444', width: 2 },
         itemStyle: { color: '#ef4444' },
         markPoint: {
           data: climaxIndices.map(i => ({
-            name: '高潮', coord: [i, intensityData[i]],
-            symbol: 'pin', symbolSize: 32, itemStyle: { color: '#f59e0b' },
+            name: '高潮',
+            coord: [i, intensityData[i]],
+            symbol: 'pin',
+            symbolSize: 32,
+            itemStyle: { color: '#f59e0b' },
           })),
+        },
+        markArea: {
+          silent: true,
+          data: [
+            [
+              { yAxis: 3, itemStyle: { color: 'rgba(22,163,74,0.06)' } },
+              { yAxis: 5 },
+            ],
+            [
+              { yAxis: 2, itemStyle: { color: 'rgba(217,119,6,0.06)' } },
+              { yAxis: 3 },
+            ],
+            [
+              { yAxis: 0, itemStyle: { color: 'rgba(220,38,38,0.05)' } },
+              { yAxis: 2 },
+            ],
+          ],
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [
+            {
+              yAxis: 2.5,
+              label: { formatter: '警戒线', fontSize: 10, color: '#9ca3af' },
+              lineStyle: { color: '#9ca3af', type: 'dashed', width: 1 },
+            },
+          ],
         },
       },
       {
@@ -98,7 +132,8 @@ function buildOption(beats: Beat[]): echarts.EChartsOption {
         type: 'line',
         data: expectationData,
         smooth: true,
-        symbol: 'diamond', symbolSize: 8,
+        symbol: 'diamond',
+        symbolSize: 8,
         lineStyle: { color: '#0d9488', width: 2, type: 'dashed' },
         itemStyle: { color: '#0d9488' },
       },
@@ -106,6 +141,7 @@ function buildOption(beats: Beat[]): echarts.EChartsOption {
   };
 }
 
+// ── 图表生命周期 ──
 function initChart() {
   if (!chartContainer.value || props.beats.length === 0) return;
   try {
@@ -116,13 +152,10 @@ function initChart() {
 function disposeChart() {
   if (chartInstance) {
     try {
-      // Guard: prevent dispose errors in jsdom where canvas may be null
-      if (chartInstance.getDom() && chartInstance.getDom().parentNode) {
-        chartInstance.dispose();
+      if ((chartInstance as any).getDom?.()?.parentNode) {
+        (chartInstance as any).dispose?.();
       }
-    } catch {
-      // Ignore dispose errors (common in test environments without canvas)
-    }
+    } catch { /* ignore */ }
     chartInstance = null;
   }
 }
@@ -138,40 +171,162 @@ onUnmounted(() => { disposeChart(); });
 </script>
 
 <template>
-  <a-card data-testid="beats-rhythm-chart" title="叙事节奏诊断" size="small" class="rhythm-chart">
+  <div data-testid="beats-rhythm-chart" class="rhythm-chart">
+    <!-- ── 总评横幅 ── -->
+    <div
+      v-if="beats.length > 0"
+      data-testid="rhythm-score-banner"
+      class="score-banner"
+      :style="{ borderLeftColor: rhythmScore.gradeColor }"
+    >
+      <div class="score-left">
+        <span
+          class="score-number"
+          :style="{ color: rhythmScore.gradeColor }"
+        >{{ rhythmScore.score }}</span>
+        <span class="score-unit">分</span>
+        <span
+          class="score-grade"
+          :style="{ background: rhythmScore.gradeColor }"
+        >{{ rhythmScore.gradeLabel }}</span>
+      </div>
+      <span class="score-summary">{{ rhythmScore.summaryText }}</span>
+    </div>
+
+    <!-- ── 图表标题 + 帮助入口 ── -->
+    <div class="chart-header">
+      <a-tooltip title="图表阅读指南">
+        <a-button
+          size="small"
+          type="text"
+          shape="circle"
+          data-testid="rhythm-help-btn"
+          @click="showHelp = !showHelp"
+        >
+          <template #icon><span style="font-weight:700">?</span></template>
+        </a-button>
+      </a-tooltip>
+    </div>
+
+    <!-- ── 帮助抽屉 ── -->
+    <RhythmHelpDrawer v-model:open="showHelp" />
+
+    <!-- ── 空状态 ── -->
     <div v-if="beats.length === 0" data-testid="rhythm-chart-empty" class="chart-empty">暂无细纲数据</div>
+
+    <!-- ── 折线图 ── -->
     <template v-else>
       <div ref="chartContainer" data-testid="rhythm-chart-canvas" class="chart-canvas" />
-      <!-- Quality warnings -->
-      <div v-if="warnings.length > 0" data-testid="rhythm-warnings" class="warnings-area">
+
+      <!-- ── 预警区间（增强版：含优化建议） ── -->
+      <div v-if="rhythmScore.warnings.length > 0" data-testid="rhythm-warnings" class="warnings-area">
         <a-alert
-          v-for="(w, idx) in warnings"
+          v-for="(w, idx) in rhythmScore.warnings"
           :key="idx"
           type="warning"
           :message="w.message"
           show-icon
           class="warning-item"
         >
+          <template #description>
+            <span class="warning-suggestion">{{ w.suggestion }}</span>
+          </template>
           <template #action>
-            <a-button
-              size="small"
-              type="primary"
-              data-testid="rhythm-optimize-btn"
-              @click="handleOptimize(w)"
-            >
-              一键优化该区间
-            </a-button>
+            <div class="warning-action">
+              <a-button
+                size="small"
+                type="primary"
+                data-testid="rhythm-optimize-btn"
+                @click="emit('batch-optimize', w.startChapter, w.endChapter, w.message)"
+              >
+                一键优化该区间
+              </a-button>
+              <span class="warning-action-hint">AI 将自动调整该区间内的冲突密度与钩子布局</span>
+            </div>
           </template>
         </a-alert>
       </div>
     </template>
-  </a-card>
+  </div>
 </template>
 
 <style scoped>
-.rhythm-chart { margin-bottom: var(--space-md); }
+.rhythm-chart {
+  /* 由外层 a-collapse-panel 提供边框和背景，此处仅做内部布局 */
+}
+
+/* ── 总评横幅 ── */
+.score-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  background: var(--color-surface-warm);
+  border-radius: var(--radius-md);
+  border-left: 4px solid;
+  flex-wrap: wrap;
+}
+.score-left {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.score-number {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.score-unit {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-right: 8px;
+}
+.score-grade {
+  font-size: 12px;
+  color: #fff;
+  padding: 1px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.score-summary {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* ── 图表标题栏 ── */
+.chart-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -8px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── 图表区 ── */
 .chart-canvas { width: 100%; height: 300px; }
 .chart-empty { text-align: center; color: var(--color-text-secondary); padding: var(--space-lg); font-size: 13px; }
+
+/* ── 预警区 ── */
 .warnings-area { margin-top: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
 .warning-item { margin: 0; }
+.warning-suggestion {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.warning-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.warning-action-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
 </style>

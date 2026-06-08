@@ -1,31 +1,30 @@
 ﻿import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
+import type { Beat } from '@/stores/useBeatStore';
 
-interface BeatV2 {
-  id: string;
-  chapterNumber: number;
-  targetWordCount: number;
-  isClimax: boolean;
-  pacingLabel: string;
-  conflictIntensity: number;
-  readerExpectation: number;
-  hookCausalChain?: any[];
-}
-
-function makeBeat(overrides: Partial<BeatV2> = {}): BeatV2 {
+// ── 测试用 Beat mock ──
+function makeBeat(overrides: Partial<Beat> & { id: string; chapterNumber: number }): Beat {
   return {
-    id: 'beat-1',
-    chapterNumber: 1,
+    projectId: 'proj-1',
+    plan: {},
     targetWordCount: 3000,
-    isClimax: false,
+    hookCount: 0,
+    useR1: false,
+    status: 'CONFIRMED' as Beat['status'],
+    narrativeSummary: '',
+    conflictDescription: '',
+    hookCausalChain: [],
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
     pacingLabel: '中',
     conflictIntensity: 3,
     readerExpectation: 3,
+    isClimax: false,
     ...overrides,
   };
 }
 
-const mockBeatsV2: BeatV2[] = [
+const healthyBeats: Beat[] = [
   makeBeat({ id: 'b1', chapterNumber: 1, conflictIntensity: 4, readerExpectation: 5, pacingLabel: '快' }),
   makeBeat({ id: 'b2', chapterNumber: 2, conflictIntensity: 3, readerExpectation: 4, pacingLabel: '中' }),
   makeBeat({ id: 'b3', chapterNumber: 3, conflictIntensity: 5, readerExpectation: 5, pacingLabel: '快', isClimax: true }),
@@ -33,19 +32,28 @@ const mockBeatsV2: BeatV2[] = [
   makeBeat({ id: 'b5', chapterNumber: 5, conflictIntensity: 3, readerExpectation: 3, pacingLabel: '中' }),
 ];
 
+const warningBeats: Beat[] = [
+  makeBeat({ id: 'w1', chapterNumber: 1, conflictIntensity: 4, readerExpectation: 4, pacingLabel: '快' }),
+  makeBeat({ id: 'w2', chapterNumber: 2, conflictIntensity: 1, readerExpectation: 2, pacingLabel: '慢' }),
+  makeBeat({ id: 'w3', chapterNumber: 3, conflictIntensity: 1, readerExpectation: 1, pacingLabel: '慢' }),
+  makeBeat({ id: 'w4', chapterNumber: 4, conflictIntensity: 2, readerExpectation: 2, pacingLabel: '慢' }),
+  makeBeat({ id: 'w5', chapterNumber: 5, conflictIntensity: 4, readerExpectation: 4, pacingLabel: '快' }),
+];
+
 describe('BeatsRhythmChart', () => {
-  const mountChart = async (props: { beats: BeatV2[] }) => {
+  const mountChart = async (props: { beats: Beat[] }) => {
     const { default: BeatsRhythmChart } = await import('@/components/BeatsRhythmChart.vue');
     return mount(BeatsRhythmChart, { props });
   };
 
+  // ── 基础渲染 ──
   it('renders the chart container', async () => {
-    const wrapper = await mountChart({ beats: mockBeatsV2 });
+    const wrapper = await mountChart({ beats: healthyBeats });
     expect(wrapper.find('[data-testid="beats-rhythm-chart"]').exists()).toBe(true);
   });
 
   it('renders the chart canvas when beats exist', async () => {
-    const wrapper = await mountChart({ beats: mockBeatsV2 });
+    const wrapper = await mountChart({ beats: healthyBeats });
     expect(wrapper.find('[data-testid="rhythm-chart-canvas"]').exists()).toBe(true);
   });
 
@@ -60,19 +68,14 @@ describe('BeatsRhythmChart', () => {
   });
 
   it('cleans up echarts instance on unmount', async () => {
-    const wrapper = await mountChart({ beats: mockBeatsV2 });
+    const wrapper = await mountChart({ beats: healthyBeats });
     expect(() => wrapper.unmount()).not.toThrow();
   });
 
   it('chart canvas is a div element', async () => {
-    const wrapper = await mountChart({ beats: mockBeatsV2 });
+    const wrapper = await mountChart({ beats: healthyBeats });
     const canvas = wrapper.find('[data-testid="rhythm-chart-canvas"]');
     expect(canvas.element).toBeInstanceOf(HTMLDivElement);
-  });
-
-  it('accepts beats with V2 fields', async () => {
-    const wrapper = await mountChart({ beats: mockBeatsV2 });
-    expect(wrapper.vm).toBeDefined();
   });
 
   it('handles single beat without error', async () => {
@@ -88,5 +91,62 @@ describe('BeatsRhythmChart', () => {
     ];
     const wrapper = await mountChart({ beats: extremes });
     expect(wrapper.vm).toBeDefined();
+  });
+
+  // ── 新增：评分横幅 ──
+  it('renders score banner when beats exist', async () => {
+    const wrapper = await mountChart({ beats: healthyBeats });
+    expect(wrapper.find('[data-testid="rhythm-score-banner"]').exists()).toBe(true);
+  });
+
+  it('does not render score banner when no beats', async () => {
+    const wrapper = await mountChart({ beats: [] });
+    expect(wrapper.find('[data-testid="rhythm-score-banner"]').exists()).toBe(false);
+  });
+
+  it('score banner shows a numeric score', async () => {
+    const wrapper = await mountChart({ beats: healthyBeats });
+    const scoreEl = wrapper.find('[data-testid="rhythm-score-banner"] .score-number');
+    expect(scoreEl.exists()).toBe(true);
+    expect(Number(scoreEl.text())).toBeGreaterThanOrEqual(0);
+    expect(Number(scoreEl.text())).toBeLessThanOrEqual(100);
+  });
+
+  // ── 新增：帮助抽屉 ──
+  it('help button is present', async () => {
+    const wrapper = await mountChart({ beats: healthyBeats });
+    expect(wrapper.find('[data-testid="rhythm-help-btn"]').exists()).toBe(true);
+  });
+
+  // ── 新增：增强预警（含优化建议） ──
+  it('renders warnings for low-quality beats', async () => {
+    const wrapper = await mountChart({ beats: warningBeats });
+    expect(wrapper.find('[data-testid="rhythm-warnings"]').exists()).toBe(true);
+  });
+
+  it('warning card includes optimization suggestion text', async () => {
+    const wrapper = await mountChart({ beats: warningBeats });
+    const suggestion = wrapper.find('.warning-suggestion');
+    expect(suggestion.exists()).toBe(true);
+    expect(suggestion.text()).toBeTruthy();
+  });
+
+  it('warning card includes action hint text', async () => {
+    const wrapper = await mountChart({ beats: warningBeats });
+    const hint = wrapper.find('.warning-action-hint');
+    expect(hint.exists()).toBe(true);
+    expect(hint.text()).toContain('AI');
+  });
+
+  it('emits batch-optimize on button click', async () => {
+    const wrapper = await mountChart({ beats: warningBeats });
+    await wrapper.find('[data-testid="rhythm-optimize-btn"]').trigger('click');
+    expect(wrapper.emitted('batch-optimize')).toBeTruthy();
+    expect(wrapper.emitted('batch-optimize')?.[0]).toEqual([2, 4, expect.any(String)]);
+  });
+
+  it('no warnings for healthy beats', async () => {
+    const wrapper = await mountChart({ beats: healthyBeats });
+    expect(wrapper.find('[data-testid="rhythm-warnings"]').exists()).toBe(false);
   });
 });
