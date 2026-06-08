@@ -26,10 +26,32 @@ vi.mock('@/api/outline', () => ({
   getOutline: (...args: any[]) => mockGetOutline(...args),
 }));
 
+const mockGetSetting = vi.fn();
+vi.mock('@/api/setting', () => ({
+  getSetting: (...args: any[]) => mockGetSetting(...args),
+}));
+
+const mockGetIdea = vi.fn();
+vi.mock('@/api/idea', () => ({
+  getIdea: (...args: any[]) => mockGetIdea(...args),
+}));
+
 const mockGetProject = vi.fn();
 vi.mock('@/api/project', () => ({
   getProject: (...args: any[]) => mockGetProject(...args),
 }));
+
+const mockIdea = {
+  id: 'step-idea', projectId: 'proj-1', phaseType: 'IDEA',
+  status: 'CONFIRMED', output: '## 卖点方案 1\n核心卖点：星际废土寻宝',
+  review: {}, version: 1,
+};
+
+const mockSetting = {
+  id: 'step-setting', projectId: 'proj-1', phaseType: 'SETTING',
+  status: 'CONFIRMED', output: '## 世界观\n科技荒芜的星际边缘',
+  review: {}, version: 1,
+};
 
 const mockOutline = {
   id: 'step-outline', projectId: 'proj-1', phaseType: 'OUTLINE',
@@ -93,6 +115,8 @@ describe('BeatsView', () => {
     localStorage.clear();
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    mockGetIdea.mockResolvedValue(mockIdea);
+    mockGetSetting.mockResolvedValue(mockSetting);
     mockGetOutline.mockResolvedValue(mockOutline);
     mockGetProject.mockResolvedValue(mockProject);
   });
@@ -298,7 +322,9 @@ describe('BeatsView', () => {
 
   describe('CONFIRMED state', () => {
     it('hides confirm/reject buttons when beats are confirmed', async () => {
-      mockGetBeats.mockResolvedValue(mockBeatsV2);
+      // Use beats with CONFIRMED status to reflect actual backend confirmed state
+      const confirmedBeats = mockBeatsV2.map(b => ({ ...b, status: 'CONFIRMED' }));
+      mockGetBeats.mockResolvedValue(confirmedBeats);
 
       const { useWorkflowStore } = await import('@/stores/useWorkflowStore');
       const store = useWorkflowStore();
@@ -313,7 +339,9 @@ describe('BeatsView', () => {
     });
 
     it('shows confirmed notice in CONFIRMED state', async () => {
-      mockGetBeats.mockResolvedValue(mockBeatsV2);
+      // Use beats with CONFIRMED status to reflect actual backend confirmed state
+      const confirmedBeats = mockBeatsV2.map(b => ({ ...b, status: 'CONFIRMED' }));
+      mockGetBeats.mockResolvedValue(confirmedBeats);
 
       const { useWorkflowStore } = await import('@/stores/useWorkflowStore');
       const store = useWorkflowStore();
@@ -327,7 +355,9 @@ describe('BeatsView', () => {
     });
 
     it('still shows beats in CONFIRMED state', async () => {
-      mockGetBeats.mockResolvedValue(mockBeatsV2);
+      // Use beats with CONFIRMED status to reflect actual backend confirmed state
+      const confirmedBeats = mockBeatsV2.map(b => ({ ...b, status: 'CONFIRMED' }));
+      mockGetBeats.mockResolvedValue(confirmedBeats);
 
       const { useWorkflowStore } = await import('@/stores/useWorkflowStore');
       const store = useWorkflowStore();

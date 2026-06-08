@@ -122,6 +122,8 @@ import {
   confirmBeats,
 } from '@/api/beats';
 import { getOutline } from '@/api/outline';
+import { getSetting } from '@/api/setting';
+import { getIdea } from '@/api/idea';
 import { getProject } from '@/api/project';
 import type { BeatDataResponse } from '@/api/beats';
 import BeatNarrativeCard from '@/components/BeatNarrativeCard.vue';
@@ -172,9 +174,19 @@ const {
     ...(configTargetChapters.value != null ? { targetChapterCount: String(configTargetChapters.value) } : {}),
   }),
   previousPhases: [
+    { phase: 'IDEA', getFn: getIdea as (id: string) => Promise<unknown> },
+    { phase: 'SETTING', getFn: getSetting as (id: string) => Promise<unknown> },
     { phase: 'OUTLINE', getFn: getOutline as (id: string) => Promise<unknown> },
   ],
-  getStatus: () => store.getStepStatus('BEATS'),
+  getStatus: (data) => {
+    // Derive phase status from actual beat data instead of store (which may be stale)
+    //   - If beats exist and all are CONFIRMED → the whole phase is CONFIRMED
+    //   - If beats exist but not all confirmed → phase is AWAITING_REVIEW (→ IN_PROGRESS)
+    //   - If no beats yet → fall back to store (handles PENDING / initial state)
+    if (!data || data.length === 0) return store.getStepStatus('BEATS');
+    const allConfirmed = data.every(b => b.status === 'CONFIRMED');
+    return allConfirmed ? 'CONFIRMED' : 'AWAITING_REVIEW';
+  },
 });
 
 // Sync beats to beatStore
