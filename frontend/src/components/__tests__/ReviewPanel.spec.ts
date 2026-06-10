@@ -61,16 +61,6 @@ describe('ReviewPanel', () => {
   // ─── PASS verdict ────────────────────────────────────────────
 
   describe('PASS verdict', () => {
-    it('renders no action buttons (auto-confirm)', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: makeReviewResult({ verdict: 'PASS' }),
-        chapterStatus: 'REVIEWING',
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      expect(buttons).toHaveLength(0);
-    });
-
     it('renders a "PASS" status badge or indicator', async () => {
       const wrapper = await mountPanel({
         reviewResult: makeReviewResult({ verdict: 'PASS' }),
@@ -87,10 +77,8 @@ describe('ReviewPanel', () => {
   // ─── PASS_WITH_SUGGESTIONS verdict ────────────────────────────
 
   describe('PASS_WITH_SUGGESTIONS verdict', () => {
-    let result: ReviewResult;
-
-    beforeEach(() => {
-      result = makeReviewResult({
+    it('displays review issues/suggestions list', async () => {
+      const result = makeReviewResult({
         verdict: 'PASS_WITH_SUGGESTIONS',
         dimensions: {
           POLITICAL_SAFETY: {
@@ -110,61 +98,7 @@ describe('ReviewPanel', () => {
           VALUES: { score: 10, issues: [] },
         },
       });
-    });
 
-    it('renders "Adopt suggestions" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      const labels = buttons.map((b) => b.text());
-      expect(labels).toEqual(
-        expect.arrayContaining([expect.stringMatching(/采纳/i)]),
-      );
-    });
-
-    it('renders "Ignore and confirm" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      const labels = buttons.map((b) => b.text());
-      expect(labels).toEqual(
-        expect.arrayContaining([expect.stringMatching(/忽略/i)]),
-      );
-    });
-
-    it('emits "adopt-suggestions" event when adopt button clicked', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const adoptBtn = wrapper.find('[data-testid="action-adopt_suggestions"]');
-      expect(adoptBtn.exists()).toBe(true);
-      await adoptBtn.trigger('click');
-
-      expect(wrapper.emitted('adopt-suggestions')).toBeTruthy();
-    });
-
-    it('emits "ignore-and-confirm" event when ignore button clicked', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const ignoreBtn = wrapper.find('[data-testid="action-ignore_and_confirm"]');
-      expect(ignoreBtn.exists()).toBe(true);
-      await ignoreBtn.trigger('click');
-
-      expect(wrapper.emitted('ignore-and-confirm')).toBeTruthy();
-    });
-
-    it('displays review issues/suggestions list', async () => {
       const wrapper = await mountPanel({
         reviewResult: result,
         chapterStatus: 'REVIEWING',
@@ -177,238 +111,9 @@ describe('ReviewPanel', () => {
 
   // ─── NEEDS_REVISION verdict ───────────────────────────────────
 
-  describe('NEEDS_REVISION verdict', () => {
-    let result: ReviewResult;
-
-    beforeEach(() => {
-      result = makeReviewResult({
-        verdict: 'NEEDS_REVISION',
-        overallScore: 4.5,
-        dimensions: {
-          POLITICAL_SAFETY: {
-            score: 4,
-            issues: [
-              {
-                severity: 'HIGH',
-                location: '第1段',
-                rule: '禁止涉政',
-                suggestion: '移除敏感政治隐喻',
-                autoFixable: false,
-              },
-            ],
-          },
-          SEXUAL_CONTENT: { score: 10, issues: [] },
-          VIOLENCE: { score: 10, issues: [] },
-          VALUES: { score: 10, issues: [] },
-        },
-      });
-    });
-
-    it('renders exactly 3 action buttons', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      expect(buttons).toHaveLength(3);
-    });
-
-    it('renders "Adopt and re-review" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(
-        wrapper.find('[data-testid="action-adopt_and_re_review"]').exists(),
-      ).toBe(true);
-    });
-
-    it('renders "Manual edit" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(
-        wrapper.find('[data-testid="action-manual_edit"]').exists(),
-      ).toBe(true);
-    });
-
-    it('renders "Appeal" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(wrapper.find('[data-testid="action-appeal"]').exists()).toBe(true);
-    });
-
-    it('emits "manual-edit" when manual edit button clicked', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      await wrapper
-        .find('[data-testid="action-manual_edit"]')
-        .trigger('click');
-      expect(wrapper.emitted('manual-edit')).toBeTruthy();
-    });
-
-    it('emits "appeal" when appeal button clicked', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      await wrapper.find('[data-testid="action-appeal"]').trigger('click');
-      expect(wrapper.emitted('appeal')).toBeTruthy();
-    });
-  });
-
-  // ─── BLOCKED verdict ──────────────────────────────────────────
-
-  describe('BLOCKED verdict', () => {
-    let result: ReviewResult;
-
-    beforeEach(() => {
-      result = makeReviewResult({
-        verdict: 'BLOCKED',
-        overallScore: 2.0,
-        dimensions: {
-          POLITICAL_SAFETY: {
-            score: 1,
-            issues: [
-              {
-                severity: 'CRITICAL',
-                location: '全文',
-                rule: '零容忍红线',
-                suggestion: '需要完全重写此章节',
-                autoFixable: false,
-              },
-            ],
-          },
-          SEXUAL_CONTENT: { score: 10, issues: [] },
-          VIOLENCE: { score: 10, issues: [] },
-          VALUES: { score: 10, issues: [] },
-        },
-      });
-    });
-
-    it('renders exactly 2 action buttons (no one-click adopt)', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      expect(buttons).toHaveLength(2);
-    });
-
-    it('renders "Manual edit" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(
-        wrapper.find('[data-testid="action-manual_edit"]').exists(),
-      ).toBe(true);
-    });
-
-    it('renders "Appeal" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(wrapper.find('[data-testid="action-appeal"]').exists()).toBe(true);
-    });
-
-    it('does NOT render any "adopt" or "accept" button', async () => {
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(wrapper.find('[data-testid="action-adopt_suggestions"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="action-adopt_and_re_review"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="action-ignore_and_confirm"]').exists()).toBe(false);
-    });
-  });
-
-  // ─── Appeal already filed ────────────────────────────────────
-
-  describe('when appeal has already been filed', () => {
-    it('does not show appeal button when appealCount >= 1', async () => {
-      const result = makeReviewResult({
-        verdict: 'NEEDS_REVISION',
-        appealCount: 1,
-      });
-
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(wrapper.find('[data-testid="action-appeal"]').exists()).toBe(
-        false,
-      );
-    });
-
-    it('shows "Force dispute" option after appeal upheld', async () => {
-      const result = makeReviewResult({
-        verdict: 'NEEDS_REVISION',
-        appealCount: 1,
-      });
-
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(
-        wrapper.find('[data-testid="action-force_dispute"]').exists(),
-      ).toBe(true);
-    });
-
-    it('shows "Edit again" option after appeal upheld', async () => {
-      const result = makeReviewResult({
-        verdict: 'BLOCKED',
-        appealCount: 1,
-      });
-
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-      });
-
-      expect(
-        wrapper.find('[data-testid="action-manual_edit"]').exists(),
-      ).toBe(true);
-    });
-  });
-
   // ─── Loading state ───────────────────────────────────────────
 
   describe('loading state', () => {
-    it('disables all action buttons while loading', async () => {
-      const result = makeReviewResult({ verdict: 'PASS_WITH_SUGGESTIONS' });
-
-      const wrapper = await mountPanel({
-        reviewResult: result,
-        chapterStatus: 'REVIEWING',
-        loading: true,
-      });
-
-      const buttons = wrapper.findAll('[data-testid^="action-"]');
-      for (const btn of buttons) {
-        expect((btn.element as HTMLButtonElement).disabled).toBe(true);
-      }
-    });
-
     it('shows loading indicator when loading prop is true', async () => {
       const result = makeReviewResult({ verdict: 'PASS_WITH_SUGGESTIONS' });
 
@@ -458,6 +163,61 @@ describe('ReviewPanel', () => {
       expect(wrapper.text()).toContain('暴力渲染');
       expect(wrapper.text()).toContain('价值观');
       expect(wrapper.text()).toContain('10');
+    });
+
+    it('survives missing overallScore without crashing', async () => {
+      const result = makeReviewResult({
+        verdict: 'PASS',
+        overallScore: undefined as any,
+      });
+
+      const wrapper = await mountPanel({
+        reviewResult: result,
+        chapterStatus: 'REVIEWING',
+      });
+
+      // Should render without throwing — shows fallback score
+      expect(wrapper.find('[data-testid="overall-score"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="overall-score"]').text()).toMatch(
+        /\d+\.\d/,
+      );
+    });
+
+    it('survives missing dimensions without crashing', async () => {
+      const result = makeReviewResult({
+        verdict: 'PASS',
+        overallScore: 10,
+        dimensions: undefined as any,
+      });
+
+      const wrapper = await mountPanel({
+        reviewResult: result,
+        chapterStatus: 'REVIEWING',
+      });
+
+      // Should render without throwing — each dimension shows fallback
+      expect(wrapper.text()).toContain('政治安全');
+      expect(wrapper.text()).toContain('色情尺度');
+      expect(wrapper.text()).toContain('暴力渲染');
+      expect(wrapper.text()).toContain('价值观');
+    });
+
+    it('survives missing verdict without crashing', async () => {
+      const result = makeReviewResult({
+        verdict: undefined as any,
+        overallScore: 10,
+      });
+
+      const wrapper = await mountPanel({
+        reviewResult: result,
+        chapterStatus: 'REVIEWING',
+      });
+
+      // Should render without throwing — shows fallback verdict badge with meaningful text
+      const badge = wrapper.find('[data-testid="verdict-badge"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBeTruthy();
+      expect(badge.text()).not.toBe('undefined');
     });
   });
 });

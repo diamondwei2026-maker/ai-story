@@ -855,6 +855,69 @@ describe("DraftingView", () => {
       expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="drafting-empty-state"]').exists()).toBe(true);
     });
+
+    it("auto-selects chapter after generation to show content immediately", async () => {
+      // onMounted loadChapters: chapter is PENDING with no content
+      mockGetChapters.mockResolvedValueOnce([
+        makeChapter({ id: "ch-1", chapterNumber: 1, title: "第一章", content: null, status: "PENDING" }),
+      ]);
+      // After generation, loadChapters returns the chapter WITH content
+      mockGetChapters.mockResolvedValue([
+        makeChapter({ id: "ch-1", chapterNumber: 1, title: "第一章", content: "第一章正文内容...", status: "REVIEWING" }),
+      ]);
+      mockGenerateChapter.mockResolvedValue({});
+
+      const wrapper = await mountView();
+      // Flush all pending promises + Vue updates (onMounted loadChapters)
+      await new Promise((r) => setTimeout(r, 10));
+      await wrapper.vm.$nextTick();
+
+      // Before generation: chapter list is visible (no workspace)
+      expect(wrapper.find('[data-testid="chapter-list"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="editor-workspace"]').exists()).toBe(false);
+
+      // Click generate button on the chapter card
+      const btn = wrapper.find('[data-testid="generate-chapter-btn"]');
+      await btn.trigger("click");
+      // Flush the async handleGenerate + Vue reactivity updates
+      await new Promise((r) => setTimeout(r, 10));
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // After generation: EditorWorkspace should be visible with the generated content
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.exists()).toBe(true);
+      expect(workspace.props("chapterContent")).toBe("第一章正文内容...");
+    });
+
+    it("supports generate event from EditorWorkspace for PENDING chapters", async () => {
+      mockGetChapters.mockResolvedValue([
+        makeChapter({ id: "ch-1", chapterNumber: 1, title: "第一章", content: null, status: "PENDING" }),
+      ]);
+      mockGenerateChapter.mockResolvedValue({});
+
+      const wrapper = await mountView();
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+
+      // Open the PENDING chapter in workspace
+      const chapterCard = wrapper.find('[data-testid="chapter-list-item"]');
+      await chapterCard.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      // Workspace should be visible with empty content
+      const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
+      expect(workspace.exists()).toBe(true);
+      expect(workspace.props("chapterContent")).toBe("");
+
+      // Emit generate from workspace (simulating TextToolbar's generate button)
+      await workspace.vm.$emit("generate");
+      await new Promise((r) => setTimeout(r, 10));
+      await wrapper.vm.$nextTick();
+
+      // Should call the generateChapter API
+      expect(mockGenerateChapter).toHaveBeenCalledWith("proj-1", "ch-1", { mode: "new-continue" });
+    });
   });
 
   // ══════════════════════════════════════════════════════════════════

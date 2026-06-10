@@ -45,6 +45,8 @@
       @retry="(feedback: string) => handleRetry(selectedChapter.id, feedback)"
       @confirm="handleConfirm(selectedChapter.id)"
       @dispute="handleDispute(selectedChapter.id)"
+      @generate="handleGenerateFromWorkspace"
+      @submit-review="handleSubmitReview(selectedChapter.id)"
       @adopt-suggestions="() => {}"
       @adopt-and-re-review="() => {}"
       @manual-edit="() => {}"
@@ -312,7 +314,22 @@ async function handleDispute(chapterId: string) {
   }
 }
 
+async function handleSubmitReview(chapterId: string) {
+  try {
+    await chapterApi.reviewChapter(props.projectId, chapterId);
+    await chapterStore.loadChapters(props.projectId);
+  } catch (e: any) {
+    chapterStore.error = e.message || "提交审核失败";
+  }
+}
+
 // ─── Actions ────────────────────────────────────────────────────────
+
+async function handleGenerateFromWorkspace() {
+  const chapter = selectedChapter.value;
+  if (!chapter) return;
+  await handleGenerate(chapter);
+}
 
 async function fetchBeats() {
   try {
@@ -323,13 +340,18 @@ async function fetchBeats() {
 }
 
 async function handleGenerate(chapter: Chapter) {
+  isGenerating.value = true;
   try {
     await chapterApi.generateChapter(props.projectId, chapter.id, {
       mode: "new-continue",
     });
     await chapterStore.loadChapters(props.projectId);
+    // 生成完成后自动选中章节，让用户立即看到生成的正文
+    selectChapter(chapter);
   } catch (e: any) {
     chapterStore.error = e.message || "生成失败";
+  } finally {
+    isGenerating.value = false;
   }
 }
 

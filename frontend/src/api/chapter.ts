@@ -1,5 +1,6 @@
 import { request } from './common';
 import type { Chapter } from '@/stores/useChapterStore';
+import type { ReviewResult } from '@/types';
 
 export async function getChapters(projectId: string): Promise<Chapter[]> {
   return request<Chapter[]>(`/projects/${projectId}/chapters`);
@@ -74,6 +75,16 @@ export async function retryChapter(
       method: 'POST',
       body: JSON.stringify(body),
     },
+  );
+}
+
+export async function reviewChapter(
+  projectId: string,
+  chapterId: string,
+): Promise<ReviewResult> {
+  return request<ReviewResult>(
+    `/projects/${projectId}/chapters/${chapterId}/review`,
+    { method: 'POST' },
   );
 }
 

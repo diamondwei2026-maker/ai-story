@@ -1,6 +1,8 @@
 import { Controller, Post, Get, Body, Param, HttpCode } from '@nestjs/common';
 import { StepService } from './step.service';
 import { ChangeAnalysisService, AnalyzeChangeResult, TargetedFixResult } from './change-analysis.service';
+import { ReviewService } from './review.service';
+import type { ReviewResult } from './entities/review.types';
 import { ChapterData } from './step.entity';
 
 @Controller('projects/:projectId/chapters')
@@ -8,6 +10,7 @@ export class ChapterController {
   constructor(
     private readonly stepService: StepService,
     private readonly changeAnalysisService: ChangeAnalysisService,
+    private readonly reviewService: ReviewService,
   ) {}
 
   @Get()
@@ -67,6 +70,15 @@ export class ChapterController {
     @Body() body: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
     return this.stepService.retryChapterGeneration(projectId, chapterId, body);
+  }
+
+  @Post(':chapterId/review')
+  @HttpCode(200)
+  async review(
+    @Param('projectId') _projectId: string,
+    @Param('chapterId') chapterId: string,
+  ): Promise<ReviewResult> {
+    return this.reviewService.evaluateChapter(chapterId);
   }
 
   @Post(':chapterId/analyze-change')

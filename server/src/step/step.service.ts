@@ -1018,6 +1018,19 @@ export class StepService {
   }
 
   private async runPostGenerationPipeline(chapter: ChapterData, projectId: string): Promise<void> {
+    try {
+      await this.runPostGenerationPipelineImpl(chapter, projectId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[PostGeneration] Pipeline failed for chapter ${chapter.id} (ch${chapter.chapterNumber}), ` +
+        `content saved but post-processing skipped: ${msg}`,
+      );
+      // Best-effort: content is already persisted; don't fail the entire generation
+    }
+  }
+
+  private async runPostGenerationPipelineImpl(chapter: ChapterData, projectId: string): Promise<void> {
     const chapterContent = chapter.content!;
 
     // Phase 1: 并行执行无需互相等待的 AI 调用（指纹 + 审核）

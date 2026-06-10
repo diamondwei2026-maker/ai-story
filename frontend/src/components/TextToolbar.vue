@@ -17,6 +17,15 @@
       继续
     </a-button>
 
+    <a-button
+      v-if="showGenerate && !isGenerating"
+      type="primary"
+      data-testid="btn-generate"
+      @click="$emit('generate')"
+    >
+      生成正文
+    </a-button>
+
     <template v-if="showRetryFeedback">
       <a-input
         data-testid="retry-feedback-input"
@@ -26,7 +35,7 @@
     </template>
 
     <a-button
-      v-if="!isGenerating"
+      v-if="!isGenerating && !showGenerate"
       data-testid="btn-retry"
       @click="$emit('retry', feedback)"
     >
@@ -42,12 +51,14 @@ defineProps<{
   isGenerating: boolean;
   isPaused: boolean;
   showRetryFeedback: boolean;
+  showGenerate?: boolean;
 }>();
 
 defineEmits<{
   pause: [];
   continue: [];
   retry: [feedback: string];
+  generate: [];
 }>();
 
 const feedback = ref('');

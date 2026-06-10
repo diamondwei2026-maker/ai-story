@@ -45,6 +45,14 @@ export async function request<T>(
       return res.json() as Promise<T>;
     } finally {
       inFlight.delete(cacheKey);
+      // 非 GET 请求完成后，清除相关 GET 缓存，避免后续 GET 返回过期数据
+      if (method !== 'GET') {
+        for (const [key] of inFlight) {
+          if (key.startsWith('GET:') && url.startsWith(key.slice(4))) {
+            inFlight.delete(key);
+          }
+        }
+      }
     }
   })();
 

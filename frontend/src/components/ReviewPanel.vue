@@ -4,7 +4,7 @@
     <div class="review-panel__header">
       <a-tag data-testid="verdict-badge" :color="verdictColor">{{ verdictLabel }}</a-tag>
       <span data-testid="overall-score" class="review-panel__score">
-        {{ reviewResult.overallScore.toFixed(1) }} / 10
+        {{ (reviewResult.overallScore ?? 0).toFixed(1) }} / 10
       </span>
     </div>
 
@@ -48,21 +48,6 @@
       处理中...
     </div>
 
-    <!-- Action buttons -->
-    <div class="review-panel__actions">
-      <a-button
-        v-for="action in availableActions"
-        :key="action.key"
-        :data-testid="`action-${action.key}`"
-        :type="actionBtnType(action.key)"
-        :danger="action.key === 'force_dispute'"
-        :disabled="loading"
-        size="small"
-        @click="handleAction(action.key)"
-      >
-        {{ action.label }}
-      </a-button>
-    </div>
   </div>
 </template>
 
@@ -78,15 +63,6 @@ const props = withDefaults(defineProps<{
   loading: false,
 });
 
-const emit = defineEmits<{
-  'adopt-suggestions': [];
-  'ignore-and-confirm': [];
-  'adopt-and-re-review': [];
-  'manual-edit': [];
-  'appeal': [];
-  'force-dispute': [];
-}>();
-
 const dimensions = [
   { key: 'POLITICAL_SAFETY', label: '政治安全' },
   { key: 'SEXUAL_CONTENT', label: '色情尺度' },
@@ -98,7 +74,7 @@ const dimensions = [
 	  const dims = props.reviewResult.dimensions;
 	  return dimensions.map((d) => ({
 	    ...d,
-	    score: (dims[d.key as keyof typeof dims]?.score ?? 0).toFixed(1),
+	    score: (dims?.[d.key as keyof typeof dims]?.score ?? 0).toFixed(1),
 	  }));
 	});
 
@@ -110,7 +86,7 @@ const verdictLabels: Record<string, string> = {
 };
 
 const verdictLabel = computed(() => {
-  return verdictLabels[props.reviewResult.verdict] ?? props.reviewResult.verdict;
+  return verdictLabels[props.reviewResult.verdict] ?? props.reviewResult.verdict ?? '未知';
 });
 
 const verdictColor = computed(() => {
@@ -126,54 +102,12 @@ const verdictColor = computed(() => {
 const allIssues = computed((): ReviewIssue[] => {
   const dims = props.reviewResult.dimensions;
   return [
-    ...(dims.POLITICAL_SAFETY?.issues ?? []),
-    ...(dims.SEXUAL_CONTENT?.issues ?? []),
-    ...(dims.VIOLENCE?.issues ?? []),
-    ...(dims.VALUES?.issues ?? []),
+    ...(dims?.POLITICAL_SAFETY?.issues ?? []),
+    ...(dims?.SEXUAL_CONTENT?.issues ?? []),
+    ...(dims?.VIOLENCE?.issues ?? []),
+    ...(dims?.VALUES?.issues ?? []),
   ];
 });
-
-const VERDICT_ACTIONS: Record<string, { key: string; label: string }[]> = {
-  PASS: [],
-  PASS_WITH_SUGGESTIONS: [
-    { key: 'adopt_suggestions', label: '采纳建议并重新审核' },
-    { key: 'ignore_and_confirm', label: '忽略并确认' },
-  ],
-  NEEDS_REVISION: [
-    { key: 'adopt_and_re_review', label: '采纳修改并重新审核' },
-    { key: 'manual_edit', label: '手动修改正文' },
-  ],
-  BLOCKED: [{ key: 'manual_edit', label: '手动修改正文' }],
-};
-
-function pushAppealAction(
-  actions: { key: string; label: string }[],
-): void {
-  if (props.reviewResult.appealCount < 1) {
-    actions.push({ key: 'appeal', label: '上诉' });
-  } else {
-    actions.push({ key: 'force_dispute', label: '强制标记争议' });
-  }
-}
-
-const availableActions = computed(() => {
-  const actions = [
-    ...(VERDICT_ACTIONS[props.reviewResult.verdict] ?? []),
-  ];
-  if (
-    props.reviewResult.verdict === 'NEEDS_REVISION' ||
-    props.reviewResult.verdict === 'BLOCKED'
-  ) {
-    pushAppealAction(actions);
-  }
-  return actions;
-});
-
-function actionBtnType(key: string): string {
-  if (key === 'adopt_suggestions' || key === 'adopt_and_re_review') return 'primary';
-  if (key === 'force_dispute') return 'primary';
-  return 'default';
-}
 
 function severityTagColor(severity: string): string {
   const map: Record<string, string> = {
@@ -185,16 +119,6 @@ function severityTagColor(severity: string): string {
   return map[severity] ?? 'default';
 }
 
-function handleAction(key: string) {
-  const event = key.replace(/_/g, '-') as
-    | 'adopt-suggestions'
-    | 'ignore-and-confirm'
-    | 'adopt-and-re-review'
-    | 'manual-edit'
-    | 'appeal'
-    | 'force-dispute';
-  emit(event as any);
-}
 </script>
 
 <style scoped>
@@ -260,9 +184,4 @@ function handleAction(key: string) {
   font-size: 13px;
 }
 
-.review-panel__actions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
 </style>
