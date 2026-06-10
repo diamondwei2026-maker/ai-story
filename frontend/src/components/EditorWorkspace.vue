@@ -26,8 +26,8 @@
       </div>
     </div>
 
-    <!-- Mode Switcher -->
-    <div class="editor-workspace__mode">
+    <!-- Mode Switcher (hidden for terminal chapters) -->
+    <div v-if="!isTerminal" class="editor-workspace__mode">
       <ModeSwitcher
         :mode="generationMode"
         :disabled="isGenerating"
@@ -43,29 +43,35 @@
       @update:content="(val: string) => emit('content-change', val)"
     />
 
-    <!-- Text Toolbar -->
-    <div class="editor-workspace__toolbar">
-      <TextToolbar
+    <!-- Chapter Action Bar (unified) -->
+    <div class="editor-workspace__action-bar">
+      <ChapterActionBar
+        :chapter-status="chapterStatus"
+        :review-verdict="reviewResult?.verdict ?? null"
+        :appeal-count="reviewResult?.appealCount ?? 0"
         :is-generating="isGenerating"
         :is-paused="isPaused"
-        :show-retry-feedback="showRetryFeedback"
+        :has-content="!!chapterContent"
+        @generate="emit('generate')"
         @pause="emit('pause')"
         @continue="emit('continue')"
         @retry="(feedback: string) => emit('retry', feedback)"
-      />
-    </div>
-
-    <!-- Review Panel -->
-    <div v-if="reviewResult" class="editor-workspace__review">
-      <ReviewPanel
-        :review-result="reviewResult"
-        :chapter-status="chapterStatus"
+        @confirm="emit('confirm')"
+        @submit-review="emit('submit-review')"
         @adopt-suggestions="emit('adopt-suggestions')"
         @ignore-and-confirm="emit('confirm')"
         @adopt-and-re-review="emit('adopt-and-re-review')"
         @manual-edit="emit('manual-edit')"
         @appeal="openAppealModal"
         @force-dispute="openDisputeModal"
+      />
+    </div>
+
+    <!-- Review Panel (display only — actions handled by ChapterActionBar) -->
+    <div v-if="reviewResult && chapterStatus !== 'PENDING' && chapterStatus !== 'DRAFT'" class="editor-workspace__review">
+      <ReviewPanel
+        :review-result="reviewResult"
+        :chapter-status="chapterStatus"
       />
     </div>
 
@@ -93,15 +99,13 @@
 import { ref, computed } from 'vue';
 import type { ReviewResult } from '@/types';
 import {
-  CHAPTER_STATUS_LABEL,
-  CHAPTER_STATUS_COLOR,
   TERMINAL_CHAPTER_STATUSES,
   chapterStatusLabel,
   chapterStatusColor,
 } from '@/types';
 import ModeSwitcher from '@/components/ModeSwitcher.vue';
 import StreamingEditor from '@/components/StreamingEditor.vue';
-import TextToolbar from '@/components/TextToolbar.vue';
+import ChapterActionBar from '@/components/ChapterActionBar.vue';
 import ReviewPanel from '@/components/ReviewPanel.vue';
 import AppealModal from '@/components/AppealModal.vue';
 import DisputeConfirm from '@/components/DisputeConfirm.vue';
@@ -124,6 +128,8 @@ const emit = defineEmits<{
   (e: 'pause'): void;
   (e: 'continue'): void;
   (e: 'retry', feedback: string): void;
+  (e: 'generate'): void;
+  (e: 'submit-review'): void;
   (e: 'close'): void;
   (e: 'adopt-suggestions'): void;
   (e: 'confirm'): void;
@@ -136,12 +142,10 @@ const emit = defineEmits<{
 const showAppealModal = ref(false);
 const showDisputeModal = ref(false);
 
-const isEditable = computed(() => {
-  return !props.isGenerating && !TERMINAL_CHAPTER_STATUSES.has(props.chapterStatus);
-});
+const isTerminal = computed(() => TERMINAL_CHAPTER_STATUSES.has(props.chapterStatus));
 
-const showRetryFeedback = computed(() => {
-  return !props.isGenerating && !TERMINAL_CHAPTER_STATUSES.has(props.chapterStatus);
+const isEditable = computed(() => {
+  return !props.isGenerating && !isTerminal.value;
 });
 
 function openAppealModal() {

@@ -73,8 +73,8 @@ describe("EditorWorkspace", () => {
       expect(wrapper.find('[data-testid="workspace-title"]').text()).toContain("第一章：天龙降世");
     });
 
-    it("renders the ModeSwitcher component", async () => {
-      const wrapper = await mountEditorWorkspace();
+    it("renders the ModeSwitcher component for non-terminal chapters", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "DRAFT" });
       expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(true);
     });
 
@@ -83,9 +83,9 @@ describe("EditorWorkspace", () => {
       expect(wrapper.find('[data-testid="streaming-editor"]').exists()).toBe(true);
     });
 
-    it("renders the TextToolbar component", async () => {
+    it("renders the ChapterActionBar component", async () => {
       const wrapper = await mountEditorWorkspace();
-      expect(wrapper.find('[data-testid="text-toolbar"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="chapter-action-bar"]').exists()).toBe(true);
     });
   });
 
@@ -95,18 +95,28 @@ describe("EditorWorkspace", () => {
 
   describe("mode switching", () => {
     it("passes generationMode to ModeSwitcher", async () => {
-      const wrapper = await mountEditorWorkspace({ generationMode: "paragraph-rewrite" });
+      const wrapper = await mountEditorWorkspace({ generationMode: "paragraph-rewrite", chapterStatus: "DRAFT" });
       const switcher = wrapper.findComponent({ name: "ModeSwitcher" });
       expect(switcher.props("mode")).toBe("paragraph-rewrite");
     });
 
     it("emits mode-change when ModeSwitcher emits update:mode", async () => {
-      const wrapper = await mountEditorWorkspace({ generationMode: "new-continue" });
+      const wrapper = await mountEditorWorkspace({ generationMode: "new-continue", chapterStatus: "DRAFT" });
       const switcher = wrapper.findComponent({ name: "ModeSwitcher" });
       await switcher.vm.$emit("update:mode", "style-upgrade");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("mode-change")).toBeTruthy();
       expect(wrapper.emitted("mode-change")![0]).toEqual(["style-upgrade"]);
+    });
+
+    it("hides ModeSwitcher for COMPLETED chapters", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "COMPLETED" });
+      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
+    });
+
+    it("hides ModeSwitcher for DISPUTED chapters", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "DISPUTED" });
+      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
     });
   });
 
@@ -156,57 +166,58 @@ describe("EditorWorkspace", () => {
   });
 
   // ══════════════════════════════════════════════════════════════════
-  // 4. TextToolbar — pause / continue / retry
+  // 4. ChapterActionBar — pause / continue / retry
   // ══════════════════════════════════════════════════════════════════
 
-  describe("TextToolbar controls", () => {
-    it("passes isGenerating to TextToolbar", async () => {
+  describe("ChapterActionBar controls", () => {
+    it("passes isGenerating to ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: true });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("isGenerating")).toBe(true);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("isGenerating")).toBe(true);
     });
 
-    it("passes isPaused to TextToolbar", async () => {
+    it("passes isPaused to ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: false, isPaused: true });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("isPaused")).toBe(true);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("isPaused")).toBe(true);
     });
 
-    it("emits pause when TextToolbar emits pause", async () => {
+    it("emits pause when ChapterActionBar emits pause", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: true, isPaused: false });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      await toolbar.vm.$emit("pause");
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      await actionBar.vm.$emit("pause");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("pause")).toBeTruthy();
     });
 
-    it("emits continue when TextToolbar emits continue", async () => {
+    it("emits continue when ChapterActionBar emits continue", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: false, isPaused: true, chapterContent: "edited by user after pause" });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      await toolbar.vm.$emit("continue");
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      await actionBar.vm.$emit("continue");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("continue")).toBeTruthy();
     });
 
-    it("emits retry with feedback when TextToolbar emits retry", async () => {
+    it("emits retry with feedback when ChapterActionBar emits retry", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: false, isPaused: false });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      await toolbar.vm.$emit("retry", "希望主角性格更果断");
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      await actionBar.vm.$emit("retry", "希望主角性格更果断");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("retry")).toBeTruthy();
       expect(wrapper.emitted("retry")![0]).toEqual(["希望主角性格更果断"]);
     });
 
-    it("shows retry feedback input when not generating and chapter not completed", async () => {
-      const wrapper = await mountEditorWorkspace({ isGenerating: false, chapterStatus: "DRAFT" });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("showRetryFeedback")).toBe(true);
+    it("passes hasContent to ChapterActionBar", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterContent: "有正文内容" });
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("hasContent")).toBe(true);
     });
 
-    it("hides retry feedback for completed chapters", async () => {
-      const wrapper = await mountEditorWorkspace({ isGenerating: false, chapterStatus: "COMPLETED" });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("showRetryFeedback")).toBe(false);
+    it("passes reviewVerdict to ChapterActionBar", async () => {
+      const reviewResult = makeReviewResult({ verdict: "NEEDS_REVISION" });
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("reviewVerdict")).toBe("NEEDS_REVISION");
     });
   });
 
@@ -223,8 +234,8 @@ describe("EditorWorkspace", () => {
       const editor = wrapper.findComponent({ name: "StreamingEditor" });
       expect(editor.props("content")).toBe("A".repeat(2000));
       expect(editor.props("isEditable")).toBe(true);
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("isPaused")).toBe(true);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("isPaused")).toBe(true);
     });
 
     it("when content <60% of targetWordCount: triggers full retry", async () => {
@@ -232,9 +243,9 @@ describe("EditorWorkspace", () => {
         chapterStatus: "DRAFT", targetWordCount: 3000,
         chapterContent: "A".repeat(500), isGenerating: false, isPaused: false,
       });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("isPaused")).toBe(false);
-      expect(toolbar.props("showRetryFeedback")).toBe(true);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("isPaused")).toBe(false);
+      expect(actionBar.props("hasContent")).toBe(true);
     });
   });
 
@@ -260,6 +271,18 @@ describe("EditorWorkspace", () => {
       const panel = wrapper.findComponent({ name: "ReviewPanel" });
       expect(panel.props("reviewResult")).toEqual(reviewResult);
       expect(panel.props("chapterStatus")).toBe("REVIEWING");
+    });
+
+    it("does not render ReviewPanel when chapterStatus is DRAFT even if reviewResult exists", async () => {
+      const reviewResult = makeReviewResult({ verdict: "PASS" });
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "DRAFT", reviewResult });
+      expect(wrapper.find('[data-testid="review-panel"]').exists()).toBe(false);
+    });
+
+    it("does not render ReviewPanel when chapterStatus is PENDING even if reviewResult exists", async () => {
+      const reviewResult = makeReviewResult({ verdict: "PASS" });
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "PENDING", reviewResult });
+      expect(wrapper.find('[data-testid="review-panel"]').exists()).toBe(false);
     });
   });
 
@@ -299,23 +322,22 @@ describe("EditorWorkspace", () => {
       });
     });
 
-    it("renders adopt suggestions and ignore buttons", async () => {
+    it("renders adopt suggestions and ignore buttons via ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      const labels = wrapper.findAll('[data-testid^="action-"]').map((b) => b.text());
-      expect(labels).toEqual(expect.arrayContaining([expect.stringMatching(/采纳/i)]));
-      expect(labels).toEqual(expect.arrayContaining([expect.stringMatching(/忽略/i)]));
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("reviewVerdict")).toBe("PASS_WITH_SUGGESTIONS");
     });
 
-    it("emits adopt-suggestions when adopt button clicked", async () => {
+    it("emits adopt-suggestions when ChapterActionBar emits adopt-suggestions", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("adopt-suggestions");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("adopt-suggestions");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("adopt-suggestions")).toBeTruthy();
     });
 
-    it("emits confirm when ignore-and-confirm clicked", async () => {
+    it("emits confirm when ChapterActionBar emits ignore-and-confirm", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("ignore-and-confirm");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("ignore-and-confirm");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("confirm")).toBeTruthy();
     });
@@ -339,28 +361,23 @@ describe("EditorWorkspace", () => {
       });
     });
 
-    it("renders 3 action buttons: adopt+re-review, manual-edit, appeal", async () => {
+    it("emits adopt-and-re-review via ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      expect(wrapper.findAll('[data-testid^="action-"]')).toHaveLength(3);
-    });
-
-    it("emits adopt-and-re-review event", async () => {
-      const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("adopt-and-re-review");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("adopt-and-re-review");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("adopt-and-re-review")).toBeTruthy();
     });
 
-    it("emits manual-edit event", async () => {
+    it("emits manual-edit via ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("manual-edit");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("manual-edit");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("manual-edit")).toBeTruthy();
     });
 
-    it("opens AppealModal when appeal button clicked", async () => {
+    it("opens AppealModal when ChapterActionBar emits appeal", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("appeal");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("appeal");
       await wrapper.vm.$nextTick();
       const appealModal = wrapper.findComponent({ name: "AppealModal" });
       expect(appealModal.exists()).toBe(true);
@@ -386,22 +403,16 @@ describe("EditorWorkspace", () => {
       });
     });
 
-    it("renders exactly 2 action buttons (no one-click adopt)", async () => {
+    it("passes BLOCKED verdict to ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      expect(wrapper.findAll('[data-testid^="action-"]')).toHaveLength(2);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("reviewVerdict")).toBe("BLOCKED");
     });
 
-    it("does NOT render any adopt button", async () => {
+    it("emits manual-edit from ChapterActionBar for BLOCKED", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      expect(wrapper.find('[data-testid="action-adopt_suggestions"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="action-adopt_and_re_review"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="action-ignore_and_confirm"]').exists()).toBe(false);
-    });
-
-    it("renders manual-edit and appeal buttons", async () => {
-      const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      expect(wrapper.find('[data-testid="action-manual_edit"]').exists()).toBe(true);
-      expect(wrapper.find('[data-testid="action-appeal"]').exists()).toBe(true);
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("manual-edit");
+      expect(wrapper.emitted("manual-edit")).toBeTruthy();
     });
   });
 
@@ -413,7 +424,7 @@ describe("EditorWorkspace", () => {
     it("renders AppealModal and closes on cancel", async () => {
       const reviewResult = makeReviewResult({ verdict: "NEEDS_REVISION" });
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("appeal");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("appeal");
       await wrapper.vm.$nextTick();
       let modal = wrapper.findComponent({ name: "AppealModal" });
       expect(modal.exists()).toBe(true);
@@ -428,7 +439,7 @@ describe("EditorWorkspace", () => {
     it("emits appeal event with reason when AppealModal submits", async () => {
       const reviewResult = makeReviewResult({ verdict: "NEEDS_REVISION" });
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("appeal");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("appeal");
       await wrapper.vm.$nextTick();
       await wrapper.findComponent({ name: "AppealModal" }).vm.$emit("submit", "审核误判：此为文学性隐喻");
       await wrapper.vm.$nextTick();
@@ -436,11 +447,11 @@ describe("EditorWorkspace", () => {
       expect(wrapper.emitted("appeal")![0]).toEqual(["审核误判：此为文学性隐喻"]);
     });
 
-    it("prevents second appeal when appealCount >= 1", async () => {
+    it("passes appealCount to ChapterActionBar for force dispute", async () => {
       const reviewResult = makeReviewResult({ verdict: "NEEDS_REVISION", appealCount: 1 });
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      expect(wrapper.find('[data-testid="action-appeal"]').exists()).toBe(false);
-      expect(wrapper.find('[data-testid="action-force_dispute"]').exists()).toBe(true);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("appealCount")).toBe(1);
     });
   });
 
@@ -449,10 +460,10 @@ describe("EditorWorkspace", () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe("force dispute flow", () => {
-    it("opens and closes DisputeConfirm modal", async () => {
+    it("opens and closes DisputeConfirm modal via ChapterActionBar", async () => {
       const reviewResult = makeReviewResult({ verdict: "BLOCKED", appealCount: 1 });
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("force-dispute");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("force-dispute");
       await wrapper.vm.$nextTick();
       let modal = wrapper.findComponent({ name: "DisputeConfirm" });
       expect(modal.exists()).toBe(true);
@@ -467,7 +478,7 @@ describe("EditorWorkspace", () => {
     it("emits dispute event when DisputeConfirm confirms", async () => {
       const reviewResult = makeReviewResult({ verdict: "BLOCKED", appealCount: 1 });
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult });
-      await wrapper.findComponent({ name: "ReviewPanel" }).vm.$emit("force-dispute");
+      await wrapper.findComponent({ name: "ChapterActionBar" }).vm.$emit("force-dispute");
       await wrapper.vm.$nextTick();
       await wrapper.findComponent({ name: "DisputeConfirm" }).vm.$emit("confirm");
       await wrapper.vm.$nextTick();
@@ -545,11 +556,12 @@ describe("EditorWorkspace", () => {
       expect(editor.props("isEditable")).toBe(false);
     });
 
-    it("hides generate/retry buttons for DISPUTED chapters", async () => {
+    it("hides action buttons for DISPUTED chapters", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "DISPUTED" });
-      const toolbar = wrapper.findComponent({ name: "TextToolbar" });
-      expect(toolbar.props("isGenerating")).toBe(false);
-      expect(toolbar.props("showRetryFeedback")).toBe(false);
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      expect(actionBar.props("isGenerating")).toBe(false);
+      // Terminal status means no visible buttons
+      expect(actionBar.props("chapterStatus")).toBe("DISPUTED");
     });
   });
 });
