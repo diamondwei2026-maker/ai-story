@@ -26,15 +26,6 @@
       </div>
     </div>
 
-    <!-- Mode Switcher (hidden for terminal chapters) -->
-    <div v-if="!isTerminal" class="editor-workspace__mode">
-      <ModeSwitcher
-        :mode="generationMode"
-        :disabled="isGenerating"
-        @update:mode="(val: string) => emit('mode-change', val)"
-      />
-    </div>
-
     <!-- Streaming Editor -->
     <StreamingEditor
       :content="chapterContent"
@@ -55,9 +46,10 @@
         @generate="emit('generate')"
         @pause="emit('pause')"
         @continue="emit('continue')"
-        @retry="(feedback: string) => emit('retry', feedback)"
+        @retry="(feedback: string, mode: string) => emit('retry', feedback, mode)"
         @confirm="emit('confirm')"
         @submit-review="emit('submit-review')"
+        @save-content="emit('save-content')"
         @adopt-suggestions="emit('adopt-suggestions')"
         @ignore-and-confirm="emit('confirm')"
         @adopt-and-re-review="emit('adopt-and-re-review')"
@@ -68,7 +60,8 @@
     </div>
 
     <!-- Review Panel (display only — actions handled by ChapterActionBar) -->
-    <div v-if="reviewResult && chapterStatus !== 'PENDING' && chapterStatus !== 'DRAFT'" class="editor-workspace__review">
+    <!-- Only show when reviewResult has a verdict (i.e. from explicit user submit, not internal audit) -->
+    <div v-if="reviewResult?.verdict && chapterStatus !== 'PENDING' && chapterStatus !== 'DRAFT' && chapterStatus !== 'PENDING_REVIEW'" class="editor-workspace__review">
       <ReviewPanel
         :review-result="reviewResult"
         :chapter-status="chapterStatus"
@@ -103,7 +96,6 @@ import {
   chapterStatusLabel,
   chapterStatusColor,
 } from '@/types';
-import ModeSwitcher from '@/components/ModeSwitcher.vue';
 import StreamingEditor from '@/components/StreamingEditor.vue';
 import ChapterActionBar from '@/components/ChapterActionBar.vue';
 import ReviewPanel from '@/components/ReviewPanel.vue';
@@ -114,22 +106,21 @@ const props = defineProps<{
   chapterId: string;
   chapterTitle: string;
   chapterContent: string;
-  chapterStatus: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
+  chapterStatus: 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
   targetWordCount: number;
-  generationMode: string;
   isGenerating: boolean;
   isPaused: boolean;
   reviewResult: ReviewResult | null;
 }>();
 
 const emit = defineEmits<{
-  (e: 'mode-change', value: string): void;
   (e: 'content-change', value: string): void;
   (e: 'pause'): void;
   (e: 'continue'): void;
-  (e: 'retry', feedback: string): void;
+  (e: 'retry', feedback: string, mode: string): void;
   (e: 'generate'): void;
   (e: 'submit-review'): void;
+  (e: 'save-content'): void;
   (e: 'close'): void;
   (e: 'adopt-suggestions'): void;
   (e: 'confirm'): void;

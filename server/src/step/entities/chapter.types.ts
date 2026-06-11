@@ -15,7 +15,7 @@ export interface ChapterData {
   beatPlan: Record<string, unknown> | null;
   targetWordCount: number;
   content: string | null;
-  status: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
+  status: 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
   chapterFingerprint: string | null;
   contextSummary: string | null;
   reviewResult: ReviewResult | Record<string, unknown> | null;

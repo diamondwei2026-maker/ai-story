@@ -53,12 +53,6 @@ describe('useChapterStore', () => {
       expect(store.error).toBeNull();
     });
 
-    it('initializes with default mode "new-continue"', async () => {
-      const { useChapterStore } = await import('@/stores/useChapterStore');
-      const store = useChapterStore();
-
-      expect(store.generationMode).toBe('new-continue');
-    });
   });
 
   describe('setChapters', () => {
@@ -98,6 +92,39 @@ describe('useChapterStore', () => {
     });
   });
 
+  describe('replaceChapterContent', () => {
+    it('replaces the entire content of a chapter', async () => {
+      const { useChapterStore } = await import('@/stores/useChapterStore');
+      const store = useChapterStore();
+      // Use fresh objects — mockChapter may be mutated by previous tests
+      const chapters = [
+        { ...mockChapter, id: 'ch-1', content: null },
+        { ...mockChapter, id: 'ch-2', chapterNumber: 2, content: null },
+        { ...mockChapter, id: 'ch-3', chapterNumber: 3, content: null },
+      ];
+      store.setChapters(chapters);
+
+      // Set initial content via append (as if from streaming)
+      store.updateChapterContent('ch-1', '原始内容');
+      expect(store.chapters.find((c) => c.id === 'ch-1')?.content).toBe('原始内容');
+
+      // Replace with new content (as if from manual edit)
+      store.replaceChapterContent('ch-1', '修改后的内容');
+
+      const chapter = store.chapters.find((c) => c.id === 'ch-1');
+      expect(chapter?.content).toBe('修改后的内容');
+    });
+
+    it('is a no-op for non-existent chapter id', async () => {
+      const { useChapterStore } = await import('@/stores/useChapterStore');
+      const store = useChapterStore();
+      store.setChapters(mockChapters);
+
+      // Should not throw
+      expect(() => store.replaceChapterContent('non-existent', 'content')).not.toThrow();
+    });
+  });
+
   describe('updateChapterStatus', () => {
     it('updates the status of a specific chapter', async () => {
       const { useChapterStore } = await import('@/stores/useChapterStore');
@@ -111,19 +138,4 @@ describe('useChapterStore', () => {
     });
   });
 
-  describe('setGenerationMode', () => {
-    it('switches the generation mode', async () => {
-      const { useChapterStore } = await import('@/stores/useChapterStore');
-      const store = useChapterStore();
-
-      store.setGenerationMode('paragraph-rewrite');
-      expect(store.generationMode).toBe('paragraph-rewrite');
-
-      store.setGenerationMode('style-upgrade');
-      expect(store.generationMode).toBe('style-upgrade');
-
-      store.setGenerationMode('new-continue');
-      expect(store.generationMode).toBe('new-continue');
-    });
-  });
 });

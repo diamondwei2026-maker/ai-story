@@ -91,6 +91,16 @@ export class ChapterController {
     return this.changeAnalysisService.analyzeChange(projectId, chapterId, body.newContent);
   }
 
+  @Post(':chapterId/save-content')
+  @HttpCode(200)
+  async saveContent(
+    @Param('projectId') projectId: string,
+    @Param('chapterId') chapterId: string,
+    @Body() body: { content: string },
+  ): Promise<ChapterData> {
+    return this.stepService.saveChapterContent(projectId, chapterId, body.content);
+  }
+
   @Post(':chapterId/targeted-fix')
   @HttpCode(200)
   async applyTargetedFix(

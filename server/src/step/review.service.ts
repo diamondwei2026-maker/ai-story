@@ -72,8 +72,12 @@ export class ReviewService {
     });
 
     const updateData: Record<string, unknown> = { reviewResult: result as unknown as Record<string, unknown> };
+    // Transition from PENDING_REVIEW to REVIEWING when user submits for review,
+    // unless the verdict is PASS which completes the chapter directly.
     if (result.verdict === 'PASS') {
       updateData['status'] = 'COMPLETED';
+    } else if (chapter.status === 'PENDING_REVIEW') {
+      updateData['status'] = 'REVIEWING';
     }
 
     await this.prisma.chapter.update({ where: { id: chapterId }, data: updateData as any });

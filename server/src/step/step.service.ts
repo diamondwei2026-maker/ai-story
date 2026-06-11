@@ -899,18 +899,20 @@ export class StepService {
 
     await this.prisma.chapter.update({
       where: { id: chapterId },
-      data: { content: chResult.content, status: 'DRAFT' },
+      data: { content: chResult.content, status: 'DRAFT', reviewResult: null },
     });
     chapter.content = chResult.content;
     chapter.status = 'DRAFT';
 
     await this.runPostGenerationPipeline(chapter, projectId);
 
+    // Clear internal audit result from post-generation pipeline — user-facing
+    // reviewResult is only set when the user explicitly clicks "提交审核".
     await this.prisma.chapter.update({
       where: { id: chapterId },
-      data: { status: 'REVIEWING' },
+      data: { status: 'PENDING_REVIEW', reviewResult: null },
     });
-    chapter.status = 'REVIEWING';
+    chapter.status = 'PENDING_REVIEW';
     this.pausedChapterIds.delete(chapterId);
 
     return chapter;
@@ -962,18 +964,20 @@ export class StepService {
     const newContent = opts.currentContent + continuation.content;
     await this.prisma.chapter.update({
       where: { id: chapterId },
-      data: { content: newContent, status: 'DRAFT' },
+      data: { content: newContent, status: 'DRAFT', reviewResult: null },
     });
     chapter.content = newContent;
     chapter.status = 'DRAFT';
 
     await this.runPostGenerationPipeline(chapter, projectId);
 
+    // Clear internal audit result from post-generation pipeline — user-facing
+    // reviewResult is only set when the user explicitly clicks "提交审核".
     await this.prisma.chapter.update({
       where: { id: chapterId },
-      data: { status: 'REVIEWING' },
+      data: { status: 'PENDING_REVIEW', reviewResult: null },
     });
-    chapter.status = 'REVIEWING';
+    chapter.status = 'PENDING_REVIEW';
     this.pausedChapterIds.delete(chapterId);
 
     return chapter;
@@ -985,6 +989,16 @@ export class StepService {
     opts: { mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade'; feedback?: string },
   ): Promise<ChapterData> {
     return this.generateChapter(projectId, chapterId, { mode: opts.mode, feedback: opts.feedback });
+  }
+
+  async saveChapterContent(projectId: string, chapterId: string, content: string): Promise<ChapterData> {
+    const chapter = await this.getChapterOrThrow(chapterId);
+    await this.prisma.chapter.update({
+      where: { id: chapterId },
+      data: { content },
+    });
+    chapter.content = content;
+    return chapter;
   }
 
   // ─── Review (delegated to ReviewService) ────────────────────────
@@ -1046,17 +1060,11 @@ export class StepService {
     });
     chapter.chapterFingerprint = fpResult.content;
 
-    // 写入审核结果
-    const reviewData: Record<string, unknown> = {
-      passed: true,
-      raw: reviewResult.content,
-      reviewedAt: new Date().toISOString(),
-    };
-    await this.prisma.chapter.update({
-      where: { id: chapter.id },
-      data: { reviewResult: reviewData as any },
-    });
-    chapter.reviewResult = reviewData;
+    // Internal audit: run independent review for diagnostics only — do NOT
+    // persist to reviewResult. The user-facing reviewResult is exclusively
+    // set by the explicit "提交审核" flow (evaluateChapter in review.service.ts).
+    // The internal audit has a different shape ({ passed, raw }) and would
+    // contaminate the field, causing the ReviewPanel to render prematurely.
 
     // Step 3: FactSheet update (serial — involves CAS write)
     const sheetUpdateResult = await this.collectAiOutput(TaskType.FACTSHEET_UPDATE, `Update FactSheet with: ${chapterContent}`);
@@ -1103,6 +1111,10 @@ export class StepService {
     targetStatus: ChapterData['status'],
   ): Promise<ChapterData> {
     const chapter = await this.getChapterOrThrow(chapterId);
+    // Idempotent: if already at target, just return
+    if (chapter.status === targetStatus) {
+      return chapter;
+    }
     if (chapter.status !== expectedStatus) {
       throw new BadRequestException(`Chapter must be ${expectedStatus} (current: ${chapter.status})`);
     }

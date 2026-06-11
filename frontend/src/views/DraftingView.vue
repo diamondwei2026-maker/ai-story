@@ -33,20 +33,19 @@
       :chapter-content="selectedChapter.content || ''"
       :chapter-status="selectedChapter.status"
       :target-word-count="selectedChapter.targetWordCount"
-      :generation-mode="generationMode"
       :is-generating="isGenerating"
       :is-paused="isPaused"
       :review-result="selectedChapter.reviewResult as any"
       @close="closeWorkspace"
-      @mode-change="handleModeChange"
       @content-change="(val: string) => handleContentChange(selectedChapter.id, val)"
       @pause="handlePause(selectedChapter.id)"
       @continue="handleContinue(selectedChapter.id)"
-      @retry="(feedback: string) => handleRetry(selectedChapter.id, feedback)"
+      @retry="(feedback: string, mode: string) => handleRetry(selectedChapter.id, feedback, mode)"
       @confirm="handleConfirm(selectedChapter.id)"
       @dispute="handleDispute(selectedChapter.id)"
       @generate="handleGenerateFromWorkspace"
       @submit-review="handleSubmitReview(selectedChapter.id)"
+      @save-content="handleSaveContent(selectedChapter.id)"
       @adopt-suggestions="() => {}"
       @adopt-and-re-review="() => {}"
       @manual-edit="() => {}"
@@ -148,6 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { message } from "ant-design-vue";
 import * as chapterApi from "@/api/chapter";
 import * as projectApi from "@/api/project";
 import * as beatsApi from "@/api/beats";
@@ -156,7 +156,6 @@ import type { Chapter } from "@/stores/useChapterStore";
 import { useChapterStore } from "@/stores/useChapterStore";
 import CompletionBanner from "@/components/CompletionBanner.vue";
 import EditorWorkspace from "@/components/EditorWorkspace.vue";
-import type { GenerationMode } from "@/stores/useChapterStore";
 import {
   TERMINAL_CHAPTER_STATUSES,
   ACTIVE_CHAPTER_STATUSES,
@@ -180,7 +179,6 @@ const beats = ref<BeatDataResponse[]>([]);
 const selectedChapterId = ref<string | null>(null);
 const isGenerating = ref(false);
 const isPaused = ref(false);
-const generationMode = ref<GenerationMode>("new-continue");
 
 // ─── Derived ────────────────────────────────────────────────────────
 
@@ -224,7 +222,11 @@ function wordCount(content: string | null): number {
 }
 
 function showGenerateButton(chapter: Chapter): boolean {
-  return !TERMINAL_CHAPTER_STATUSES.has(chapter.status);
+  if (TERMINAL_CHAPTER_STATUSES.has(chapter.status)) return false;
+  // PENDING_REVIEW means content is already generated, waiting for user to submit for review.
+  // The "生成正文" button should be hidden — user can click the card to open workspace and use "提交审核".
+  if (chapter.status === 'PENDING_REVIEW') return false;
+  return true;
 }
 
 function canGenerate(chapter: Chapter): boolean {
@@ -248,12 +250,8 @@ function closeWorkspace() {
 
 // ─── Workspace event handlers ───────────────────────────────────────
 
-function handleModeChange(mode: string) {
-  generationMode.value = mode as GenerationMode;
-}
-
-function handleContentChange(_chapterId: string, _content: string) {
-  // Content changes are handled by the parent via SSE or manual editing
+function handleContentChange(chapterId: string, content: string) {
+  chapterStore.replaceChapterContent(chapterId, content);
 }
 
 async function handlePause(chapterId: string) {
@@ -281,11 +279,11 @@ async function handleContinue(chapterId: string) {
   }
 }
 
-async function handleRetry(chapterId: string, feedback: string) {
+async function handleRetry(chapterId: string, feedback: string, mode: string) {
   try {
     isGenerating.value = true;
     await chapterApi.retryChapter(props.projectId, chapterId, {
-      mode: generationMode.value,
+      mode: mode || 'new-continue',
       feedback: feedback || undefined,
     });
     isGenerating.value = false;
@@ -311,6 +309,17 @@ async function handleDispute(chapterId: string) {
     chapterStore.updateChapterStatus(chapterId, 'DISPUTED');
   } catch (e: any) {
     chapterStore.error = e.message || "争议标记失败";
+  }
+}
+
+async function handleSaveContent(chapterId: string) {
+  const chapter = chapterStore.chapters.find((c) => c.id === chapterId);
+  if (!chapter || !chapter.content) return;
+  try {
+    await chapterApi.saveChapterContent(props.projectId, chapterId, chapter.content);
+    message.success('修改已保存');
+  } catch (e: any) {
+    chapterStore.error = e.message || '保存失败';
   }
 }
 

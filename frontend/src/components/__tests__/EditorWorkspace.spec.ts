@@ -31,7 +31,6 @@ const defaultProps = {
   chapterContent: "夜色如墨，李凡站在城墙之上。",
   chapterStatus: "COMPLETED" as const,
   targetWordCount: 3000,
-  generationMode: "new-continue",
   isGenerating: false,
   isPaused: false,
   reviewResult: null as ReviewResult | null,
@@ -73,9 +72,9 @@ describe("EditorWorkspace", () => {
       expect(wrapper.find('[data-testid="workspace-title"]').text()).toContain("第一章：天龙降世");
     });
 
-    it("renders the ModeSwitcher component for non-terminal chapters", async () => {
+    it("does NOT render ModeSwitcher (mode selection moved to ChapterActionBar)", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "DRAFT" });
-      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
     });
 
     it("renders the StreamingEditor component", async () => {
@@ -90,33 +89,14 @@ describe("EditorWorkspace", () => {
   });
 
   // ══════════════════════════════════════════════════════════════════
-  // 2. Mode switching
+  // 2. Mode switching removed — mode is now in ChapterActionBar
   // ══════════════════════════════════════════════════════════════════
 
-  describe("mode switching", () => {
-    it("passes generationMode to ModeSwitcher", async () => {
-      const wrapper = await mountEditorWorkspace({ generationMode: "paragraph-rewrite", chapterStatus: "DRAFT" });
-      const switcher = wrapper.findComponent({ name: "ModeSwitcher" });
-      expect(switcher.props("mode")).toBe("paragraph-rewrite");
-    });
-
-    it("emits mode-change when ModeSwitcher emits update:mode", async () => {
-      const wrapper = await mountEditorWorkspace({ generationMode: "new-continue", chapterStatus: "DRAFT" });
-      const switcher = wrapper.findComponent({ name: "ModeSwitcher" });
-      await switcher.vm.$emit("update:mode", "style-upgrade");
-      await wrapper.vm.$nextTick();
-      expect(wrapper.emitted("mode-change")).toBeTruthy();
-      expect(wrapper.emitted("mode-change")![0]).toEqual(["style-upgrade"]);
-    });
-
-    it("hides ModeSwitcher for COMPLETED chapters", async () => {
-      const wrapper = await mountEditorWorkspace({ chapterStatus: "COMPLETED" });
-      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
-    });
-
-    it("hides ModeSwitcher for DISPUTED chapters", async () => {
-      const wrapper = await mountEditorWorkspace({ chapterStatus: "DISPUTED" });
-      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
+  describe("no mode switching via EditorWorkspace", () => {
+    it("does NOT have mode-change event (mode selection moved to ChapterActionBar)", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "DRAFT" });
+      // mode-change is no longer emitted by EditorWorkspace
+      expect(wrapper.emitted("mode-change")).toBeFalsy();
     });
   });
 
@@ -198,19 +178,27 @@ describe("EditorWorkspace", () => {
       expect(wrapper.emitted("continue")).toBeTruthy();
     });
 
-    it("emits retry with feedback when ChapterActionBar emits retry", async () => {
+    it("emits retry with feedback and mode when ChapterActionBar emits retry", async () => {
       const wrapper = await mountEditorWorkspace({ isGenerating: false, isPaused: false });
       const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
-      await actionBar.vm.$emit("retry", "希望主角性格更果断");
+      await actionBar.vm.$emit("retry", "希望主角性格更果断", "style-upgrade");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("retry")).toBeTruthy();
-      expect(wrapper.emitted("retry")![0]).toEqual(["希望主角性格更果断"]);
+      expect(wrapper.emitted("retry")![0]).toEqual(["希望主角性格更果断", "style-upgrade"]);
     });
 
     it("passes hasContent to ChapterActionBar", async () => {
       const wrapper = await mountEditorWorkspace({ chapterContent: "有正文内容" });
       const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
       expect(actionBar.props("hasContent")).toBe(true);
+    });
+
+    it("emits save-content when ChapterActionBar emits save-content", async () => {
+      const wrapper = await mountEditorWorkspace({ chapterStatus: "PENDING_REVIEW", isGenerating: false, isPaused: false, chapterContent: "edited by user" });
+      const actionBar = wrapper.findComponent({ name: "ChapterActionBar" });
+      await actionBar.vm.$emit("save-content");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted("save-content")).toBeTruthy();
     });
 
     it("passes reviewVerdict to ChapterActionBar", async () => {

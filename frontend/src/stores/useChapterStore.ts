@@ -12,7 +12,7 @@ export interface Chapter {
   beatPlan: Record<string, unknown> | null;
   targetWordCount: number;
   content: string | null;
-  status: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
+  status: 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
   chapterFingerprint: string | null;
   contextSummary: string | null;
   reviewResult: Record<string, unknown> | null;
@@ -47,7 +47,6 @@ export const useChapterStore = defineStore('chapterStore', () => {
   const chapters = ref<Chapter[]>(persisted.chapters);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const generationMode = ref<GenerationMode>('new-continue');
 
   /** O(1) 索引：chapterId → chapter，避免频繁的 .find() 扫描 */
   const chapterIndex = ref<Map<string, Chapter>>(new Map());
@@ -108,6 +107,14 @@ export const useChapterStore = defineStore('chapterStore', () => {
     schedulePersist();
   }
 
+  function replaceChapterContent(chapterId: string, content: string) {
+    const chapter = chapterIndex.value.get(chapterId);
+    if (!chapter) return;
+    chapter.content = content;
+    chapter.updatedAt = new Date().toISOString();
+    schedulePersist();
+  }
+
   function updateChapterStatus(
     chapterId: string,
     status: Chapter['status'],
@@ -119,20 +126,15 @@ export const useChapterStore = defineStore('chapterStore', () => {
     storePersist.save({ chapters: chapters.value });
   }
 
-  function setGenerationMode(mode: GenerationMode) {
-    generationMode.value = mode;
-  }
-
   return {
     chapters,
     loading,
     error,
-    generationMode,
     setChapters,
     loadChapters,
     updateChapterContent,
+    replaceChapterContent,
     updateChapterStatus,
-    setGenerationMode,
     flushPersist,
   };
 });

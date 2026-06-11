@@ -33,6 +33,13 @@
       <!-- Content exists, no review verdict: submit-review + retry -->
       <template v-if="showRetrySection">
         <a-button
+          v-if="chapterStatus === 'PENDING_REVIEW'"
+          data-testid="btn-save-content"
+          @click="$emit('save-content')"
+        >
+          保存修改
+        </a-button>
+        <a-button
           data-testid="btn-submit-review"
           type="primary"
           @click="$emit('submit-review')"
@@ -46,9 +53,17 @@
           placeholder="输入反馈意见（仅本次生效）"
         />
 
+        <a-select
+          v-model:value="retryMode"
+          data-testid="retry-mode-select"
+          size="small"
+          style="width: 120px"
+          :options="modeOptions"
+        />
+
         <a-button
           data-testid="btn-retry"
-          @click="$emit('retry', feedback)"
+          @click="$emit('retry', feedback, retryMode)"
         >
           重试
         </a-button>
@@ -101,9 +116,16 @@
           v-model:value="feedback"
           placeholder="输入反馈意见（仅本次生效）"
         />
+        <a-select
+          v-model:value="retryMode"
+          data-testid="retry-mode-select"
+          size="small"
+          style="width: 120px"
+          :options="modeOptions"
+        />
         <a-button
           data-testid="btn-retry"
-          @click="$emit('retry', feedback)"
+          @click="$emit('retry', feedback, retryMode)"
         >
           重新生成
         </a-button>
@@ -138,9 +160,16 @@
           v-model:value="feedback"
           placeholder="输入反馈意见（仅本次生效）"
         />
+        <a-select
+          v-model:value="retryMode"
+          data-testid="retry-mode-select"
+          size="small"
+          style="width: 120px"
+          :options="modeOptions"
+        />
         <a-button
           data-testid="btn-retry"
-          @click="$emit('retry', feedback)"
+          @click="$emit('retry', feedback, retryMode)"
         >
           重新生成
         </a-button>
@@ -170,7 +199,7 @@ import { ref, computed } from 'vue';
 import type { ReviewVerdict } from '@/types';
 
 const props = defineProps<{
-  chapterStatus: 'PENDING' | 'DRAFT' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
+  chapterStatus: 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
   reviewVerdict: ReviewVerdict | null;
   appealCount: number;
   isGenerating: boolean;
@@ -182,9 +211,10 @@ defineEmits<{
   generate: [];
   pause: [];
   continue: [];
-  retry: [feedback: string];
+  retry: [feedback: string, mode: string];
   confirm: [];
   'submit-review': [];
+  'save-content': [];
   'adopt-suggestions': [];
   'ignore-and-confirm': [];
   'adopt-and-re-review': [];
@@ -194,6 +224,13 @@ defineEmits<{
 }>();
 
 const feedback = ref('');
+const retryMode = ref('new-continue');
+
+const modeOptions = [
+  { value: 'new-continue', label: '新建续写' },
+  { value: 'paragraph-rewrite', label: '段落改写' },
+  { value: 'style-upgrade', label: '文笔升级' },
+];
 
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'DISPUTED']);
 

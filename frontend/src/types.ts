@@ -28,6 +28,7 @@ export interface ReviewResult {
 export const CHAPTER_STATUS_LABEL: Record<string, string> = {
   PENDING: '待生成',
   DRAFT: '生成中',
+  PENDING_REVIEW: '待审核',
   REVIEWING: '审核中',
   COMPLETED: '已完成',
   DISPUTED: '已标记争议',
@@ -36,13 +37,14 @@ export const CHAPTER_STATUS_LABEL: Record<string, string> = {
 export const CHAPTER_STATUS_COLOR: Record<string, string> = {
   PENDING: 'default',
   DRAFT: 'processing',
+  PENDING_REVIEW: 'blue',
   REVIEWING: 'orange',
   COMPLETED: 'green',
   DISPUTED: 'red',
 };
 
 export const TERMINAL_CHAPTER_STATUSES = new Set(['COMPLETED', 'DISPUTED']);
-export const ACTIVE_CHAPTER_STATUSES = new Set(['DRAFT', 'REVIEWING']);
+export const ACTIVE_CHAPTER_STATUSES = new Set(['DRAFT', 'PENDING_REVIEW', 'REVIEWING']);
 
 // ─── Pure utility helpers ──────────────────────────────────────────────
 

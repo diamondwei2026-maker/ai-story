@@ -12,6 +12,7 @@ const mockDisputeChapter = vi.fn();
 const mockPauseChapter = vi.fn();
 const mockContinueChapter = vi.fn();
 const mockRetryChapter = vi.fn();
+const mockSaveChapterContent = vi.fn();
 const mockConfirmCompletion = vi.fn();
 const mockReopenProject = vi.fn();
 
@@ -23,6 +24,7 @@ vi.mock("@/api/chapter", () => ({
   pauseChapter: (...args: any[]) => mockPauseChapter(...args),
   continueChapter: (...args: any[]) => mockContinueChapter(...args),
   retryChapter: (...args: any[]) => mockRetryChapter(...args),
+  saveChapterContent: (...args: any[]) => mockSaveChapterContent(...args),
 }));
 
 vi.mock("@/api/project", () => ({
@@ -51,7 +53,7 @@ interface MockChapter {
   beatPlan: Record<string, unknown> | null;
   targetWordCount: number;
   content: string | null;
-  status: "PENDING" | "DRAFT" | "REVIEWING" | "COMPLETED" | "DISPUTED";
+  status: "PENDING" | "DRAFT" | "PENDING_REVIEW" | "REVIEWING" | "COMPLETED" | "DISPUTED";
   chapterFingerprint: string | null;
   contextSummary: string | null;
   reviewResult: Record<string, unknown> | null;
@@ -668,7 +670,7 @@ describe("DraftingView", () => {
       expect(wrapper.find('[data-testid="chapter-list"]').exists()).toBe(true);
     });
 
-    it("calls retryChapter when EditorWorkspace emits retry for PENDING chapter", async () => {
+    it("calls retryChapter when EditorWorkspace emits retry with mode", async () => {
       mockGetChapters.mockResolvedValue(threeChapters);
       mockRetryChapter.mockResolvedValue({});
 
@@ -681,36 +683,48 @@ describe("DraftingView", () => {
       await chapters[2].trigger("click");
       await wrapper.vm.$nextTick();
 
-      // Workspace should be visible with TextToolbar
+      // Workspace should be visible
       const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
       expect(workspace.exists()).toBe(true);
 
-      // Trigger retry via workspace (this simulates clicking "重试" in TextToolbar)
-      await workspace.vm.$emit("retry", "");
+      // Trigger retry via workspace with mode from ChapterActionBar
+      await workspace.vm.$emit("retry", "some feedback", "paragraph-rewrite");
       await wrapper.vm.$nextTick();
 
       expect(mockRetryChapter).toHaveBeenCalledWith(
         "proj-1",
         "ch-3",
-        { mode: "new-continue", feedback: undefined },
+        { mode: "paragraph-rewrite", feedback: "some feedback" },
       );
     });
 
-    it("passes generationMode to EditorWorkspace", async () => {
-      mockGetChapters.mockResolvedValue(threeChapters);
+    it("handles save-content event from EditorWorkspace", async () => {
+      const chapters = [
+        makeChapter({ id: "ch-1", chapterNumber: 1, title: "第一章", content: "用户修改后的正文", status: "PENDING_REVIEW" }),
+      ];
+      mockGetChapters.mockResolvedValue(chapters);
+      mockSaveChapterContent.mockResolvedValue({});
+
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      const chapters = wrapper.findAll('[data-testid="chapter-list-item"]');
-      await chapters[0].trigger("click");
+      const chapterCard = wrapper.find('[data-testid="chapter-list-item"]');
+      await chapterCard.trigger("click");
       await wrapper.vm.$nextTick();
 
       const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
-      expect(workspace.props("generationMode")).toBeDefined();
+      await workspace.vm.$emit("save-content");
+      await wrapper.vm.$nextTick();
+
+      expect(mockSaveChapterContent).toHaveBeenCalledWith(
+        "proj-1",
+        "ch-1",
+        "用户修改后的正文",
+      );
     });
 
-    it("updates generationMode when mode-change emitted from EditorWorkspace", async () => {
+    it("does NOT pass generationMode to EditorWorkspace (mode is in ChapterActionBar now)", async () => {
       mockGetChapters.mockResolvedValue(threeChapters);
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
@@ -721,10 +735,8 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
 
       const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
-      await workspace.vm.$emit("mode-change", "style-upgrade");
-      await wrapper.vm.$nextTick();
-
-      expect(workspace.props("generationMode")).toBe("style-upgrade");
+      // generationMode prop should no longer exist on EditorWorkspace
+      expect(workspace.props("generationMode")).toBeUndefined();
     });
 
     it("handles pause event from EditorWorkspace", async () => {
@@ -763,7 +775,7 @@ describe("DraftingView", () => {
       expect(mockContinueChapter).toHaveBeenCalled();
     });
 
-    it("handles retry event from EditorWorkspace with feedback", async () => {
+    it("handles retry event from EditorWorkspace with feedback and mode", async () => {
       mockGetChapters.mockResolvedValue(threeChapters);
       mockRetryChapter.mockResolvedValue({});
       const wrapper = await mountView();
@@ -775,13 +787,13 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
 
       const workspace = wrapper.findComponent({ name: "EditorWorkspace" });
-      await workspace.vm.$emit("retry", "希望风格更热血");
+      await workspace.vm.$emit("retry", "希望风格更热血", "style-upgrade");
       await wrapper.vm.$nextTick();
 
       expect(mockRetryChapter).toHaveBeenCalledWith(
         "proj-1",
         "ch-3",
-        { mode: "new-continue", feedback: "希望风格更热血" },
+        { mode: "style-upgrade", feedback: "希望风格更热血" },
       );
     });
 

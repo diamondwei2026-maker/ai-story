@@ -78,6 +78,20 @@ export async function retryChapter(
   );
 }
 
+export async function saveChapterContent(
+  projectId: string,
+  chapterId: string,
+  content: string,
+): Promise<Chapter> {
+  return request<Chapter>(
+    `/projects/${projectId}/chapters/${chapterId}/save-content`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
 export async function reviewChapter(
   projectId: string,
   chapterId: string,
