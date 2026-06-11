@@ -857,7 +857,21 @@ export class StepService {
       where: { projectId },
       orderBy: { chapterNumber: 'asc' },
     });
-    return docs.map((d) => this.toChapter(d));
+    const chapters = docs.map((d) => this.toChapter(d));
+
+    // 后台为已有正文但缺少标题的章节生成标题（fire-and-forget，不阻塞响应）
+    const chaptersNeedingTitle = chapters.filter(
+      (ch) => ch.content && !ch.title,
+    );
+    if (chaptersNeedingTitle.length > 0) {
+      Promise.allSettled(
+        chaptersNeedingTitle.map((ch) =>
+          this.generateAndSaveChapterTitle(ch).catch(() => {}),
+        ),
+      );
+    }
+
+    return chapters;
   }
 
   // ─── DRAFTING Phase: Chapter Generation ──────────────────────
@@ -993,11 +1007,25 @@ export class StepService {
 
   async saveChapterContent(projectId: string, chapterId: string, content: string): Promise<ChapterData> {
     const chapter = await this.getChapterOrThrow(chapterId);
+
+    // 保存正文时，将非终态章节重置为 PENDING_REVIEW，并清除旧的审核结果。
+    // 因为正文内容已改变，之前的审核结论不再有效，用户需要重新提交审核。
+    const shouldResetReview = !['COMPLETED', 'DISPUTED'].includes(chapter.status);
+    const updateData: Record<string, unknown> = { content };
+    if (shouldResetReview) {
+      updateData['status'] = 'PENDING_REVIEW';
+      updateData['reviewResult'] = null;
+    }
+
     await this.prisma.chapter.update({
       where: { id: chapterId },
-      data: { content },
+      data: updateData as any,
     });
     chapter.content = content;
+    if (shouldResetReview) {
+      chapter.status = 'PENDING_REVIEW';
+      chapter.reviewResult = null;
+    }
     return chapter;
   }
 
@@ -1047,10 +1075,11 @@ export class StepService {
   private async runPostGenerationPipelineImpl(chapter: ChapterData, projectId: string): Promise<void> {
     const chapterContent = chapter.content!;
 
-    // Phase 1: 并行执行无需互相等待的 AI 调用（指纹 + 审核）
+    // Phase 1: 并行执行无需互相等待的 AI 调用（指纹 + 审核 + 标题）
     const [fpResult, reviewResult] = await Promise.all([
       this.collectAiOutput(TaskType.FINGERPRINT_EXTRACTION, `Extract fingerprint for: ${chapterContent}`),
       this.collectAiOutput(TaskType.INDEPENDENT_REVIEW, `Review content: ${chapterContent}`),
+      this.generateAndSaveChapterTitle(chapter),
     ]);
 
     // 写入指纹结果
@@ -1141,6 +1170,54 @@ export class StepService {
 
   private estimateTokens(content: string): number {
     return this.contextBudgetService.estimateTokens(content);
+  }
+
+  /**
+   * 根据章节正文内容 + 节拍计划，调用 AI 生成章节标题，写入 DB 并更新内存对象。
+   * 失败时优雅降级（标题非关键路径）。
+   */
+  private async generateAndSaveChapterTitle(chapter: ChapterData): Promise<void> {
+    const chapterContent = chapter.content;
+
+    console.log(
+      `[ChapterTitle] ⚡ ENTERED for ch${chapter.chapterNumber} ` +
+      `(hasContent=${!!chapterContent}, currentTitle=${chapter.title || 'null'})`,
+    );
+
+    if (!chapterContent) {
+      console.warn(`[ChapterTitle] Skipped ch${chapter.chapterNumber}: no content`);
+      return;
+    }
+
+    try {
+      const prompt = this.promptLoader.renderTemplate('creation', 'chapter-title-generation', {
+        chapterContent: chapterContent.slice(0, 2000),
+        beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
+        chapterNumber: String(chapter.chapterNumber),
+      });
+      const result = await this.collectAiOutput(TaskType.CHAPTER_TITLE, prompt);
+
+      if (result.content && result.content.trim()) {
+        const title = result.content.trim().slice(0, 50);
+        await this.prisma.chapter.update({
+          where: { id: chapter.id },
+          data: { title },
+        });
+        chapter.title = title;
+        console.log(
+          `[ChapterTitle] Generated title for ch${chapter.chapterNumber}: "${title}"`,
+        );
+      } else {
+        console.warn(
+          `[ChapterTitle] Empty title returned for ch${chapter.chapterNumber}`,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[ChapterTitle] Failed to generate title for ch${chapter.chapterNumber}: ${msg}`,
+      );
+    }
   }
 
   private async findBeatById(beatId: string): Promise<BeatData | null> {

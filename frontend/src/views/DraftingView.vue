@@ -154,6 +154,7 @@ import * as beatsApi from "@/api/beats";
 import type { BeatDataResponse } from "@/api/beats";
 import type { Chapter } from "@/stores/useChapterStore";
 import { useChapterStore } from "@/stores/useChapterStore";
+import { useWorkflowStore } from "@/stores/useWorkflowStore";
 import CompletionBanner from "@/components/CompletionBanner.vue";
 import EditorWorkspace from "@/components/EditorWorkspace.vue";
 import {
@@ -172,6 +173,7 @@ const props = defineProps<{
 // ─── Store ──────────────────────────────────────────────────────────
 
 const chapterStore = useChapterStore();
+const workflowStore = useWorkflowStore();
 
 // ─── Local state ────────────────────────────────────────────────────
 
@@ -376,6 +378,17 @@ async function handleConfirmCompletion(payload: { action: string }) {
 // ─── Lifecycle ──────────────────────────────────────────────────────
 
 onMounted(() => {
+  // 同步工作流步骤状态：前置阶段必须在 DRAFTING 之前已确认，
+  // DRAFTING 本身为进行中。否则刷新页面或从 Hub 进入时 Stepper 全显示为 PENDING。
+  for (const phase of ['IDEA', 'SETTING', 'OUTLINE', 'BEATS'] as const) {
+    if (workflowStore.getStepStatus(phase) !== 'CONFIRMED') {
+      workflowStore.setStepStatus(phase, 'CONFIRMED');
+    }
+  }
+  if (workflowStore.getStepStatus('DRAFTING') !== 'CONFIRMED') {
+    workflowStore.setStepStatus('DRAFTING', 'IN_PROGRESS');
+  }
+
   chapterStore.loadChapters(props.projectId);
   fetchBeats();
 });

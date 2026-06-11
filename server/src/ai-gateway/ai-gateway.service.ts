@@ -11,6 +11,7 @@ export enum TaskType {
   CRITICAL_CHAPTER = 'CRITICAL_CHAPTER',
   CHAPTER_REWRITE = 'CHAPTER_REWRITE',
   CHAPTER_POLISH = 'CHAPTER_POLISH',
+  CHAPTER_TITLE = 'CHAPTER_TITLE',
   INDEPENDENT_REVIEW = 'INDEPENDENT_REVIEW',
   FINGERPRINT_EXTRACTION = 'FINGERPRINT_EXTRACTION',
   FACTSHEET_UPDATE = 'FACTSHEET_UPDATE',
@@ -65,6 +66,7 @@ const MODEL_MAP: Record<TaskType, string> = {
   [TaskType.CHAPTER_GENERATION]: 'deepseek-chat-v3',
   [TaskType.CHAPTER_REWRITE]: 'deepseek-chat-v3',
   [TaskType.CHAPTER_POLISH]: 'deepseek-chat-v3',
+  [TaskType.CHAPTER_TITLE]: 'deepseek-chat-v3',
   [TaskType.INDEPENDENT_REVIEW]: 'deepseek-chat-v3',
   [TaskType.FINGERPRINT_EXTRACTION]: 'deepseek-chat-v3',
   [TaskType.FACTSHEET_UPDATE]: 'deepseek-chat-v3',
@@ -96,6 +98,7 @@ const SKIP_ON_FAILURE_TASKS: TaskType[] = [
   TaskType.FINGERPRINT_EXTRACTION,
   TaskType.FACTSHEET_UPDATE,
   TaskType.CHANGE_ANALYSIS,
+  TaskType.CHAPTER_TITLE,
 ];
 
 @Injectable()

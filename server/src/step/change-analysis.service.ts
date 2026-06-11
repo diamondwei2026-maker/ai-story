@@ -146,7 +146,7 @@ export class ChangeAnalysisService {
       where: { id: chapterId },
       data: {
         changeAnalysis: changeAnalysis as any,
-        status: 'DRAFT',
+        status: 'PENDING_REVIEW',
       },
     });
 
