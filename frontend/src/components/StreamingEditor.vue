@@ -66,6 +66,7 @@ import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 import EmptyState from '@/components/EmptyState.vue';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
+import { copyToClipboard } from '@/utils/clipboard';
 
 const props = defineProps<{
   content: string;
@@ -84,7 +85,7 @@ defineExpose({ editing });
 
 async function copyContent() {
   try {
-    await navigator.clipboard.writeText(props.content);
+    await copyToClipboard(props.content);
     copied.value = true;
     message.success('已复制到剪贴板');
     setTimeout(() => { copied.value = false; }, 2000);
@@ -130,6 +131,7 @@ async function copyContent() {
   color: var(--color-ink);
   white-space: pre-wrap;
   margin: 0;
+  text-indent: 2em;
 }
 
 .streaming-editor__cursor {

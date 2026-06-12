@@ -61,6 +61,7 @@ const html = computed(() => {
 
 .markdown-renderer :deep(p) {
   margin: 0 0 12px 0;
+  text-indent: 2em;
 }
 
 .markdown-renderer :deep(p:last-child) {

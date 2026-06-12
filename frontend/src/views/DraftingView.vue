@@ -228,6 +228,9 @@ function showGenerateButton(chapter: Chapter): boolean {
   // PENDING_REVIEW means content is already generated, waiting for user to submit for review.
   // The "生成正文" button should be hidden — user can click the card to open workspace and use "提交审核".
   if (chapter.status === 'PENDING_REVIEW') return false;
+  // If content has already been generated, hide the button.
+  // This covers DRAFT status after generation completes and other edge cases.
+  if (chapter.content) return false;
   return true;
 }
 

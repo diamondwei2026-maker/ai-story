@@ -54,6 +54,7 @@
 import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
+import { copyToClipboard } from '@/utils/clipboard';
 
 const props = defineProps<{
   oneLiner: string;
@@ -73,7 +74,7 @@ const copied = ref(false);
 async function copySummary() {
   const text = [props.oneLiner, props.fullSummary].filter(Boolean).join('\n\n');
   try {
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     copied.value = true;
     message.success('已复制到剪贴板');
     setTimeout(() => { copied.value = false; }, 2000);
