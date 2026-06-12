@@ -130,5 +130,18 @@ describe('ChapterActionBar', () => {
       ]);
     });
 
+    it('shows mode description hint next to the mode selector', async () => {
+      const wrapper = await mountBar({
+        chapterStatus: 'PENDING_REVIEW',
+        hasContent: true,
+        reviewVerdict: null,
+      });
+
+      const hint = wrapper.find('[data-testid="retry-mode-hint"]');
+      expect(hint.exists()).toBe(true);
+      // 默认选中"新建续写"，应显示对应描述
+      expect(hint.text()).toContain('全新撰写');
+    });
+
   });
 });

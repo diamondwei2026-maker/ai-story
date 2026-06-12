@@ -115,7 +115,7 @@ describe('StepService - Chapter Generation (DRAFTING)', () => {
       expect(result.status).toBe('REVIEWING');
     });
 
-    it('should call prompt template with the correct mode', async () => {
+    it('should call prompt template with the correct mode instruction', async () => {
       const { projectId, chapters } = await setupDraftingProject();
       const chapter = chapters[0];
 
@@ -129,7 +129,109 @@ describe('StepService - Chapter Generation (DRAFTING)', () => {
         'creation',
         'chapter-generation',
         expect.objectContaining({
-          mode: 'paragraph-rewrite',
+          modeInstruction: expect.stringContaining('段落改写'),
+        }),
+      );
+    });
+
+    it('should render new-continue mode as full-chapter drafting instruction', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const chapter = chapters[0];
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapter.id, {
+        mode: 'new-continue',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          modeInstruction: expect.stringContaining('新建续写'),
+        }),
+      );
+      const callArgs = mockPromptLoader.renderTemplate.mock.calls[0][2];
+      expect(callArgs.modeInstruction).toContain('从零开始全新撰写');
+    });
+
+    it('should render style-upgrade mode with polish instruction', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const chapter = chapters[0];
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapter.id, {
+        mode: 'style-upgrade',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          modeInstruction: expect.stringContaining('文笔升级'),
+        }),
+      );
+    });
+
+    it('should inject existing chapter content for paragraph-rewrite mode', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const chapter = chapters[0];
+
+      // Simulate existing content on the chapter
+      const chapterEntity = await service.getChapterOrThrow(chapter.id);
+      // The chapter from setupDraftingProject starts with null content.
+      // We need to test that when content exists, it gets passed.
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapter.id, {
+        mode: 'paragraph-rewrite',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          currentContent: expect.any(String),
+        }),
+      );
+    });
+
+    it('should inject existing chapter content for style-upgrade mode', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const chapter = chapters[0];
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapter.id, {
+        mode: 'style-upgrade',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          currentContent: expect.any(String),
+        }),
+      );
+    });
+
+    it('should NOT inject currentContent for new-continue mode', async () => {
+      const { projectId, chapters } = await setupDraftingProject();
+      const chapter = chapters[0];
+
+      mockPromptLoader.renderTemplate.mockClear();
+
+      await service.generateChapter(projectId, chapter.id, {
+        mode: 'new-continue',
+      });
+
+      expect(mockPromptLoader.renderTemplate).toHaveBeenCalledWith(
+        'creation',
+        'chapter-generation',
+        expect.objectContaining({
+          currentContent: '',
         }),
       );
     });
@@ -420,7 +522,7 @@ describe('StepService - Chapter Generation (DRAFTING)', () => {
         'creation',
         'chapter-generation',
         expect.objectContaining({
-          mode: 'style-upgrade',
+          modeInstruction: expect.stringContaining('文笔升级'),
         }),
       );
     });

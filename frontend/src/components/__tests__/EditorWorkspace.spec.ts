@@ -72,11 +72,6 @@ describe("EditorWorkspace", () => {
       expect(wrapper.find('[data-testid="workspace-title"]').text()).toContain("第一章：天龙降世");
     });
 
-    it("does NOT render ModeSwitcher (mode selection moved to ChapterActionBar)", async () => {
-      const wrapper = await mountEditorWorkspace({ chapterStatus: "DRAFT" });
-      expect(wrapper.find('[data-testid="mode-switcher"]').exists()).toBe(false);
-    });
-
     it("renders the StreamingEditor component", async () => {
       const wrapper = await mountEditorWorkspace();
       expect(wrapper.find('[data-testid="streaming-editor"]').exists()).toBe(true);

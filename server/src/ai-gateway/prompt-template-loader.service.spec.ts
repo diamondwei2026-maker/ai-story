@@ -69,9 +69,10 @@ describe('PromptTemplateLoaderService', () => {
       expect(rendered).not.toContain('{{');
     });
 
-    it('should render chapter-generation template with all 8 variables', () => {
+    it('should render chapter-generation template with all 10 variables', () => {
       const rendered = service.renderTemplate('creation', 'chapter-generation', {
-        mode: 'new-continue',
+        modeInstruction: '## 生成模式：新建续写\n测试模式指令',
+        currentContent: '现有正文...',
         beatPlan: '{"chapterNumber":1,"plan":"主角觉醒异能"}',
         targetWordCount: '3000',
         feedback: '希望主角性格更果断',
@@ -80,7 +81,9 @@ describe('PromptTemplateLoaderService', () => {
         globalDynamic: '主角异能等级：初级',
         localContext: '当前节拍：异能觉醒，初次展现力量',
       });
-      expect(rendered).toContain('new-continue');
+      expect(rendered).toContain('新建续写');
+      expect(rendered).toContain('测试模式指令');
+      expect(rendered).toContain('现有正文');
       expect(rendered).toContain('主角觉醒异能');
       expect(rendered).toContain('3000');
       expect(rendered).toContain('希望主角性格更果断');
@@ -88,14 +91,15 @@ describe('PromptTemplateLoaderService', () => {
       expect(rendered).toContain('灵气复苏');
       expect(rendered).toContain('初级');
       expect(rendered).toContain('异能觉醒');
-      expect(rendered).not.toContain('{{mode}}');
+      expect(rendered).not.toContain('{{modeInstruction}}');
       expect(rendered).not.toContain('{{beatPlan}}');
       expect(rendered).not.toContain('{{targetWordCount}}');
     });
 
     describe('chapter-generation template content', () => {
       const chapterVars = {
-        mode: 'new-continue',
+        modeInstruction: '## 生成模式：新建续写\n测试模式指令',
+        currentContent: '',
         beatPlan: '{"chapterNumber":1,"plan":"测试节拍"}',
         targetWordCount: '3000',
         feedback: '',

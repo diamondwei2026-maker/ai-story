@@ -876,6 +876,47 @@ export class StepService {
 
   // ─── DRAFTING Phase: Chapter Generation ──────────────────────
 
+  /**
+   * 将生成模式映射为中文写作指令，供 prompt 模板使用。
+   * 注意：此函数必须与前端 modeOptions 保持同步。
+   */
+  private buildModeInstruction(
+    mode: 'new-continue' | 'paragraph-rewrite' | 'style-upgrade',
+  ): string {
+    switch (mode) {
+      case 'new-continue':
+        return `## 生成模式：新建续写
+你是从零开始全新撰写本章正文。严格以节拍计划为蓝图独立创作，不参考任何已有正文内容。
+你需要：
+- 根据节拍计划中标注的冲突点、情绪基调、叙事节奏，自主设计场景和人物互动
+- 确保本章作为独立叙事单元有完整的起承转合
+- 与前文章节摘要保持连续但不重复，自然承接上文伏笔或悬念
+- 在节拍计划标注的"钩子预设"处埋设新的伏笔或悬念点`;
+      case 'paragraph-rewrite':
+        return `## 生成模式：段落改写
+你需要在保留现有正文剧情骨架的前提下，重新组织段落结构和叙事节奏。
+你需要：
+- 保持当前章节现有正文中的人物行为、情节推进、关键对话完全不变
+- 重新编排段落顺序和场景节奏：拆分过长的段落、合并琐碎的短段落
+- 优化叙事节奏：加速拖沓的过渡段落，扩展冲突或转折场景的描写深度
+- 保持对话内容不变，但可调整对话与叙述的比例分配，增强画面节奏感
+- 不改变任何伏笔/悬念的埋设位置和内容`;
+      case 'style-upgrade':
+        return `## 生成模式：文笔升级
+你需要在不改变剧情、结构、对话内容的前提下，全面提升文字品质。
+你需要：
+- 保持当前章节现有正文中的人物行为、情节推进、段落结构和对话内容完全不变
+- 提升场景描写的画面感：用具体的感官细节（色彩、声音、气味、触感）替代抽象形容词
+- 提升人物塑造的深度：通过细腻的微表情、下意识动作、言行矛盾来折射心理
+- 提升对话的自然度：让人物的语气、用词、句式贴合其身份和情境
+- 提升节奏的文气：用长短句交替、留白和细节密度变化来控制阅读呼吸感
+- 不删减已有伏笔/悬念，但可用更精妙的语言让暗示更自然`;
+      default:
+        return `## 生成模式：新建续写
+你是从零开始全新撰写本章正文。`;
+    }
+  }
+
   async generateChapter(
     projectId: string,
     chapterId: string,
@@ -897,10 +938,15 @@ export class StepService {
     // Issue #21: compute three-layer context budget before constructing prompt
     const budget = await this.contextBudgetService.computeBudget(projectId, chapterId);
 
+    // 段落改写/文笔升级需要传入现有正文作为改写基础
+    const needsCurrentContent =
+      opts.mode === 'paragraph-rewrite' || opts.mode === 'style-upgrade';
+
     const chResult = await this.collectAiOutput(
       await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
-        mode: opts.mode,
+        modeInstruction: this.buildModeInstruction(opts.mode),
+        currentContent: needsCurrentContent ? (chapter.content ?? '') : '',
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
         targetWordCount: String(chapter.targetWordCount),
         feedback: opts.feedback ?? '',
@@ -965,10 +1011,12 @@ export class StepService {
     const continuation = await this.collectAiOutput(
       await this.resolveChapterTaskType(chapter),
       this.promptLoader.renderTemplate('creation', 'chapter-generation', {
-        mode: 'new-continue',
+        modeInstruction: this.buildModeInstruction('new-continue'),
+        currentContent: opts.currentContent,
         beatPlan: chapter.beatPlan ? JSON.stringify(chapter.beatPlan) : '',
         targetWordCount: String(chapter.targetWordCount),
-        currentContent: opts.currentContent,
+        feedback: '',
+        previousSummary: '',
         globalStatic: budget.globalStatic,
         globalDynamic: budget.globalDynamic,
         localContext: budget.local,
