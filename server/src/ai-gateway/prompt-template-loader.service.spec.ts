@@ -93,6 +93,45 @@ describe('PromptTemplateLoaderService', () => {
       expect(rendered).not.toContain('{{targetWordCount}}');
     });
 
+    describe('chapter-generation template content', () => {
+      const chapterVars = {
+        mode: 'new-continue',
+        beatPlan: '{"chapterNumber":1,"plan":"测试节拍"}',
+        targetWordCount: '3000',
+        feedback: '',
+        previousSummary: '',
+        globalStatic: '测试世界观',
+        globalDynamic: '测试动态',
+        localContext: '测试上下文',
+      };
+
+      let rendered: string;
+      beforeEach(() => {
+        rendered = service.renderTemplate('creation', 'chapter-generation', chapterVars);
+      });
+
+      it('should NOT instruct AI to use bold for inner monologue or key dialogue', () => {
+        expect(rendered).not.toMatch(/内心独白.*\*\*/);
+        expect(rendered).not.toMatch(/关键台词.*加粗/);
+      });
+
+      it('should instruct AI to integrate thoughts naturally into narrative', () => {
+        const hasNaturalGuidance =
+          /心想/.test(rendered) ||
+          /暗忖/.test(rendered) ||
+          /心道/.test(rendered) ||
+          /自然融入/.test(rendered);
+        expect(hasNaturalGuidance).toBe(true);
+      });
+
+      it('should not use Markdown formatting as narrative technique instructions', () => {
+        expect(rendered).not.toContain('用 **加粗** 强调');
+        expect(rendered).not.toMatch(/斜体.*标记/);
+        // 不应在任何写作指导中提及斜体
+        expect(rendered).not.toMatch(/斜体/);
+      });
+    });
+
     it('should throw when template not found', () => {
       expect(() =>
         service.renderTemplate('creation', 'not-found', {}),
@@ -103,7 +142,7 @@ describe('PromptTemplateLoaderService', () => {
   describe('listTemplates', () => {
     it('should list all templates in a given category', () => {
       const templates = service.listTemplates('creation');
-      expect(templates).toHaveLength(10);
+      expect(templates).toHaveLength(11);
       expect(templates).toContain('idea-generation');
       expect(templates).toContain('idea-summary-generation');
       expect(templates).toContain('setting-generation');
