@@ -94,10 +94,11 @@ BLOCKED:
 Chapter.status 枚举修正为：
 
 ```
-PENDING | DRAFT | REVIEWING | COMPLETED | DISPUTED
+PENDING | DRAFT | PENDING_REVIEW | REVIEWING | COMPLETED | DISPUTED
 ```
 
-移除 `PUBLISHED`——当前 Out of Scope 已明确不涉及平台发布。若后续引入发布功能，Chapter 应新增独立的 `publishStatus` 字段与创作状态解耦，而非在 status 枚举中混入发布语义。
+- `PENDING_REVIEW`（#22/#23 实施后新增）——正文已保存但用户尚未提交审核的中间状态。用户编辑正文并保存后进入此状态；编辑器关闭时若触发实质性变更（ADR-0006 Decision 2）则重置为此状态。此状态与 `REVIEWING`（审核 AI 运行中）分离，使用户可在提交审核前自由编辑而不触发审核管道。
+- 移除 `PUBLISHED`——当前 Out of Scope 已明确不涉及平台发布。若后续引入发布功能，Chapter 应新增独立的 `publishStatus` 字段与创作状态解耦，而非在 status 枚举中混入发布语义。
 
 Project.status 枚举：
 

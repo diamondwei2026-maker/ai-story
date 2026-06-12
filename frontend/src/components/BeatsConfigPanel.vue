@@ -32,13 +32,14 @@ const wordCountOptions = [
 ];
 const localWordCount = ref(props.defaultWordCount);
 
+const effectiveChapters = computed(() =>
+  isCustomChapter.value ? customChapterCount.value : targetChapterCount.value,
+);
+
 function handleStartGeneration() {
   emit('update:wordCount', localWordCount.value);
-  const effectiveChapters = isCustomChapter.value
-    ? customChapterCount.value
-    : targetChapterCount.value;
   emit('start-generation', {
-    targetChapterCount: effectiveChapters,
+    targetChapterCount: effectiveChapters.value,
     defaultWordCount: localWordCount.value,
   });
 }
@@ -69,7 +70,7 @@ function handleStartGeneration() {
           data-testid="config-custom-chapters"
           class="config-custom-input"
         />
-        <span class="config-hint">约{{ isCustomChapter ? customChapterCount : targetChapterCount }}章（可浮动10%）</span>
+        <span class="config-hint">约{{ effectiveChapters }}章（可浮动10%）</span>
       </div>
 
       <!-- Word count -->
@@ -90,6 +91,21 @@ function handleStartGeneration() {
           </div>
         </a-collapse-panel>
       </a-collapse>
+
+      <!-- High-volume warning (>90 chapters) -->
+      <a-alert
+        v-if="effectiveChapters > 90"
+        type="warning"
+        show-icon
+        message="超大规模拆解提示"
+        data-testid="config-high-volume-warning"
+        class="config-warning"
+      >
+        <template #description>
+          当前 {{ effectiveChapters }} 章超出单次 AI 输出上限（90章）。生成时将使用高篇幅模式（V3 + 32K tokens），
+          建议拆分为多次生成以确保质量。未来版本将支持分批自动生成。
+        </template>
+      </a-alert>
 
       <div class="config-action">
         <a-button
@@ -121,6 +137,7 @@ function handleStartGeneration() {
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }
+.config-warning { margin-bottom: var(--space-md); }
 .config-action { text-align: center; padding-top: var(--space-sm); }
 .config-confirmed-text { font-size: 13px; color: var(--color-text-secondary); margin-left: var(--space-sm); }
 </style>

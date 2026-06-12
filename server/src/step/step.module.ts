@@ -1,5 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { SettingController } from './step.controller';
+import { SettingController } from './setting.controller';
 import { IdeaController } from './idea.controller';
 import { OutlineController } from './outline.controller';
 import { BeatsController, BeatModificationController } from './beats.controller';

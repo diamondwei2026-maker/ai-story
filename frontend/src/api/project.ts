@@ -31,3 +31,25 @@ export async function reopenProject(projectId: string): Promise<{ status: string
     method: 'POST',
   });
 }
+
+export async function deleteProject(projectId: string): Promise<void> {
+  return request(`/projects/${projectId}`, { method: 'DELETE' });
+}
+
+export async function updateProject(
+  projectId: string,
+  body: { title?: string; config?: Project['config'] },
+): Promise<Project> {
+  return request(`/projects/${projectId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function archiveProject(projectId: string): Promise<Project> {
+  return request(`/projects/${projectId}/archive`, { method: 'POST' });
+}
+
+export async function restoreProject(projectId: string): Promise<Project> {
+  return request(`/projects/${projectId}/restore`, { method: 'POST' });
+}
