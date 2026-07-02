@@ -15,7 +15,7 @@ export interface BeatDataResponse {
   hookCount: number;
   isClimax: boolean;
   useR1: boolean;
-  status: string;
+  status: 'PENDING' | 'STALE' | 'CONFIRMED';
   narrativeSummary: string;
   conflictDescription: string;
   pacingLabel: string;

@@ -262,6 +262,19 @@ watch(data, (newData) => {
     if (review && typeof review.selectedSellPoint === 'number') {
       selectedSellPointIndex.value = review.selectedSellPoint as number;
     }
+
+    // 从后端 input 字段恢复 ideaText（页面刷新 / 已有数据加载场景）
+    if (newData.input && !ideaText.value) {
+      const raw = newData.input;
+      if (raw.startsWith('idea: ')) {
+        const fbIdx = raw.indexOf('\nfeedback:');
+        ideaText.value = fbIdx > -1
+          ? raw.slice(6, fbIdx).trim()
+          : raw.slice(6).trim();
+      } else {
+        ideaText.value = raw.trim();
+      }
+    }
   }
 });
 
@@ -301,7 +314,6 @@ async function handleRegenerateWithFeedback(feedback: string) {
     });
     data.value = result;
     selectedSellPointIndex.value = -1;
-    feedbackText.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '重新生成失败';
   } finally {
