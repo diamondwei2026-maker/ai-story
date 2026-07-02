@@ -1,6 +1,8 @@
 ﻿// ─── Shared type definitions ─────────────────────────────────────────
 // Used by EditorWorkspace, ReviewPanel, and their tests
 
+export type ReviewVerdict = 'PASS' | 'PASS_WITH_SUGGESTIONS' | 'NEEDS_REVISION' | 'BLOCKED';
+
 export interface ReviewIssue {
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   location: string;
@@ -10,7 +12,7 @@ export interface ReviewIssue {
 }
 
 export interface ReviewResult {
-  verdict: 'PASS' | 'PASS_WITH_SUGGESTIONS' | 'NEEDS_REVISION' | 'BLOCKED';
+  verdict: ReviewVerdict;
   dimensions: {
     POLITICAL_SAFETY: { score: number; issues: ReviewIssue[] };
     SEXUAL_CONTENT: { score: number; issues: ReviewIssue[] };
@@ -27,11 +29,11 @@ export interface ReviewResult {
 
 export const CHAPTER_STATUS_LABEL: Record<string, string> = {
   PENDING: '待生成',
-  DRAFT: '生成中',
-  PENDING_REVIEW: '待审核',
-  REVIEWING: '审核中',
+  DRAFT: '草稿',
+  PENDING_REVIEW: '草稿',
+  REVIEWING: '待审核',
   COMPLETED: '已完成',
-  DISPUTED: '已标记争议',
+  DISPUTED: '争议',
 };
 
 export const CHAPTER_STATUS_COLOR: Record<string, string> = {

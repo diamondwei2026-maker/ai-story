@@ -1,61 +1,71 @@
-<template>
-  <a-card data-testid="world-builder" title="世界观设定">
-    <template #extra>
-      <a-button
-        v-if="!editing"
-        size="small"
-        data-testid="edit-world-btn"
-        @click="enterEditMode"
-      >
-        编辑
-      </a-button>
-      <a-button
-        v-else
-        size="small"
-        type="primary"
-        data-testid="save-world-btn"
-        @click="save"
-      >
-        保存
-      </a-button>
-    </template>
+﻿<template>
+  <div data-testid="world-builder">
+    <a-empty
+      v-if="!hasContent"
+      data-testid="world-empty"
+      description="暂无世界观数据，请先生成设定"
+    />
 
-    <template v-if="!editing">
-      <a-collapse v-model:activeKey="activePanels">
-        <a-collapse-panel
-          v-for="dim in dimensions"
-          :key="dim.key"
-          :header="dim.label"
-          :data-testid="`dimension-${dim.key}`"
-        >
-          <MarkdownRenderer
-            v-if="dim.value"
-            :content="dim.value"
-          />
-          <p v-else class="world-builder__text body-text">尚未生成。</p>
-        </a-collapse-panel>
-      </a-collapse>
-    </template>
-
-    <template v-else>
+    <div v-if="hasContent" class="world-builder__grid">
       <div
         v-for="dim in dimensions"
         :key="dim.key"
         :data-testid="`dimension-${dim.key}`"
-        class="world-builder__dimension"
+        class="world-builder__card"
       >
-        <h4 class="world-builder__label">{{ dim.label }}</h4>
+        <!-- Card header: title + edit/save/cancel -->
+        <div class="world-builder__card-header">
+          <span class="world-builder__card-title">{{ dim.label }}</span>
+          <button
+            v-if="!readonly && editingDim !== dim.key"
+            class="world-builder__edit-btn"
+            :data-testid="`edit-dim-${dim.key}-btn`"
+            @click="startEdit(dim.key)"
+          >
+            <EditOutlined />
+          </button>
+          <div v-if="editingDim === dim.key" class="world-builder__edit-actions">
+            <button
+              class="world-builder__save-btn"
+              :data-testid="`save-dim-${dim.key}-btn`"
+              @click="saveEdit(dim.key)"
+            >
+              <CheckOutlined />
+            </button>
+            <button
+              class="world-builder__cancel-btn"
+              :data-testid="`cancel-dim-${dim.key}-btn`"
+              @click="cancelEdit"
+            >
+              <CloseOutlined />
+            </button>
+          </div>
+        </div>
+
+        <!-- View mode -->
+        <template v-if="editingDim !== dim.key">
+          <MarkdownRenderer
+            v-if="dim.value"
+            :content="dim.value"
+          />
+          <p v-else class="world-builder__card-empty">尚未生成。</p>
+        </template>
+
+        <!-- Edit mode -->
         <a-textarea
+          v-else
           v-model:value="edits[dim.key]"
-          :rows="4"
+          :rows="5"
+          class="world-builder__card-textarea"
         />
       </div>
-    </template>
-  </a-card>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue';
 import { parseSections } from '@/utils/contentParser';
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
@@ -75,14 +85,13 @@ const DIMENSIONS: Omit<Dimension, 'value'>[] = [
 
 const props = defineProps<{
   content?: string;
+  readonly?: boolean;
 }>();
 
-const editing = ref(false);
-const activePanels = ref<string[]>(DIMENSIONS.map((d) => d.key));
+/** Which dimension key is currently being edited (null = view mode) */
+const editingDim = ref<string | null>(null);
 const savedEdits = ref<Record<string, string>>({});
 
-// When new content arrives (e.g. regenerate), discard stale saved edits
-// so they don't block the fresh parsed content from rendering.
 watch(() => props.content, () => {
   savedEdits.value = {};
 });
@@ -92,43 +101,111 @@ const parsed = computed(() => parseSections(props.content ?? ''));
 const dimensions = computed<Dimension[]>(() =>
   DIMENSIONS.map((d) => ({
     ...d,
-    // Use || (not ??) so empty-string savedEdits also fall through to parsed
     value: savedEdits.value[d.key] || parsed.value[d.sectionHeader] || '',
   })),
 );
 
+const hasContent = computed(() =>
+  dimensions.value.some((d) => d.value),
+);
+
 const edits = ref<Record<string, string>>({});
 
-function enterEditMode() {
-  const map: Record<string, string> = {};
-  dimensions.value.forEach((d) => {
-    map[d.key] = d.value;
-  });
-  edits.value = map;
-  editing.value = true;
+function startEdit(key: string) {
+  const dim = dimensions.value.find((d) => d.key === key);
+  edits.value = {
+    ...edits.value,
+    [key]: dim?.value ?? '',
+  };
+  editingDim.value = key;
 }
 
-function save() {
-  savedEdits.value = { ...edits.value };
-  editing.value = false;
+function saveEdit(key: string) {
+  if (edits.value[key] !== undefined) {
+    savedEdits.value = {
+      ...savedEdits.value,
+      [key]: edits.value[key],
+    };
+  }
+  editingDim.value = null;
+}
+
+function cancelEdit() {
+  editingDim.value = null;
 }
 </script>
 
 <style scoped>
-.world-builder__dimension {
-  margin-bottom: var(--space-md);
+/* ── Grid ─────────────────────────────────────────── */
+.world-builder__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
 }
 
-.world-builder__label {
+/* ── Card ─────────────────────────────────────────── */
+.world-builder__card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.world-builder__card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.world-builder__card-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.world-builder__card-empty {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin: 0 0 4px 0;
+  color: #9ca3af;
+  margin: 0;
 }
 
-.world-builder__text {
-  margin: 0;
-  color: var(--color-text-secondary);
-  white-space: pre-wrap;
+.world-builder__card-textarea {
+  min-height: 100px;
 }
+
+/* ── Edit buttons ─────────────────────────────────── */
+.world-builder__edit-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px;
+}
+.world-builder__edit-btn:hover { color: #4b5563; }
+
+.world-builder__edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.world-builder__save-btn {
+  background: none;
+  border: none;
+  color: #059669;
+  cursor: pointer;
+  padding: 2px;
+}
+.world-builder__save-btn:hover { color: #047857; }
+
+.world-builder__cancel-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px;
+}
+.world-builder__cancel-btn:hover { color: #4b5563; }
 </style>

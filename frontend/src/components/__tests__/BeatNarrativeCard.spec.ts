@@ -10,13 +10,13 @@ const mockBeatV2 = {
   hookCount: 2,
   isClimax: false,
   useR1: false,
-  status: 'PENDING',
+  status: 'PENDING' as const,
   narrativeSummary: '主角在垃圾星意外发现了一艘星舰，AI声称自己是千年前失踪的帝国旗舰',
   conflictDescription: '主角必须在48小时内修复星舰引擎，否则整个星区将被自毁程序炸毁',
   pacingLabel: '快',
   hookCausalChain: [
-    { hook: 'AI的真实身份', resolvesInChapter: 3 },
-    { hook: '自毁倒计时', resolvesInChapter: 1 },
+    { hook: 'AI的真实身份', resolvesInChapter: 3 as number | null },
+    { hook: '自毁倒计时', resolvesInChapter: 1 as number | null },
   ],
   conflictIntensity: 4,
   readerExpectation: 5,
@@ -48,9 +48,9 @@ describe('BeatNarrativeCard', () => {
       expect(wrapper.find('[data-testid="beat-narrative-card"]').exists()).toBe(true);
     });
 
-    it('displays chapter number badge', async () => {
+    it('displays chapter number in circle avatar', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      expect(wrapper.find('[data-testid="narrative-card-chapter"]').text()).toContain('第1章');
+      expect(wrapper.find('[data-testid="narrative-card-chapter"]').text()).toBe('1');
     });
 
     it('displays narrative summary', async () => {
@@ -58,19 +58,21 @@ describe('BeatNarrativeCard', () => {
       expect(wrapper.find('[data-testid="narrative-card-summary"]').text()).toContain('垃圾星');
     });
 
-    it('displays word count', async () => {
+    it('displays word count in k format', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      expect(wrapper.find('[data-testid="narrative-card-wordcount"]').text()).toContain('3000');
+      expect(wrapper.find('[data-testid="narrative-card-wordcount"]').text()).toContain('3.0k');
     });
 
     it('displays pacing label with tag', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      expect(wrapper.find('[data-testid="narrative-card-pacing"]').text()).toBe('快');
+      expect(wrapper.find('[data-testid="narrative-card-pacing"]').text()).toContain('快');
     });
 
-    it('displays conflict intensity score', async () => {
+    it('displays conflict intensity dots', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      expect(wrapper.text()).toContain('冲突 4/5');
+      const dots = wrapper.find('[data-testid="narrative-card-intensity-dots"]');
+      expect(dots.exists()).toBe(true);
+      expect(dots.findAll('.dot--active').length).toBe(4); // intensity = 4
     });
 
     it('shows 暂无叙事摘要 when narrativeSummary is empty', async () => {
@@ -85,9 +87,9 @@ describe('BeatNarrativeCard', () => {
       expect(wrapper.find('[data-testid="narrative-card-conflict-desc"]').text()).toContain('暂无冲突描述');
     });
 
-    it('emits toggle-expand when header is clicked', async () => {
+    it('emits toggle-expand when chapter avatar is clicked', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      await wrapper.find('[data-testid="narrative-card-header"]').trigger('click');
+      await wrapper.find('[data-testid="narrative-card-chapter"]').trigger('click');
       expect(wrapper.emitted('toggle-expand')?.[0]).toEqual(['beat-1']);
     });
 
@@ -97,14 +99,14 @@ describe('BeatNarrativeCard', () => {
       expect(wrapper.emitted('toggle-expand')?.[0]).toEqual(['beat-1']);
     });
 
-    it('shows "展开" hint when collapsed', async () => {
+    it('shows chevron down (▼) when collapsed', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isExpanded: false });
-      expect(wrapper.find('[data-testid="narrative-card-expand-hint"]').text()).toBe('展开');
+      expect(wrapper.find('[data-testid="narrative-card-expand-toggle"]').text()).toBe('▼');
     });
 
-    it('shows "收起" hint when expanded', async () => {
+    it('shows chevron up (▲) when expanded', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isExpanded: true });
-      expect(wrapper.find('[data-testid="narrative-card-expand-hint"]').text()).toBe('收起');
+      expect(wrapper.find('[data-testid="narrative-card-expand-toggle"]').text()).toBe('▲');
     });
   });
 
@@ -126,15 +128,17 @@ describe('BeatNarrativeCard', () => {
       expect(wrapper.find('[data-testid="narrative-card-conflict-desc"]').text()).toContain('48小时');
     });
 
-    it('displays hook causal chain in expanded state', async () => {
+    it('displays hook causal chain text in expanded state', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isExpanded: true });
-      const hookLinks = wrapper.findAll('[data-testid="narrative-card-hook-link"]');
-      expect(hookLinks.length).toBe(2);
+      const hookText = wrapper.find('[data-testid="narrative-card-hook-text"]');
+      expect(hookText.exists()).toBe(true);
+      expect(hookText.text()).toContain('AI的真实身份');
+      expect(hookText.text()).toContain('自毁倒计时');
     });
 
     it('shows hook resolve target in expanded state', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isExpanded: true });
-      expect(wrapper.text()).toContain('回收于第3章');
+      expect(wrapper.text()).toContain('第3章回收');
     });
 
     it('shows "暂无钩子" when hookCausalChain is empty', async () => {
@@ -159,13 +163,13 @@ describe('BeatNarrativeCard', () => {
     });
 
     it('shows STALE badge when status is STALE', async () => {
-      const beat = { ...mockBeatV2, status: 'STALE' };
+      const beat = { ...mockBeatV2, status: 'STALE' as const };
       const wrapper = await mountCard({ beat });
       expect(wrapper.find('[data-testid="narrative-card-stale-badge"]').exists()).toBe(true);
     });
 
     it('hides STALE badge when status is not STALE', async () => {
-      const wrapper = await mountCard({ beat: { ...mockBeatV2, status: 'PENDING' } });
+      const wrapper = await mountCard({ beat: { ...mockBeatV2, status: 'PENDING' as const } });
       expect(wrapper.find('[data-testid="narrative-card-stale-badge"]').exists()).toBe(false);
     });
 
@@ -180,12 +184,12 @@ describe('BeatNarrativeCard', () => {
     });
   });
 
-  // ── "换一种写法" dropdown ──────────────────────────
+  // ── AI adjust popover trigger ──────────────────────
 
-  describe('"换一种写法" dropdown', () => {
-    it('renders the rewrite button', async () => {
+  describe('AI adjust popover', () => {
+    it('renders the adjust (wand) button', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2 });
-      expect(wrapper.find('[data-testid="narrative-card-rewrite-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="narrative-card-adjust-btn"]').exists()).toBe(true);
     });
   });
 
@@ -194,12 +198,18 @@ describe('BeatNarrativeCard', () => {
   describe('card styling', () => {
     it('applies expanded class when isExpanded', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isExpanded: true });
-      expect(wrapper.classes()).toContain('narrative-card--expanded');
+      expect(wrapper.classes()).toContain('beat-card--expanded');
     });
 
     it('applies affected class when isAffected', async () => {
       const wrapper = await mountCard({ beat: mockBeatV2, isAffected: true });
-      expect(wrapper.classes()).toContain('narrative-card--affected');
+      expect(wrapper.classes()).toContain('beat-card--affected');
+    });
+
+    it('applies climax class when isClimax', async () => {
+      const beat = { ...mockBeatV2, isClimax: true };
+      const wrapper = await mountCard({ beat });
+      expect(wrapper.classes()).toContain('beat-card--climax');
     });
   });
 
@@ -207,7 +217,7 @@ describe('BeatNarrativeCard', () => {
 
   describe('edge cases', () => {
     it('handles beat without hookCausalChain gracefully', async () => {
-      const beat = { ...mockBeatV2, hookCausalChain: [] as any };
+      const beat = { ...mockBeatV2, hookCausalChain: [] };
       const wrapper = await mountCard({ beat, isExpanded: true });
       expect(wrapper.find('[data-testid="narrative-card-expanded"]').exists()).toBe(true);
     });
@@ -215,27 +225,26 @@ describe('BeatNarrativeCard', () => {
     it('displays higher chapter numbers correctly', async () => {
       const beat = { ...mockBeatV2, chapterNumber: 42 };
       const wrapper = await mountCard({ beat });
-      expect(wrapper.find('[data-testid="narrative-card-chapter"]').text()).toContain('第42章');
+      expect(wrapper.find('[data-testid="narrative-card-chapter"]').text()).toBe('42');
     });
 
-    it('shows resolve info in hook link when resolvesInChapter is set', async () => {
+    it('shows resolve info in hook display when resolvesInChapter is set', async () => {
       const beat = {
         ...mockBeatV2,
-        hookCausalChain: [{ hook: '核心谜题', resolvesInChapter: 10 }],
+        hookCausalChain: [{ hook: '核心谜题', resolvesInChapter: 10 as number | null }],
       };
       const wrapper = await mountCard({ beat, isExpanded: true });
-      expect(wrapper.text()).toContain('回收于第10章');
+      expect(wrapper.text()).toContain('第10章回收');
     });
 
-    it('does not show resolve info when resolvesInChapter is null', async () => {
+    it('shows fallback when resolvesInChapter is null', async () => {
       const beat = {
         ...mockBeatV2,
-        hookCausalChain: [{ hook: '悬而未决', resolvesInChapter: null }],
+        hookCausalChain: [{ hook: '悬而未决', resolvesInChapter: null as number | null }],
         isExpanded: true,
       };
       const wrapper = await mountCard({ beat, isExpanded: true });
-      const hookText = wrapper.find('[data-testid="narrative-card-hook-link"]').text();
-      expect(hookText).not.toContain('回收于');
+      expect(wrapper.text()).toContain('未设定回收章节');
     });
   });
 });

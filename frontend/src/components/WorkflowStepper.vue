@@ -1,5 +1,6 @@
-<template>
+﻿<template>
   <div class="workflow-stepper">
+    <!-- Factsheet Alert Banner -->
     <div
       v-if="showAlertBanner"
       data-testid="factsheet-alert-banner"
@@ -25,6 +26,7 @@
       </a-button>
     </div>
 
+    <!-- Completion Banner -->
     <div
       v-if="showCompletionBanner"
       data-testid="completion-banner-area"
@@ -33,34 +35,44 @@
       <slot name="completion-banner" />
     </div>
 
+    <!-- Readonly Overlay -->
     <div v-if="isReadonly" data-testid="readonly-overlay" class="readonly-overlay">
       <div class="readonly-overlay__badge">只读模式 · 已完本</div>
     </div>
 
-    <div class="stepper__counter">
-      <a-tag>步骤 {{ currentIndex + 1 }} / {{ steps.length }}</a-tag>
+    <!-- Stage Pipeline -->
+    <div class="pipeline" data-testid="stage-pipeline">
+      <template v-for="(step, index) in steps" :key="step.phase">
+        <button
+          data-testid="step-item"
+          :data-step-index="index"
+          class="pipeline__step"
+          :class="pipelineStepClass(step, index)"
+          :disabled="!isClickable(index)"
+          @click="isClickable(index) && emit('step-click', steps[index].phase)"
+        >
+          <!-- Icon -->
+          <span v-if="step.status === 'CONFIRMED'" class="pipeline__icon pipeline__icon--done">
+            <CheckOutlined />
+          </span>
+          <span v-else-if="!isClickable(index)" class="pipeline__icon pipeline__icon--locked">
+            <LockOutlined />
+          </span>
+          <span v-else class="pipeline__icon pipeline__icon--current">
+            {{ index + 1 }}
+          </span>
+          <!-- Label -->
+          <span data-testid="step-label" class="pipeline__label">{{ step.label }}</span>
+        </button>
+        <!-- Connector -->
+        <span
+          v-if="index < steps.length - 1"
+          class="pipeline__connector"
+        />
+      </template>
     </div>
 
-    <a-steps :current="currentIndex" size="default" @click="onStepsClick">
-      <a-step
-        v-for="(step, index) in steps"
-        :key="step.phase"
-        :status="mapStatus(step.status)"
-        :data-testid="'step-item'"
-        :data-step-index="index"
-      >
-        <template #title>
-          <span data-testid="step-label">{{ step.label }}</span>
-        </template>
-        <template #description>
-          <span data-testid="step-status">{{ statusLabel(step.status) }}</span>
-        </template>
-        <template #icon>
-          <component :is="phaseIcon(step.phase)" />
-        </template>
-      </a-step>
-    </a-steps>
-
+    <!-- Reopen -->
     <div v-if="isReadonly" class="stepper__reopen">
       <a-button
         data-testid="reopen-project-btn"
@@ -73,14 +85,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type Component } from 'vue';
-import {
-  BulbOutlined,
-  GlobalOutlined,
-  OrderedListOutlined,
-  PartitionOutlined,
-  EditOutlined,
-} from '@ant-design/icons-vue';
+import { computed } from 'vue';
+import { CheckOutlined, LockOutlined } from '@ant-design/icons-vue';
 import type { PhaseType, StepStatus } from '@/stores/useWorkflowStore';
 
 export interface StepInfo {
@@ -93,14 +99,6 @@ export interface FactsheetAlert {
   level: 'NORMAL' | 'PRIORITY' | 'WARNING' | 'CRITICAL';
   depth: number;
 }
-
-const PHASE_ICONS: Record<string, Component> = {
-  IDEA: BulbOutlined,
-  SETTING: GlobalOutlined,
-  OUTLINE: OrderedListOutlined,
-  BEATS: PartitionOutlined,
-  DRAFTING: EditOutlined,
-};
 
 const props = defineProps<{
   steps: StepInfo[];
@@ -135,84 +133,52 @@ const showCompletionBanner = computed(() => {
   );
 });
 
-function phaseIcon(phase: string): Component {
-  return PHASE_ICONS[phase] ?? BulbOutlined;
-}
-
-function mapStatus(status: StepStatus): 'wait' | 'process' | 'finish' | 'error' {
-  const map: Record<StepStatus, 'wait' | 'process' | 'finish' | 'error'> = {
-    PENDING: 'wait',
-    IN_PROGRESS: 'process',
-    CONFIRMED: 'finish',
-    REJECTED: 'error',
-  };
-  return map[status];
-}
-
-const statusLabels: Record<StepStatus, string> = {
-  PENDING: '待开始',
-  IN_PROGRESS: '进行中',
-  CONFIRMED: '已完成',
-  REJECTED: '需修改',
-};
-
-function statusLabel(status: StepStatus): string {
-  return statusLabels[status];
-}
-
 function isClickable(index: number): boolean {
   if (isReadonly.value) return false;
-  // 当前及之前的步骤始终可点击
   if (index <= currentIndex.value) return true;
-  // 若前方步骤的所有前置均已确认，也允许点击（处理 localStorage 丢失后从 Hub 进入的正确重定向场景）
   const allPreviousConfirmed = props.steps
     .slice(0, index)
     .every((s) => s.status === 'CONFIRMED');
   return allPreviousConfirmed;
 }
 
-function onStepsClick(e: MouseEvent) {
-  const target = (e.target as HTMLElement).closest('[data-step-index]') as HTMLElement | null;
-  if (!target) return;
-  const index = Number(target.dataset.stepIndex);
-  if (Number.isNaN(index)) return;
-  if (isClickable(index)) {
-    emit('step-click', props.phaseOrder[index]);
-  }
+function pipelineStepClass(step: StepInfo, index: number): Record<string, boolean> {
+  const isCurrent = props.steps[currentIndex.value]?.phase === step.phase;
+  return {
+    'pipeline__step--locked': !isClickable(index),
+    'pipeline__step--current': isCurrent,
+    'pipeline__step--completed': step.status === 'CONFIRMED' && !isCurrent,
+  };
 }
 </script>
 
 <style scoped>
 .workflow-stepper {
-  padding: var(--space-md) 0;
+  padding: 8px 0;
 }
 
-.stepper__counter {
-  text-align: center;
-  margin-bottom: var(--space-md);
-}
-
+/* ── Alert Banner ───────────────────────────────────────────── */
 .factsheet-alert-banner {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  padding: 12px 20px;
-  margin-bottom: 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  padding: 10px 20px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  font-size: var(--font-size-body);
   flex-wrap: wrap;
 }
 
 .factsheet-alert-banner--warning {
-  background-color: var(--color-warning-light);
-  border: 1px solid var(--color-warning);
+  background-color: #fef3c7;
+  border: 1px solid #f59e0b;
   color: #92400e;
 }
 
 .factsheet-alert-banner--critical {
-  background-color: var(--color-error-light);
-  border: 1px solid var(--color-error);
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
   color: #991b1b;
 }
 
@@ -229,6 +195,7 @@ function onStepsClick(e: MouseEvent) {
   margin-bottom: 12px;
 }
 
+/* ── Readonly ──────────────────────────────────────────────── */
 .readonly-overlay {
   display: flex;
   align-items: center;
@@ -241,16 +208,101 @@ function onStepsClick(e: MouseEvent) {
   display: inline-block;
   padding: 4px 14px;
   border-radius: 12px;
-  background-color: var(--color-success-light);
-  border: 1px solid var(--color-success);
+  background-color: #d1fae5;
+  border: 1px solid #10b981;
   color: #065f46;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
 }
 
+/* ── Pipeline ──────────────────────────────────────────────── */
+.pipeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pipeline__step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: var(--font-size-caption);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.pipeline__step:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pipeline__step--locked {
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.pipeline__step--current {
+  background: #111827;
+  color: #fff;
+}
+
+.pipeline__step--current:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.pipeline__step--completed {
+  color: #6b7280;
+}
+
+.pipeline__step--completed:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pipeline__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+}
+
+.pipeline__icon--done {
+  color: #6b7280;
+}
+
+.pipeline__icon--locked {
+  color: #d1d5db;
+}
+
+.pipeline__icon--current {
+  background: #fff;
+  color: #111827;
+}
+
+.pipeline__label {
+  white-space: nowrap;
+}
+
+.pipeline__connector {
+  width: 12px;
+  height: 1px;
+  background: #d1d5db;
+  flex-shrink: 0;
+}
+
+/* ── Reopen ────────────────────────────────────────────────── */
 .stepper__reopen {
   display: flex;
   justify-content: center;
-  margin-top: var(--space-md);
+  margin-top: 12px;
 }
 </style>

@@ -72,11 +72,8 @@ export class ReviewService {
     });
 
     const updateData: Record<string, unknown> = { reviewResult: result as unknown as Record<string, unknown> };
-    // Transition from PENDING_REVIEW to REVIEWING when user submits for review,
-    // unless the verdict is PASS which completes the chapter directly.
-    if (result.verdict === 'PASS') {
-      updateData['status'] = 'COMPLETED';
-    } else if (chapter.status === 'PENDING_REVIEW') {
+    // 非终态章节提交审核统一进入 REVIEWING，即使 PASS 也要用户手动确认
+    if (!['COMPLETED', 'DISPUTED'].includes(chapter.status as string)) {
       updateData['status'] = 'REVIEWING';
     }
 
@@ -114,8 +111,9 @@ export class ReviewService {
     });
 
     const updateData: Record<string, unknown> = { reviewResult: result as unknown as Record<string, unknown> };
-    if (result.verdict === 'PASS') {
-      updateData['status'] = 'COMPLETED';
+    // 上诉后统一进入 REVIEWING，让用户查看结果并手动确认
+    if (!['COMPLETED', 'DISPUTED'].includes(chapter.status as string)) {
+      updateData['status'] = 'REVIEWING';
     }
 
     await this.prisma.chapter.update({ where: { id: chapterId }, data: updateData as any });

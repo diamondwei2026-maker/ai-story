@@ -47,13 +47,14 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 
-  /* ===== Typography ===== */
+  /* ===== Typography — aligned to Figma/Tailwind scale ===== */
   --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Georgia', serif;
-  --font-size-display: 32px;
-  --font-size-heading: 24px;
-  --font-size-section: 18px;
-  --font-size-body: 15px;
-  --font-size-caption: 12px;
+  --font-size-display: 24px;    /* Figma: text-2xl equivalent */
+  --font-size-heading: 18px;    /* Figma: text-lg equivalent */
+  --font-size-section: 16px;    /* Figma: text-base (bold) */
+  --font-size-body: 14px;       /* Figma: text-sm — primary body */
+  --font-size-caption: 12px;    /* Figma: text-xs — labels / hints */
+  --font-size-micro: 10px;      /* Figma: text-[10px] — mini badges */
 
   /* ===== Editorial Surface ===== */
   --color-surface-warm: #fefcf8;

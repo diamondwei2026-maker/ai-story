@@ -1,87 +1,146 @@
-<template>
-  <div class="project-hub page-container">
-    <!-- Hero -->
-    <div class="project-hub__hero">
-      <h1 class="project-hub__title page-title serif-accent">我的项目</h1>
-      <p class="page-container__subtitle">继续你的创作之旅</p>
-      <div class="project-hub__hero-actions">
-        <a-button
-          type="primary"
-          size="large"
+﻿<template>
+  <div class="project-hub">
+    <!-- Header -->
+    <header class="project-hub__header">
+      <div class="project-hub__header-inner">
+        <div>
+          <h1 class="project-hub__title">AI 小说创作平台</h1>
+          <p class="project-hub__subtitle">全流程 AI 辅助创作，从灵感到完本</p>
+        </div>
+        <button
           data-testid="create-project-btn"
+          class="project-hub__create-btn"
           @click="showCreateModal = true"
         >
+          <PlusOutlined />
           新建项目
-        </a-button>
+        </button>
       </div>
-    </div>
+    </header>
 
-    <EditorialDivider v-if="loaded && projects.length > 0" />
+    <main class="project-hub__main">
+      <!-- Loading -->
+      <div v-if="loading" class="project-hub__loading">
+        <a-spin size="large" tip="加载项目列表中..." />
+      </div>
 
-    <!-- Project Cards Grid -->
-    <a-spin v-if="loading" class="project-hub__loading" size="large" tip="加载项目列表中..." />
-    <a-alert
-      v-else-if="loadError"
-      type="error"
-      :message="loadError"
-      class="project-hub__error"
-      closable
-      @close="loadError = null"
-    />
+      <!-- Error -->
+      <a-alert
+        v-else-if="loadError"
+        type="error"
+        :message="loadError"
+        class="project-hub__error"
+        closable
+        @close="loadError = null"
+      />
 
-    <a-row
-      v-if="loaded && projects.length > 0"
-      data-testid="project-list"
-      :gutter="[24, 24]"
-      class="project-hub__grid"
-    >
-      <a-col
-        v-for="project in projects"
-        :key="project.id"
-        :xs="24"
-        :sm="12"
-        :lg="8"
-      >
-        <a-card
-          hoverable
-          data-testid="project-card"
-          class="project-card"
-          @click="openProject(project.id)"
+      <template v-if="loaded">
+        <!-- Filter Tabs -->
+        <div class="project-hub__tabs">
+          <button
+            v-for="tab in filterTabs"
+            :key="tab.key"
+            data-testid="filter-tab"
+            class="project-hub__tab"
+            :class="{ 'project-hub__tab--active': activeFilter === tab.key }"
+            @click="activeFilter = tab.key"
+          >
+            {{ tab.label }}
+            <span class="project-hub__tab-count">{{ tabCount(tab.key) }}</span>
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div
+          v-if="filteredProjects.length === 0"
+          data-testid="empty-state"
+          class="project-hub__empty"
         >
-          <template #cover>
-            <div
-              :class="['project-card__cover', coverClass(project.title)]"
-            >
-              <span class="project-card__cover-initial serif-accent">
-                {{ project.title.charAt(0) }}
+          <FileTextOutlined class="project-hub__empty-icon" />
+          <p>暂无项目</p>
+        </div>
+
+        <!-- Project Cards Grid -->
+        <div
+          v-else
+          data-testid="project-list"
+          class="project-hub__grid"
+        >
+          <div
+            v-for="project in filteredProjects"
+            :key="project.id"
+            data-testid="project-card"
+            class="project-card"
+            :class="{ 'project-card--archived': project.status === 'ARCHIVED' }"
+            @click="project.status !== 'ARCHIVED' && openProject(project.id)"
+          >
+            <!-- Title + Status -->
+            <div class="project-card__header">
+              <div class="project-card__info">
+                <h3 class="project-card__name">{{ project.title }}</h3>
+                <p v-if="projectDescription(project)" class="project-card__desc">
+                  {{ projectDescription(project) }}
+                </p>
+                <p v-else class="project-card__desc--empty">暂无简介</p>
+              </div>
+              <span
+                data-testid="project-status-tag"
+                class="project-card__status"
+                :class="stageTagClass(project.status)"
+              >
+                {{ statusLabel(project.status) }}
               </span>
             </div>
-          </template>
-          <a-card-meta>
-            <template #title>
-              <span class="project-card__title">{{ project.title }}</span>
-            </template>
-            <template #description>
-              <div class="project-card__meta">
-                <a-tag :color="statusColor(project.status)">
-                  {{ statusLabel(project.status) }}
-                </a-tag>
-                <span class="project-card__date caption">
-                  {{ formatDate(project.updatedAt) }}
-                </span>
-              </div>
-            </template>
-          </a-card-meta>
-        </a-card>
-      </a-col>
-    </a-row>
 
-    <!-- Empty State -->
-    <EmptyState
-      v-if="loaded && projects.length === 0"
-      data-testid="empty-state"
-      description="你的写作台还是空的，开始你的第一部小说吧。"
-    />
+            <!-- Meta -->
+            <div class="project-card__meta">
+              <span class="project-card__meta-item">
+                <BookOutlined />
+                {{ genreLabel(project) }}
+              </span>
+              <span class="project-card__meta-item">
+                <FileTextOutlined />
+                {{ formatWordCount(projectWordCount(project)) }}
+              </span>
+              <span class="project-card__meta-item project-card__meta-item--date">
+                <ClockCircleOutlined />
+                {{ formatDate(project.updatedAt) }}
+              </span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div v-if="project.status !== 'ARCHIVED'" class="project-card__progress">
+              <div class="project-card__progress-bar">
+                <div
+                  v-for="(phase, idx) in STAGES"
+                  :key="phase.key"
+                  class="project-card__progress-segment"
+                  :class="progressSegmentClass(project, phase.key, idx)"
+                />
+              </div>
+              <div class="project-card__progress-labels">
+                <span
+                  v-for="phase in STAGES"
+                  :key="phase.key"
+                  class="project-card__progress-label"
+                >{{ phase.shortLabel }}</span>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <button
+              data-testid="project-action-btn"
+              class="project-card__action"
+              :class="{ 'project-card__action--disabled': project.status === 'ARCHIVED' }"
+              @click.stop="openProject(project.id)"
+            >
+              {{ actionLabel(project.status) }}
+              <RightOutlined />
+            </button>
+          </div>
+        </div>
+      </template>
+    </main>
 
     <CreateProjectModal
       v-model:open="showCreateModal"
@@ -91,12 +150,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '@/stores/useProjectStore';
 import type { Project } from '@/stores/useProjectStore';
-import EmptyState from '@/components/EmptyState.vue';
-import EditorialDivider from '@/components/EditorialDivider.vue';
+import {
+  PlusOutlined,
+  BookOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  RightOutlined,
+} from '@ant-design/icons-vue';
 import CreateProjectModal from '@/components/CreateProjectModal.vue';
 
 const router = useRouter();
@@ -106,39 +170,47 @@ const showCreateModal = ref(false);
 const loading = ref(false);
 const loaded = ref(false);
 const loadError = ref<string | null>(null);
-
 const projects = ref<Project[]>(projectStore.projects);
 
-const COVER_GRADIENTS = [
-  'cover--teal',
-  'cover--amber',
-  'cover--slate',
-  'cover--navy',
-  'cover--emerald',
-  'cover--rose',
+// ── Filter ──────────────────────────────────────────────────────
+type FilterKey = 'all' | 'active' | 'completed' | 'archived';
+const activeFilter = ref<FilterKey>('all');
+
+const filterTabs = [
+  { key: 'all' as const, label: '全部' },
+  { key: 'active' as const, label: '创作中' },
+  { key: 'completed' as const, label: '已完本' },
+  { key: 'archived' as const, label: '已归档' },
 ];
 
-function coverClass(title: string): string {
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) {
-    hash = (hash * 31 + title.charCodeAt(i)) | 0;
-  }
-  return COVER_GRADIENTS[Math.abs(hash) % COVER_GRADIENTS.length];
+function tabCount(key: FilterKey): number {
+  if (key === 'all') return projects.value.length;
+  if (key === 'active') return projects.value.filter((p) => !['COMPLETED', 'ARCHIVED'].includes(p.status)).length;
+  if (key === 'completed') return projects.value.filter((p) => p.status === 'COMPLETED').length;
+  return projects.value.filter((p) => p.status === 'ARCHIVED').length;
 }
 
-function statusColor(status: string): string {
-  const map: Record<string, string> = {
-    IDEA: 'processing',
-    SETTING: 'teal',
-    OUTLINE: 'blue',
-    BEATS: 'purple',
-    DRAFTING: 'orange',
-    COMPLETED: 'success',
-    ARCHIVED: 'default',
-  };
-  return map[status] ?? 'default';
-}
+const filteredProjects = computed(() =>
+  projects.value.filter((p) => {
+    if (activeFilter.value === 'all') return true;
+    if (activeFilter.value === 'active') return !['COMPLETED', 'ARCHIVED'].includes(p.status);
+    if (activeFilter.value === 'completed') return p.status === 'COMPLETED';
+    return p.status === 'ARCHIVED';
+  }),
+);
 
+// ── Stage constants ─────────────────────────────────────────────
+const STAGES = [
+  { key: 'IDEA', shortLabel: '灵感' },
+  { key: 'SETTING', shortLabel: '设定' },
+  { key: 'OUTLINE', shortLabel: '大纲' },
+  { key: 'BEATS', shortLabel: '细纲' },
+  { key: 'DRAFTING', shortLabel: '正文' },
+];
+
+const PHASE_ORDER = ['IDEA', 'SETTING', 'OUTLINE', 'BEATS', 'DRAFTING'];
+
+// ── Helpers ─────────────────────────────────────────────────────
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
     IDEA: '灵感提取',
@@ -152,6 +224,46 @@ function statusLabel(status: string): string {
   return map[status] ?? status;
 }
 
+const STAGE_TAG_CLASS: Record<string, string> = {
+  IDEA: 'stage-tag--violet',
+  SETTING: 'stage-tag--blue',
+  OUTLINE: 'stage-tag--emerald',
+  BEATS: 'stage-tag--amber',
+  DRAFTING: 'stage-tag--rose',
+  COMPLETED: 'stage-tag--green',
+  ARCHIVED: 'stage-tag--gray',
+};
+
+function stageTagClass(status: string): string {
+  return STAGE_TAG_CLASS[status] ?? 'stage-tag--gray';
+}
+
+function genreLabel(project: Project): string {
+  return project.config?.genre ?? '未分类';
+}
+
+function projectDescription(project: Project): string | null {
+  // Use genre as fallback description since Project interface doesn't have description
+  const desc = (project as any).description;
+  return desc || null;
+}
+
+function projectWordCount(project: Project): number {
+  return (project as any).wordCount ?? 0;
+}
+
+function formatWordCount(count: number): string {
+  if (count === 0) return '尚未写作';
+  if (count >= 10000) return `${(count / 10000).toFixed(1)} 万字`;
+  return `${count} 字`;
+}
+
+function actionLabel(status: string): string {
+  if (status === 'COMPLETED') return '浏览作品';
+  if (status === 'ARCHIVED') return '查看详情';
+  return '继续创作';
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -161,6 +273,32 @@ function formatDate(iso: string): string {
   if (days === 1) return '昨天更新';
   if (days < 7) return `${days} 天前更新`;
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function progressSegmentClass(project: Project, phaseKey: string, _idx: number): string {
+  const status = project.status;
+  const currentIdx = PHASE_ORDER.indexOf(status === 'COMPLETED' ? 'DRAFTING' : status);
+  const phaseIdx = PHASE_ORDER.indexOf(phaseKey);
+  if (status === 'COMPLETED' || status === 'ARCHIVED') return 'project-card__progress-segment--done';
+  if (phaseIdx < currentIdx) return 'project-card__progress-segment--done';
+  if (phaseIdx === currentIdx) return 'project-card__progress-segment--current';
+  return 'project-card__progress-segment--pending';
+}
+
+// ── Actions ────────────────────────────────────────────────────
+const PHASE_ROUTE_MAP: Record<string, string> = {
+  IDEA: 'workflow.idea',
+  SETTING: 'workflow.setting',
+  OUTLINE: 'workflow.outline',
+  BEATS: 'workflow.beats',
+  DRAFTING: 'workflow.drafting',
+  COMPLETED: 'workflow.outline',
+};
+
+function openProject(id: string) {
+  const project = projectStore.projects.find((p) => p.id === id);
+  const routeName = PHASE_ROUTE_MAP[project?.status ?? ''] ?? 'workflow.idea';
+  router.push({ name: routeName, params: { id } });
 }
 
 async function loadProjects() {
@@ -178,27 +316,19 @@ async function loadProjects() {
   }
 }
 
-async function handleCreateProject(title: string) {
+async function handleCreateProject(title: string, genre?: string) {
   const project = await projectStore.createProject(title);
+  if (genre) {
+    try {
+      await import('@/api/project').then((m) =>
+        m.updateProject(project.id, { config: { genre } }),
+      );
+    } catch {
+      // non-critical
+    }
+  }
   projects.value = projectStore.projects;
   router.push({ name: 'workflow.idea', params: { id: project.id } });
-}
-
-/** 根据项目 status 映射到已实现的 phase 路由，用于恢复工作进度 */
-const PHASE_ROUTE_MAP: Record<string, string> = {
-  IDEA: 'workflow.idea',
-  SETTING: 'workflow.setting',
-  OUTLINE: 'workflow.outline',
-  BEATS: 'workflow.beats',
-  DRAFTING: 'workflow.drafting',
-  // COMPLETED 暂回退到 outline（完本只读模式未实现）
-  COMPLETED: 'workflow.outline',
-};
-
-function openProject(id: string) {
-  const project = projectStore.projects.find((p) => p.id === id);
-  const routeName = PHASE_ROUTE_MAP[project?.status ?? ''] ?? 'workflow.idea';
-  router.push({ name: routeName, params: { id } });
 }
 
 onMounted(() => {
@@ -207,87 +337,320 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.project-hub__hero {
-  text-align: center;
-  padding: var(--space-2xl) 0 var(--space-xl);
+/* ── Page Container ────────────────────────────────────────────── */
+.project-hub {
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.project-hub__header {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.project-hub__header-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .project-hub__title {
-  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
 }
 
-.project-hub__hero-actions {
-  margin-top: var(--space-xl);
+.project-hub__subtitle {
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+.project-hub__create-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #111827;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: var(--font-size-body);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.project-hub__create-btn:hover {
+  background: #374151;
+}
+
+/* ── Main ─────────────────────────────────────────────────────── */
+.project-hub__main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 32px 24px;
 }
 
 .project-hub__loading,
 .project-hub__error {
   text-align: center;
-  padding: var(--space-2xl);
+  padding: 80px 0;
 }
 
+/* ── Filter Tabs ──────────────────────────────────────────────── */
+.project-hub__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.project-hub__tab {
+  padding: 10px 16px;
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.project-hub__tab:hover {
+  color: #374151;
+}
+
+.project-hub__tab--active {
+  color: #111827;
+  border-bottom-color: #111827;
+}
+
+.project-hub__tab-count {
+  margin-left: 6px;
+  font-size: var(--font-size-caption);
+  color: #9ca3af;
+}
+
+/* ── Empty State ──────────────────────────────────────────────── */
+.project-hub__empty {
+  text-align: center;
+  padding: 80px 0;
+  color: #9ca3af;
+}
+
+.project-hub__empty-icon {
+  font-size: 32px;
+  opacity: 0.3;
+  margin-bottom: 12px;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────── */
 .project-hub__grid {
-  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
+/* ── Card ─────────────────────────────────────────────────────── */
 .project-card {
-  transition: transform 0.2s var(--ease-out-expo), box-shadow 0.2s var(--ease-out-expo);
-  overflow: hidden;
-  border-radius: var(--radius-lg);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: box-shadow 0.2s;
+  cursor: pointer;
 }
 
 .project-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.project-card__cover {
-  height: 120px;
+.project-card--archived {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.project-card__header {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.project-card__cover-initial {
-  font-size: 48px;
+.project-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-card__name {
+  font-size: var(--font-size-section);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  text-transform: uppercase;
-  user-select: none;
+  color: #111827;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cover--teal {
-  background: linear-gradient(135deg, #0d9488, #0f766e);
-}
-.cover--amber {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-.cover--slate {
-  background: linear-gradient(135deg, #475569, #334155);
-}
-.cover--navy {
-  background: linear-gradient(135deg, #1e40af, #1e3a8a);
-}
-.cover--emerald {
-  background: linear-gradient(135deg, #059669, #047857);
-}
-.cover--rose {
-  background: linear-gradient(135deg, #e11d48, #be123c);
+.project-card__desc {
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  margin: 4px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
 }
 
-.project-card__title {
-  font-size: 15px;
-  font-weight: 600;
+.project-card__desc--empty {
+  font-size: var(--font-size-body);
+  color: #9ca3af;
+  margin: 4px 0 0;
+  font-style: italic;
 }
 
+.project-card__status {
+  flex-shrink: 0;
+  font-size: var(--font-size-caption);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+/* ── Stage Tag Colors ─────────────────────────────────────────── */
+.stage-tag--violet {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border-color: #ddd6fe;
+}
+.stage-tag--blue {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+.stage-tag--emerald {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+.stage-tag--amber {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: #fde68a;
+}
+.stage-tag--rose {
+  background: #fff1f2;
+  color: #e11d48;
+  border-color: #fecdd3;
+}
+.stage-tag--green {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+.stage-tag--gray {
+  background: #f9fafb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+/* ── Meta ─────────────────────────────────────────────────────── */
 .project-card__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  gap: 12px;
+  font-size: var(--font-size-caption);
+  color: #9ca3af;
 }
 
-.project-card__date {
-  white-space: nowrap;
+.project-card__meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-card__meta-item--date {
+  margin-left: auto;
+}
+
+/* ── Progress ─────────────────────────────────────────────────── */
+.project-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-card__progress-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.project-card__progress-segment {
+  flex: 1;
+  height: 4px;
+  border-radius: 6px;
+}
+
+.project-card__progress-segment--done {
+  background: #374151;
+}
+
+.project-card__progress-segment--current {
+  background: #9ca3af;
+}
+
+.project-card__progress-segment--pending {
+  background: #e5e7eb;
+}
+
+.project-card__progress-labels {
+  display: flex;
+  justify-content: space-between;
+}
+
+.project-card__progress-label {
+  font-size: var(--font-size-caption);
+  color: #9ca3af;
+}
+
+/* ── Action ───────────────────────────────────────────────────── */
+.project-card__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: var(--font-size-body);
+  color: #374151;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.project-card__action:hover {
+  background: #f9fafb;
+}
+
+.project-card__action--disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
 }
 </style>

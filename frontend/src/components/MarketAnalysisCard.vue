@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <a-badge-ribbon :text="`方案 ${sellPoint.index + 1}`" color="teal">
     <a-card
       hoverable
@@ -83,7 +83,7 @@ defineEmits<{
 }
 
 .market-card__ref-tag {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .market-card__diff {

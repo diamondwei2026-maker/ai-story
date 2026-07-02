@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-testid="sellpoint-selector" class="sellpoint-selector">
     <h3 data-testid="sellpoint-section-title" class="sellpoint-selector__title">
       选择核心卖点方案
@@ -107,7 +107,7 @@ function onRegenerate() {
 }
 
 .sellpoint-selector__title {
-  font-size: 18px;
+  font-size: var(--font-size-heading);
   color: var(--color-text-primary);
   margin: 0 0 16px 0;
 }
@@ -137,7 +137,7 @@ function onRegenerate() {
 }
 
 .sellpoint-selector__feedback-label {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   color: var(--color-text-primary);
 }

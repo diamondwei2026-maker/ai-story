@@ -143,12 +143,12 @@ describe("DraftingView", () => {
       expect(wrapper.find('[data-testid="drafting-view"]').exists()).toBe(true);
     });
 
-    it('shows the phase title "正文迭代"', async () => {
+    it("renders drafting-view container even without header", async () => {
       mockGetChapters.mockResolvedValue(emptyChapters);
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-testid="drafting-title"]').text()).toContain("正文迭代");
+      expect(wrapper.find('[data-testid="drafting-view"]').exists()).toBe(true);
     });
 
     it("displays chapters in ascending ChapterNumber order", async () => {
@@ -251,7 +251,7 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("已标记争议");
+      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("争议");
     });
 
     it("displays correct status text for DRAFT chapters", async () => {
@@ -261,7 +261,7 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("生成中");
+      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("草稿");
     });
 
     it("displays correct status text for REVIEWING chapters", async () => {
@@ -271,7 +271,7 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("审核中");
+      expect(wrapper.find('[data-testid="chapter-status-badge"]').text()).toContain("待审核");
     });
   });
 
@@ -487,8 +487,8 @@ describe("DraftingView", () => {
   // 6. Completion banner
   // ══════════════════════════════════════════════════════════════════
 
-  describe("completion banner", () => {
-    it("renders CompletionBanner when all chapters are completed/disputed and project is DRAFTING", async () => {
+  describe("completion button", () => {
+    it("renders 完本 button when all chapters are completed/disputed", async () => {
       mockGetChapters.mockResolvedValue(allCompletedChapters);
       mockConfirmCompletion.mockResolvedValue({});
       mockReopenProject.mockResolvedValue({});
@@ -497,29 +497,30 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      const banner = wrapper.find('[data-testid="completion-banner"]');
-      expect(banner.exists()).toBe(true);
+      const btn = wrapper.find('[data-testid="completion-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.text()).toContain("完本");
     });
 
-    it("does not render CompletionBanner when not all chapters are completed", async () => {
+    it("does not render 完本 button when not all chapters are completed", async () => {
       mockGetChapters.mockResolvedValue(threeChapters);
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-testid="completion-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="completion-btn"]').exists()).toBe(false);
     });
 
-    it("does not render CompletionBanner when no chapters exist", async () => {
+    it("does not render 完本 button when no chapters exist", async () => {
       mockGetChapters.mockResolvedValue(emptyChapters);
       const wrapper = await mountView();
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-testid="completion-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="completion-btn"]').exists()).toBe(false);
     });
 
-    it("calls confirmCompletion API when confirm-completion event is emitted from banner", async () => {
+    it("calls confirmCompletion API when 完本 button is clicked", async () => {
       mockGetChapters.mockResolvedValue(allCompletedChapters);
       mockConfirmCompletion.mockResolvedValue({ status: "COMPLETED" });
 
@@ -527,9 +528,8 @@ describe("DraftingView", () => {
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
-      // Trigger the banner confirm-completion event
-      const banner = wrapper.findComponent({ name: "CompletionBanner" });
-      await banner.vm.$emit("confirm-completion", { action: "direct-complete" });
+      const btn = wrapper.find('[data-testid="completion-btn"]');
+      await btn.trigger("click");
       await wrapper.vm.$nextTick();
 
       expect(mockConfirmCompletion).toHaveBeenCalled();

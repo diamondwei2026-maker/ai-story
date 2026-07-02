@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-testid="dispute-confirm-backdrop">
     <a-modal
       :open="visible"
@@ -55,7 +55,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .dispute-modal__info {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-md);
 }

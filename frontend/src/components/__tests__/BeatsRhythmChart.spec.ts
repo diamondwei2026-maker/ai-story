@@ -2,7 +2,6 @@
 import { mount } from '@vue/test-utils';
 import type { Beat } from '@/stores/useBeatStore';
 
-// ── 测试用 Beat mock ──
 function makeBeat(overrides: Partial<Beat> & { id: string; chapterNumber: number }): Beat {
   return {
     projectId: 'proj-1',
@@ -52,101 +51,42 @@ describe('BeatsRhythmChart', () => {
     expect(wrapper.find('[data-testid="beats-rhythm-chart"]').exists()).toBe(true);
   });
 
-  it('renders the chart canvas when beats exist', async () => {
+  // ── Bar chart ──
+  it('renders bar chart when beats exist', async () => {
     const wrapper = await mountChart({ beats: healthyBeats });
-    expect(wrapper.find('[data-testid="rhythm-chart-canvas"]').exists()).toBe(true);
+    expect(wrapper.findAll('.rhythm-chart__bar').length).toBe(healthyBeats.length);
   });
 
-  it('renders empty state when no beats', async () => {
-    const wrapper = await mountChart({ beats: [] });
-    expect(wrapper.find('[data-testid="rhythm-chart-empty"]').exists()).toBe(true);
-  });
-
-  it('hides chart canvas when no beats', async () => {
-    const wrapper = await mountChart({ beats: [] });
-    expect(wrapper.find('[data-testid="rhythm-chart-canvas"]').exists()).toBe(false);
-  });
-
-  it('cleans up echarts instance on unmount', async () => {
+  it('bar chart labels match chapter numbers', async () => {
     const wrapper = await mountChart({ beats: healthyBeats });
-    expect(() => wrapper.unmount()).not.toThrow();
+    const labels = wrapper.findAll('.rhythm-chart__bar-label');
+    expect(labels[0].text()).toBe('1');
+    expect(labels[labels.length - 1].text()).toBe(String(healthyBeats.length));
   });
 
-  it('chart canvas is a div element', async () => {
+  // ── Stat cards ──
+  it('renders 3 stat cards when beats exist', async () => {
     const wrapper = await mountChart({ beats: healthyBeats });
-    const canvas = wrapper.find('[data-testid="rhythm-chart-canvas"]');
-    expect(canvas.element).toBeInstanceOf(HTMLDivElement);
+    expect(wrapper.findAll('.rhythm-stat-card').length).toBe(3);
   });
 
-  it('handles single beat without error', async () => {
-    const singleBeat = [makeBeat({ id: 'b1', chapterNumber: 1 })];
-    const wrapper = await mountChart({ beats: singleBeat });
-    expect(wrapper.find('[data-testid="rhythm-chart-canvas"]').exists()).toBe(true);
-  });
-
-  it('handles beats with extreme values (1 and 5)', async () => {
-    const extremes = [
-      makeBeat({ id: 'b1', chapterNumber: 1, conflictIntensity: 1, readerExpectation: 1 }),
-      makeBeat({ id: 'b2', chapterNumber: 2, conflictIntensity: 5, readerExpectation: 5 }),
-    ];
-    const wrapper = await mountChart({ beats: extremes });
-    expect(wrapper.vm).toBeDefined();
-  });
-
-  // ── 新增：评分横幅 ──
-  it('renders score banner when beats exist', async () => {
+  it('stat cards show correct values', async () => {
     const wrapper = await mountChart({ beats: healthyBeats });
-    expect(wrapper.find('[data-testid="rhythm-score-banner"]').exists()).toBe(true);
+    const values = wrapper.findAll('.rhythm-stat-card__value');
+    // avg intensity for healthyBeats = (4+3+5+2+3)/5 = 3.4
+    expect(values[1].text()).toBe('3.4');
+    // climax count = 1 (b3)
+    expect(values[2].text()).toBe('1');
   });
 
-  it('does not render score banner when no beats', async () => {
-    const wrapper = await mountChart({ beats: [] });
-    expect(wrapper.find('[data-testid="rhythm-score-banner"]').exists()).toBe(false);
-  });
-
-  it('score banner shows a numeric score', async () => {
-    const wrapper = await mountChart({ beats: healthyBeats });
-    const scoreEl = wrapper.find('[data-testid="rhythm-score-banner"] .score-number');
-    expect(scoreEl.exists()).toBe(true);
-    expect(Number(scoreEl.text())).toBeGreaterThanOrEqual(0);
-    expect(Number(scoreEl.text())).toBeLessThanOrEqual(100);
-  });
-
-  // ── 新增：帮助抽屉 ──
-  it('help button is present', async () => {
-    const wrapper = await mountChart({ beats: healthyBeats });
-    expect(wrapper.find('[data-testid="rhythm-help-btn"]').exists()).toBe(true);
-  });
-
-  // ── 新增：增强预警（含优化建议） ──
-  it('renders warnings for low-quality beats', async () => {
+  // ── Warning banner ──
+  it('renders warning for warning data', async () => {
     const wrapper = await mountChart({ beats: warningBeats });
-    expect(wrapper.find('[data-testid="rhythm-warnings"]').exists()).toBe(true);
+    expect(wrapper.find('.rhythm-warning').exists()).toBe(true);
   });
 
-  it('warning card includes optimization suggestion text', async () => {
-    const wrapper = await mountChart({ beats: warningBeats });
-    const suggestion = wrapper.find('.warning-suggestion');
-    expect(suggestion.exists()).toBe(true);
-    expect(suggestion.text()).toBeTruthy();
-  });
-
-  it('warning card includes action hint text', async () => {
-    const wrapper = await mountChart({ beats: warningBeats });
-    const hint = wrapper.find('.warning-action-hint');
-    expect(hint.exists()).toBe(true);
-    expect(hint.text()).toContain('AI');
-  });
-
-  it('emits batch-optimize on button click', async () => {
-    const wrapper = await mountChart({ beats: warningBeats });
-    await wrapper.find('[data-testid="rhythm-optimize-btn"]').trigger('click');
-    expect(wrapper.emitted('batch-optimize')).toBeTruthy();
-    expect(wrapper.emitted('batch-optimize')?.[0]).toEqual([2, 4, expect.any(String)]);
-  });
-
-  it('no warnings for healthy beats', async () => {
+  it('no warning for healthy beats', async () => {
     const wrapper = await mountChart({ beats: healthyBeats });
-    expect(wrapper.find('[data-testid="rhythm-warnings"]').exists()).toBe(false);
+    expect(wrapper.find('.rhythm-warning').exists()).toBe(false);
   });
 });

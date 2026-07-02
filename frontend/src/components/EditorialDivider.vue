@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <a-divider class="editorial-divider">
     <span class="editorial-divider__ornament">&#9670;</span>
   </a-divider>
@@ -12,6 +12,6 @@
 
 .editorial-divider__ornament {
   color: var(--color-rule);
-  font-size: 10px;
+  font-size: var(--font-size-micro);
 }
 </style>

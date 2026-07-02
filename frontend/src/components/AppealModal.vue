@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-testid="appeal-modal-backdrop">
     <a-modal
       :open="visible"
@@ -80,7 +80,7 @@ function handleSubmit() {
 
 <style scoped>
 .appeal-modal__verdict-info {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
   margin: 0 0 var(--space-sm) 0;
 }
