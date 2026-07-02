@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue';
 import type { ChangeAnalysisData, ImpactedChapter } from '@/api/chapter';
 
@@ -163,7 +163,7 @@ const statusLabels: Record<string, string> = {
   text-align: center;
   color: var(--color-text-secondary);
   padding: var(--space-sm);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .severity-group {
@@ -196,19 +196,19 @@ const statusLabels: Record<string, string> = {
 }
 
 .severity-group__item-chapter {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--color-text-primary);
   white-space: nowrap;
 }
 
 .severity-group__item-reason {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 
 .severity-group__item-status {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   white-space: nowrap;
 }
 

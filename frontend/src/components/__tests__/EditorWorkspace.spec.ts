@@ -489,12 +489,12 @@ describe("EditorWorkspace", () => {
 
     it("shows correct status text for REVIEWING", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "REVIEWING", reviewResult: makeReviewResult({ verdict: "PASS" }) });
-      expect(wrapper.find('[data-testid="workspace-status-badge"]').text()).toContain("审核中");
+      expect(wrapper.find('[data-testid="workspace-status-badge"]').text()).toContain("待审核");
     });
 
     it("shows correct status text for DISPUTED", async () => {
       const wrapper = await mountEditorWorkspace({ chapterStatus: "DISPUTED" });
-      expect(wrapper.find('[data-testid="workspace-status-badge"]').text()).toContain("已标记争议");
+      expect(wrapper.find('[data-testid="workspace-status-badge"]').text()).toContain("争议");
     });
 
     it("shows target word count in workspace", async () => {

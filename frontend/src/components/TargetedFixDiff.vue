@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
 
 withDefaults(defineProps<{
@@ -82,7 +82,7 @@ const emit = defineEmits<{
 }
 
 .targeted-fix-diff__panel-title {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0 0 6px 0;
@@ -93,7 +93,7 @@ const emit = defineEmits<{
   padding: 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;

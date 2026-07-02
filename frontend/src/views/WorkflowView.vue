@@ -1,30 +1,46 @@
-<template>
-  <div class="workflow-view page-container">
-    <div class="workflow-view__header">
-      <a-page-header
-        :title="projectTitle"
-        class="workflow-view__page-header"
-        @back="router.push('/')"
-      >
-        <template #tags>
-          <a-tag :color="phaseTagColor">{{ currentPhaseLabel }}</a-tag>
-        </template>
-        <template #extra>
+﻿<template>
+  <div class="workflow-view">
+    <!-- Header -->
+    <header class="workflow-view__header">
+      <div class="workflow-view__header-inner">
+        <div class="workflow-view__header-left">
+          <button class="workflow-view__back-btn" @click="router.push('/')">
+            <ArrowLeftOutlined />
+            返回项目
+          </button>
+          <span class="workflow-view__divider" />
+          <span class="workflow-view__project-name">{{ projectTitle }}</span>
+        </div>
+
+        <div class="workflow-view__header-center">
+          <WorkflowStepper
+            :steps="steps"
+            :currentPhase="store.currentPhase"
+            :phaseOrder="store.phaseOrder"
+            @step-click="handleStepClick"
+          />
+        </div>
+
+        <div class="workflow-view__header-right">
           <ModelBadge
             v-if="aiStatus.aiMeta.value"
             :model-name="aiStatus.aiMeta.value.modelUsed"
             :degraded="aiStatus.aiMeta.value.degraded"
           />
-        </template>
-      </a-page-header>
-    </div>
+        </div>
+      </div>
+    </header>
 
-    <WorkflowStepper
-      :steps="steps"
-      :currentPhase="store.currentPhase"
-      :phaseOrder="store.phaseOrder"
-      @step-click="handleStepClick"
-    />
+    <!-- Breadcrumb Alert for read-only browsing -->
+    <div
+      v-if="isViewingCompletedStage"
+      class="workflow-view__readonly-banner"
+    >
+      <span>正在浏览已完成阶段（只读）</span>
+      <button @click="handleReturnToCurrent">
+        返回当前阶段
+      </button>
+    </div>
 
     <div class="workflow-view__content">
       <router-view v-slot="{ Component }">
@@ -43,8 +59,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ArrowLeftOutlined } from '@ant-design/icons-vue';
 import { useWorkflowStore, PHASE_ORDER, type PhaseType } from '@/stores/useWorkflowStore';
 import { useProjectStore } from '@/stores/useProjectStore';
 import type { StepInfo } from '@/components/WorkflowStepper.vue';
@@ -53,13 +70,21 @@ import ModelBadge from '@/components/ModelBadge.vue';
 import AiUnavailableModal from '@/components/AiUnavailableModal.vue';
 import { useAiStatus } from '@/composables/useAiStatus';
 
-/** 已实现前端视图的 phase → route name 映射 */
 const PHASE_TO_ROUTE: Record<string, string> = {
   IDEA: 'workflow.idea',
   SETTING: 'workflow.setting',
   OUTLINE: 'workflow.outline',
   BEATS: 'workflow.beats',
   DRAFTING: 'workflow.drafting',
+};
+
+const PHASE_ORDER_KEYS = PHASE_ORDER as readonly PhaseType[];
+const phaseLabels: Record<string, string> = {
+  IDEA: '灵感提取',
+  SETTING: '设定集',
+  OUTLINE: '剧情大纲',
+  BEATS: '细纲拆解',
+  DRAFTING: '正文迭代',
 };
 
 const route = useRoute();
@@ -75,47 +100,53 @@ const projectTitle = computed(() => {
   return p?.title ?? '项目';
 });
 
-const phaseLabels: Record<string, string> = {
-  IDEA: '灵感提取',
-  SETTING: '设定集',
-  OUTLINE: '剧情大纲',
-  BEATS: '细纲拆解',
-  DRAFTING: '正文迭代',
-};
-
-const currentPhaseLabel = computed(() => phaseLabels[store.currentPhase] ?? store.currentPhase);
-
-const phaseTagColor = computed(() => {
-  const map: Record<string, string> = {
-    IDEA: 'processing',
-    SETTING: 'teal',
-    OUTLINE: 'blue',
-    BEATS: 'purple',
-    DRAFTING: 'orange',
-  };
-  return map[store.currentPhase] ?? 'default';
-});
-
 const steps = computed<StepInfo[]>(() =>
-  PHASE_ORDER.map((phase) => ({
+  PHASE_ORDER_KEYS.map((phase) => ({
     phase,
     label: phaseLabels[phase] || phase,
     status: store.getStepStatus(phase),
-  }))
+  })),
 );
 
+const isViewingCompletedStage = ref(false);
+
+function currentRoutePhase(): PhaseType | null {
+  const name = route.name as string;
+  for (const [phase, routeName] of Object.entries(PHASE_TO_ROUTE)) {
+    if (name === routeName || name.startsWith(routeName)) return phase as PhaseType;
+  }
+  return null;
+}
+
+const isBrowsingCompleted = computed(() => {
+  const viewingPhase = currentRoutePhase();
+  if (!viewingPhase) return false;
+  const viewingIdx = PHASE_ORDER_KEYS.indexOf(viewingPhase);
+  const currentIdx = PHASE_ORDER_KEYS.indexOf(store.currentPhase);
+  return viewingIdx < currentIdx;
+});
+
+watch(isBrowsingCompleted, (val) => {
+  isViewingCompletedStage.value = val;
+});
+
+function handleReturnToCurrent() {
+  store.setCurrentPhase(store.currentPhase);
+  const routeName = PHASE_TO_ROUTE[store.currentPhase];
+  if (routeName) {
+    router.push({ name: routeName, params: { id: projectId.value } });
+  }
+  isViewingCompletedStage.value = false;
+}
+
 function handleStepClick(phase: string) {
-  // 1. 先导航到对应 phase 的子路由（仅已实现的 phase）
   const routeName = PHASE_TO_ROUTE[phase];
   if (routeName) {
     router.push({ name: routeName, params: { id: projectId.value } });
   }
-  // 2. 再更新 store，确保 Stepper 高亮正确
   store.setCurrentPhase(phase as PhaseType);
 }
 
-/** 项目切换时加载该项目隔离的工作流状态快照，
- *  避免不同项目间的 stepStatus 串扰（Issue 根因）。 */
 watch(
   projectId,
   (id) => {
@@ -124,8 +155,6 @@ watch(
   { immediate: true },
 );
 
-/** 根据项目服务器状态同步 workflow store 的 currentPhase，
- *  确保刷新页面或从 Hub 进入时 Stepper 与路由一致。 */
 watch(
   [() => projectStore.projects, projectId],
   ([projects, id]) => {
@@ -140,7 +169,6 @@ watch(
         ? serverPhase
         : 'OUTLINE';
 
-    // 仅当 store 与服务器不一致时更新
     if (store.currentPhase !== syncedPhase) {
       store.setCurrentPhase(syncedPhase);
     }
@@ -155,20 +183,114 @@ function handleAiRetry() {
 </script>
 
 <style scoped>
+/* ── Layout ─────────────────────────────────────────────── */
+.workflow-view {
+  min-height: 100vh;
+  background-color: #f9fafb;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────────── */
 .workflow-view__header {
-  margin-bottom: var(--space-md);
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
-.workflow-view__page-header {
-  padding: 0;
+.workflow-view__header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
+.workflow-view__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.workflow-view__back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.workflow-view__back-btn:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+.workflow-view__divider {
+  width: 1px;
+  height: 20px;
+  background: #e5e7eb;
+}
+
+.workflow-view__project-name {
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.workflow-view__header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.workflow-view__header-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Readonly Banner ────────────────────────────────────── */
+.workflow-view__readonly-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: var(--font-size-body);
+  color: #92400e;
+  margin: 16px auto 0;
+  max-width: 64rem;
+  width: calc(100% - 48px);
+}
+
+.workflow-view__readonly-banner button {
+  color: #92400e;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-body);
+}
+
+/* ── Content ────────────────────────────────────────────── */
 .workflow-view__content {
-  margin-top: var(--space-lg);
-  padding: var(--space-xl);
-  background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  flex: 1;
+  padding: 0;
 }
 </style>

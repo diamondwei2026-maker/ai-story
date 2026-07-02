@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="chapter-action-bar" data-testid="chapter-action-bar">
     <template v-if="!isTerminal">
       <!-- PENDING: generate -->
@@ -327,7 +327,7 @@ const showRetrySection = computed(() => {
 }
 
 .chapter-action-bar__mode-hint {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-text-muted);
   white-space: nowrap;
   max-width: 280px;

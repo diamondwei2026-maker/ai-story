@@ -1,143 +1,95 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue';
-import MarkdownRenderer from '@/components/MarkdownRenderer.vue';
+﻿<script setup lang="ts">
+import { ref } from 'vue';
 
 const props = withDefaults(defineProps<{
   defaultWordCount: number;
   isConfirmed: boolean;
-  outlineText?: string;
-}>(), { outlineText: '' });
+}>(), {});
 
 const emit = defineEmits<{
   'start-generation': [opts: { targetChapterCount: number; defaultWordCount: number }];
   'update:wordCount': [value: number];
 }>();
 
-// Volume presets
-const volumeOptions = [
-  { value: 15, label: '短篇' },
-  { value: 25, label: '中篇' },
-  { value: 40, label: '长篇' },
-  { value: 0, label: '自定义...' },
-];
 const targetChapterCount = ref(25);
-const customChapterCount = ref(50);
-const isCustomChapter = computed(() => targetChapterCount.value === 0);
-
-const wordCountOptions = [
-  { value: 2000, label: '2000字' },
-  { value: 3000, label: '3000字' },
-  { value: 4000, label: '4000字' },
-  { value: 5000, label: '5000字' },
-];
 const localWordCount = ref(props.defaultWordCount);
-
-const effectiveChapters = computed(() =>
-  isCustomChapter.value ? customChapterCount.value : targetChapterCount.value,
-);
 
 function handleStartGeneration() {
   emit('update:wordCount', localWordCount.value);
   emit('start-generation', {
-    targetChapterCount: effectiveChapters.value,
+    targetChapterCount: targetChapterCount.value,
     defaultWordCount: localWordCount.value,
   });
 }
 </script>
 
 <template>
-  <a-card data-testid="beats-config-panel" title="细纲生成配置" size="small" class="config-panel">
+  <div data-testid="beats-config-panel" class="config-panel">
     <template v-if="isConfirmed">
       <a-tag data-testid="config-confirmed-label" color="green">已确认</a-tag>
       <span class="config-confirmed-text">细纲已确认，进入正文创作阶段</span>
     </template>
 
     <template v-else>
-      <!-- Volume preset -->
-      <div class="config-field">
-        <span class="config-label">篇幅预设</span>
-        <a-segmented
-          v-model:value="targetChapterCount"
-          :options="volumeOptions"
-          data-testid="config-volume-segmented"
-        />
-        <a-input-number
-          v-if="isCustomChapter"
-          v-model:value="customChapterCount"
-          :min="10"
-          :max="120"
-          :step="5"
-          data-testid="config-custom-chapters"
-          class="config-custom-input"
-        />
-        <span class="config-hint">约{{ effectiveChapters }}章（可浮动10%）</span>
-      </div>
-
-      <!-- Word count -->
-      <div class="config-field">
-        <span class="config-label">每章字数</span>
-        <a-segmented
-          v-model:value="localWordCount"
-          :options="wordCountOptions"
-          data-testid="config-wordcount-segmented"
-        />
-      </div>
-
-      <!-- Outline preview -->
-      <a-collapse v-if="outlineText" :bordered="false" class="config-collapse">
-        <a-collapse-panel key="outline" header="大纲预览（点击展开）">
-          <div data-testid="config-outline-preview" class="outline-preview-wrapper">
-            <MarkdownRenderer :content="outlineText" />
-          </div>
-        </a-collapse-panel>
-      </a-collapse>
-
-      <!-- High-volume warning (>90 chapters) -->
-      <a-alert
-        v-if="effectiveChapters > 90"
-        type="warning"
-        show-icon
-        message="超大规模拆解提示"
-        data-testid="config-high-volume-warning"
-        class="config-warning"
-      >
-        <template #description>
-          当前 {{ effectiveChapters }} 章超出单次 AI 输出上限（90章）。生成时将使用高篇幅模式（V3 + 32K tokens），
-          建议拆分为多次生成以确保质量。未来版本将支持分批自动生成。
-        </template>
-      </a-alert>
-
-      <div class="config-action">
-        <a-button
-          type="primary"
-          size="large"
+      <div class="config-row">
+        <div class="config-input-group">
+          <label class="config-input__label">目标章节数</label>
+          <input
+            v-model.number="targetChapterCount"
+            type="number"
+            data-testid="config-chapter-input"
+            class="config-input"
+            :min="1"
+            :max="120"
+          />
+        </div>
+        <div class="config-input-group">
+          <label class="config-input__label">默认每章字数</label>
+          <input
+            v-model.number="localWordCount"
+            type="number"
+            data-testid="config-wordcount-input"
+            class="config-input"
+            :min="500"
+            :step="500"
+          />
+        </div>
+        <button
           data-testid="config-start-generation-btn"
-          class="amber-btn"
+          class="config-submit"
           @click="handleStartGeneration"
         >
-          开始拆解
-        </a-button>
+          ✧ 开始拆解
+        </button>
       </div>
     </template>
-  </a-card>
+  </div>
 </template>
 
 <style scoped>
-.config-panel { margin-bottom: var(--space-md); }
-.config-field { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); flex-wrap: wrap; }
-.config-label { font-size: 13px; color: var(--color-text-secondary); min-width: 70px; flex-shrink: 0; }
-.config-hint { font-size: 11px; color: var(--color-text-secondary); }
-.config-custom-input { width: 100px; }
-.config-collapse { margin-bottom: var(--space-md); }
-.outline-preview-wrapper {
-  max-height: 400px;
-  overflow-y: auto;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-surface-warm);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
+.config-panel {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px;
 }
-.config-warning { margin-bottom: var(--space-md); }
-.config-action { text-align: center; padding-top: var(--space-sm); }
-.config-confirmed-text { font-size: 13px; color: var(--color-text-secondary); margin-left: var(--space-sm); }
+
+.config-row {
+  display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+}
+.config-input-group { display: flex; flex-direction: column; gap: 6px; }
+.config-input__label { font-size: 13px; color: #4b5563; }
+.config-input {
+  border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 8px 12px; font-size: 14px; width: 112px; outline: none;
+}
+.config-input:focus { border-color: #9ca3af; box-shadow: 0 0 0 1px #9ca3af; }
+
+.config-submit {
+  display: flex; align-items: center; gap: 4px;
+  padding: 9px 20px; border-radius: 8px;
+  background: #111827; color: #fff; border: none;
+  font-size: 14px; cursor: pointer; transition: background .15s;
+  white-space: nowrap;
+}
+.config-submit:hover { background: #1f2937; }
+
+.config-confirmed-text { font-size: 14px; color: #6b7280; margin-left: 8px; }
 </style>

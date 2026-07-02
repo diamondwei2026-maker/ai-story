@@ -75,7 +75,7 @@ function getContainer(): HTMLElement {
   margin-top: var(--space-md);
 }
 .help-footer h4 {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   margin: 0 0 var(--space-sm);
   color: var(--color-text-primary);
@@ -85,7 +85,7 @@ function getContainer(): HTMLElement {
   align-items: center;
   gap: 8px;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 .legend-swatch {

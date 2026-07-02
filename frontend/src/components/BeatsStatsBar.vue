@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue';
 import type { Beat } from '@/stores/useBeatStore';
 
@@ -74,12 +74,12 @@ function fmtWordCount(n: number): string {
   color: var(--color-text-primary);
 }
 .stat-label {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
 }
 .stat-divider {
   color: var(--color-border);
-  font-size: 14px;
+  font-size: var(--font-size-body);
   user-select: none;
 }
 </style>

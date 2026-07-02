@@ -1,10 +1,24 @@
-<template>
+﻿<template>
   <div data-testid="setting-view" class="setting-view">
-    <h2 data-testid="setting-title" class="setting-view__title section-title">设定集</h2>
+    <!-- Stage Header -->
+    <div class="setting-view__header">
+      <div>
+        <h2 data-testid="setting-title" class="setting-view__title">设定集</h2>
+        <p class="setting-view__desc">构建故事世界观、角色体系和关系网络，作为后续所有阶段的创作基础</p>
+      </div>
+      <span v-if="isConfirmed" class="confirmed-badge">
+        <CheckCircleOutlined />
+        已确认
+      </span>
+    </div>
 
     <!-- Loading -->
     <div v-if="loading" data-testid="setting-loading" class="setting-view__loading">
-      <a-spin tip="设定生成中，请稍候..." />
+      <LoadingOutlined spin class="setting-view__loading-icon" />
+      <div>
+        <p class="setting-view__loading-text">AI 正在生成设定集</p>
+        <p class="setting-view__loading-sub">基于你的故事创意构建完整的世界观与角色体系...</p>
+      </div>
     </div>
 
     <!-- Error -->
@@ -18,61 +32,61 @@
       class="setting-view__error"
     >
       <template #action>
-        <a-button
-          data-testid="setting-retry-btn"
-          size="small"
-          @click="handleGenerate"
-        >
-          重试
-        </a-button>
+        <a-button data-testid="setting-retry-btn" size="small" @click="handleGenerate">重试</a-button>
       </template>
     </a-alert>
 
-    <!-- 无设定且初始加载已完成（极端情况回退显示） -->
+    <!-- Empty State -->
     <EmptyState
       v-if="!settingData && !loading && initialLoadDone"
       description="设定尚未生成"
     />
 
-    <!-- Setting content -->
+    <!-- Setting Content -->
     <template v-if="settingData && !loading">
-      <a-tabs v-model:activeKey="activeTab" type="card" size="large" class="setting-view__tabs">
-        <a-tab-pane key="world" tab="世界观">
-          <WorldBuilder :content="settingData.output" />
-        </a-tab-pane>
-        <a-tab-pane key="characters" tab="角色">
-          <CharacterCard :content="settingData.output" />
-        </a-tab-pane>
-        <a-tab-pane key="relationships" tab="关系">
-          <RelationGraph :content="settingData.output" />
-        </a-tab-pane>
-      </a-tabs>
+      <div class="setting-view__content">
+        <div class="setting-view__tabs-row">
+          <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            class="setting-view__tab"
+            :class="{ 'setting-view__tab--active': activeTab === tab.key }"
+            @click="activeTab = tab.key"
+          >{{ tab.label }}</button>
+        </div>
 
-      <div
-        v-if="!isConfirmed"
-        class="setting-view__actions"
-      >
-        <a-button
-          data-testid="regenerate-setting-btn"
-          :loading="regenerating"
-          @click="handleRegenerate"
-        >
-          {{ regenerating ? '刷新中...' : '刷新关联内容' }}
-        </a-button>
-        <a-button
-          danger
-          data-testid="reject-setting-btn"
-          @click="handleReject"
-        >
-          驳回，重新生成
-        </a-button>
+        <div class="setting-view__panel">
+          <WorldBuilder v-if="activeTab === 'world'" :content="settingData.output" :readonly="isConfirmed" />
+          <CharacterCard v-if="activeTab === 'characters'" :content="settingData.output" :readonly="isConfirmed" />
+          <RelationGraph v-if="activeTab === 'relationships'" :content="settingData.output" :readonly="isConfirmed" />
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div v-if="!isConfirmed" class="setting-view__actions">
+        <div class="setting-view__actions-left">
+          <a-button
+            data-testid="regenerate-setting-btn"
+            :loading="regenerating"
+            @click="handleRegenerate"
+          >
+            <ReloadOutlined /> {{ regenerating ? '刷新中...' : '刷新关联内容' }}
+          </a-button>
+          <a-button
+            danger
+            data-testid="reject-setting-btn"
+            @click="handleReject"
+          >
+            <CloseOutlined /> 驳回，重新生成
+          </a-button>
+        </div>
         <a-button
           type="primary"
           data-testid="confirm-setting-btn"
-          class="amber-btn"
+          class="setting-view__confirm-btn"
           @click="handleConfirm"
         >
-          确认设定，进入大纲阶段
+          <CheckCircleOutlined /> 确认设定，进入大纲阶段 <RightOutlined />
         </a-button>
       </div>
     </template>
@@ -81,6 +95,13 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
+import {
+  CheckCircleOutlined,
+  LoadingOutlined,
+  ReloadOutlined,
+  CloseOutlined,
+  RightOutlined,
+} from '@ant-design/icons-vue';
 import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
 import { generateSetting, confirmSetting, rejectSetting, getSetting } from '@/api/setting';
 import { getIdea } from '@/api/idea';
@@ -94,6 +115,11 @@ const props = defineProps<{
   projectId: string;
 }>();
 
+const tabs = [
+  { key: 'world', label: '世界观' },
+  { key: 'characters', label: '角色' },
+  { key: 'relationships', label: '关系' },
+];
 const activeTab = ref('world');
 
 /** 从 IDEA 阶段提取的已确认创意摘要，供设定生成使用 */
@@ -165,33 +191,142 @@ watch([initialLoadDone, ideaLoaded], ([settingDone, ideaDone]) => {
 </script>
 
 <style scoped>
+/* ── Layout ─────────────────────────────────────────── */
 .setting-view {
-  padding: var(--space-md) 0;
+  padding: 0;
+}
+
+.setting-view__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 32px 24px 0;
 }
 
 .setting-view__title {
-  margin-bottom: var(--space-md);
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
 }
 
-.setting-view__loading {
-  text-align: center;
-  padding: var(--space-xl);
+.setting-view__desc {
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  margin: 0;
 }
 
-.setting-view__error {
-  margin-bottom: var(--space-md);
-}
-
-.setting-view__tabs {
-  margin-bottom: var(--space-lg);
-}
-
-.setting-view__actions {
-  text-align: center;
-  padding: var(--space-lg) 0;
+.confirmed-badge {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-body);
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Loading ────────────────────────────────────────── */
+.setting-view__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 16px;
+  padding: 80px 24px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin: 0 24px;
+}
+
+.setting-view__loading-icon {
+  font-size: var(--font-size-display);
+  color: #3b82f6;
+}
+
+.setting-view__loading-text {
+  font-size: var(--font-size-body);
+  color: #374151;
+  margin: 0;
+}
+
+.setting-view__loading-sub {
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
+.setting-view__error { margin: 0 24px 16px; }
+
+/* ── Content ───────────────────────────────────────── */
+.setting-view__content {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0 24px;
+}
+
+.setting-view__tabs-row {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.setting-view__tab {
+  flex: 1;
+  padding: 12px 0;
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.setting-view__tab:hover { color: #374151; }
+
+.setting-view__tab--active {
+  color: #111827;
+  background: #f9fafb;
+  border-bottom-color: #111827;
+}
+
+.setting-view__panel {
+  padding: 24px;
+}
+
+/* ── Actions ───────────────────────────────────────── */
+.setting-view__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  gap: 12px;
   flex-wrap: wrap;
+}
+
+.setting-view__actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-view__confirm-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #111827 !important;
+  border-color: #111827 !important;
+  color: #fff !important;
+}
+.setting-view__confirm-btn:hover:not(:disabled) {
+  background: #374151 !important;
+  border-color: #374151 !important;
 }
 </style>

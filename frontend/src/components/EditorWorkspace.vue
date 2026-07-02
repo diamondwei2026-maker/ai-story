@@ -194,7 +194,7 @@ function handleDisputeConfirm() {
 }
 
 .editor-workspace__word-count {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 

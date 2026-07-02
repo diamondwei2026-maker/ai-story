@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="visible" data-testid="completion-banner" class="completion-banner">
     <a-alert
       type="success"
@@ -118,12 +118,12 @@ function handleOption(action: string) {
 }
 
 .completion-banner__text {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 600;
 }
 
 .completion-options-dialog__depth {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-sm);
 }

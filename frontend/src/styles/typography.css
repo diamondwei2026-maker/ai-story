@@ -66,6 +66,33 @@
   margin-top: var(--space-sm);
 }
 
+/* ===== Atomic text utilities (aligned to Figma/Tailwind) ===== */
+.text-body {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.text-heading {
+  font-size: var(--font-size-heading);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.text-section {
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.text-caption {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.text-micro {
+  font-size: var(--font-size-micro);
+}
+
 /* ===== Page Transitions ===== */
 
 .page-fade-enter-active,

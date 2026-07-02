@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <a-card data-testid="summary-card" title="小说简介">
     <template #extra>
       <a-button
@@ -103,7 +103,7 @@ async function copySummary() {
 
 .summary-card__label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--color-text-secondary);
   margin-bottom: 6px;
