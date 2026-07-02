@@ -5,6 +5,7 @@ export interface StepDataResponse {
   projectId: string;
   phaseType: string;
   status: string;
+  input?: string | null;
   output: string;
   review: Record<string, unknown>;
   version: number;
