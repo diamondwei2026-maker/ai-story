@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils';
 
 describe('ChapterActionBar', () => {
   const mountBar = async (props: {
-    chapterStatus: string;
-    reviewVerdict?: string | null;
+    chapterStatus: 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED';
+    reviewVerdict?: 'PASS' | 'NEEDS_REVISION' | 'BLOCKED' | null;
     appealCount?: number;
     isGenerating?: boolean;
     isPaused?: boolean;
@@ -15,12 +15,14 @@ describe('ChapterActionBar', () => {
     );
     return mount(ChapterActionBar, {
       props: {
-        chapterStatus: 'PENDING_REVIEW',
-        reviewVerdict: null,
-        appealCount: 0,
-        isGenerating: false,
-        isPaused: false,
-        hasContent: true,
+        ...{
+          chapterStatus: 'PENDING_REVIEW' as const,
+          reviewVerdict: null,
+          appealCount: 0,
+          isGenerating: false,
+          isPaused: false,
+          hasContent: true,
+        },
         ...props,
       },
     });

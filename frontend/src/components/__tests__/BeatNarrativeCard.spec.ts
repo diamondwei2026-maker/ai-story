@@ -10,7 +10,7 @@ const mockBeatV2 = {
   hookCount: 2,
   isClimax: false,
   useR1: false,
-  status: 'PENDING' as const,
+  status: 'PENDING' as 'PENDING' | 'STALE' | 'CONFIRMED',
   narrativeSummary: '主角在垃圾星意外发现了一艘星舰，AI声称自己是千年前失踪的帝国旗舰',
   conflictDescription: '主角必须在48小时内修复星舰引擎，否则整个星区将被自毁程序炸毁',
   pacingLabel: '快',

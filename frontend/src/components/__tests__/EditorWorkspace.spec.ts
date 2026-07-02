@@ -29,7 +29,7 @@ const defaultProps = {
   chapterId: "ch-1",
   chapterTitle: "第一章：天龙降世",
   chapterContent: "夜色如墨，李凡站在城墙之上。",
-  chapterStatus: "COMPLETED" as const,
+  chapterStatus: "COMPLETED" as 'PENDING' | 'DRAFT' | 'PENDING_REVIEW' | 'REVIEWING' | 'COMPLETED' | 'DISPUTED',
   targetWordCount: 3000,
   isGenerating: false,
   isPaused: false,

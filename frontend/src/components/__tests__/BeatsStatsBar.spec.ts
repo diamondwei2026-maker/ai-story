@@ -35,7 +35,7 @@ const mockBeats: BeatV2[] = [
 describe('BeatsStatsBar', () => {
   const mountBar = async (props: { beats: BeatV2[] }) => {
     const { default: BeatsStatsBar } = await import('@/components/BeatsStatsBar.vue');
-    return mount(BeatsStatsBar, { props });
+    return mount(BeatsStatsBar, { props } as any);
   };
 
   it('renders the stats bar container', async () => {

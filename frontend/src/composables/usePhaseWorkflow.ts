@@ -18,10 +18,10 @@ interface UsePhaseWorkflowOptions<T> {
   phase: PhaseType;
   nextPhase: PhaseType;
   getFn: (projectId: string) => Promise<T | null>;
-  generateFn: (projectId: string, opts: Record<string, string>) => Promise<T>;
+  generateFn: (projectId: string, opts: Record<string, unknown>) => Promise<T>;
   confirmFn: (projectId: string) => Promise<unknown>;
   rejectFn?: (projectId: string) => Promise<unknown>;
-  generateArgs: () => Record<string, string>;
+  generateArgs: () => Record<string, unknown>;
   /**
    * 所有前置阶段的定义列表，用于 mount 时同步其状态到 store。
    * 按 phaseOrder 排列（最早在前），确保整个链条的状态不会因 localStorage 丢失而显示错误。
