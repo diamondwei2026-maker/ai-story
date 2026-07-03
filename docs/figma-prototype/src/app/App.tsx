@@ -1,47 +1,49 @@
-import { useState } from "react"
-import { ProjectCenter } from "./components/ProjectCenter"
-import { WorkspaceLayout } from "./components/WorkspaceLayout"
-import { mockProjects } from "./data/mockData"
-import type { Project, StageKey } from "./data/mockData"
+import { useState } from "react";
+import { ProjectCenter } from "./components/ProjectCenter";
+import { WorkspaceLayout } from "./components/WorkspaceLayout";
+import { mockProjects } from "./data/mockData";
+import type { Project, StageKey } from "./data/mockData";
 
-type AppView = "center" | "workspace"
+type AppView = "center" | "workspace";
 
 export default function App() {
-  const [view, setView] = useState<AppView>("center")
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [view, setView] = useState<AppView>("center");
+  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
-  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
 
   const openProject = (id: string) => {
-    setActiveProjectId(id)
-    setView("workspace")
-  }
+    setActiveProjectId(id);
+    setView("workspace");
+  };
 
   const backToCenter = () => {
-    setView("center")
-    setActiveProjectId(null)
-  }
+    setView("center");
+    setActiveProjectId(null);
+  };
 
   const advanceStage = (projectId: string, newStage: StageKey) => {
     setProjects((prev) =>
       prev.map((p) => {
-        if (p.id !== projectId) return p
-        const newCompleted = [...new Set([...p.completedStages, p.currentStage])]
-        const isLastStage = p.currentStage === "DRAFTING"
+        if (p.id !== projectId) return p;
+        const newCompleted = [
+          ...new Set([...p.completedStages, p.currentStage]),
+        ];
+        const isLastStage = p.currentStage === "DRAFTING";
         return {
           ...p,
           currentStage: newStage,
           status: isLastStage ? "已完本" : newStage,
           completedStages: newCompleted,
           lastModified: new Date().toISOString().split("T")[0],
-        }
-      })
-    )
-  }
+        };
+      }),
+    );
+  };
 
   const createProject = (title: string, genre: string) => {
-    const newId = `proj-${Date.now()}`
+    const newId = `proj-${Date.now()}`;
     const newProject: Project = {
       id: newId,
       title,
@@ -51,10 +53,10 @@ export default function App() {
       genre: genre || "未分类",
       wordCount: 0,
       completedStages: [],
-    }
-    setProjects((prev) => [newProject, ...prev])
-    openProject(newId)
-  }
+    };
+    setProjects((prev) => [newProject, ...prev]);
+    openProject(newId);
+  };
 
   if (view === "workspace" && activeProject) {
     return (
@@ -63,8 +65,19 @@ export default function App() {
         onBack={backToCenter}
         onAdvanceStage={(newStage) => advanceStage(activeProject.id, newStage)}
       />
-    )
+    );
   }
 
-  return <ProjectCenter projects={projects} onOpenProject={openProject} onCreateProject={createProject} />
+  const deleteProject = (id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  return (
+    <ProjectCenter
+      projects={projects}
+      onOpenProject={openProject}
+      onCreateProject={createProject}
+      onDeleteProject={deleteProject}
+    />
+  );
 }

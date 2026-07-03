@@ -56,5 +56,14 @@ export const useProjectStore = defineStore('projectStore', () => {
     storePersist.save({ projects: projects.value, currentProject: currentProject.value });
   }
 
-  return { projects, currentProject, setProjects, setCurrentProject, clearCurrentProject, createProject, loadProjects };
+  async function deleteProject(projectId: string): Promise<void> {
+    await projectApi.deleteProject(projectId);
+    projects.value = projects.value.filter((p) => p.id !== projectId);
+    if (currentProject.value?.id === projectId) {
+      currentProject.value = null;
+    }
+    storePersist.save({ projects: projects.value, currentProject: currentProject.value });
+  }
+
+  return { projects, currentProject, setProjects, setCurrentProject, clearCurrentProject, createProject, loadProjects, deleteProject };
 });

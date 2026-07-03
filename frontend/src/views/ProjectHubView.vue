@@ -83,13 +83,39 @@
                 </p>
                 <p v-else class="project-card__desc--empty">暂无简介</p>
               </div>
-              <span
-                data-testid="project-status-tag"
-                class="project-card__status"
-                :class="stageTagClass(project.status)"
-              >
-                {{ statusLabel(project.status) }}
-              </span>
+              <div class="project-card__header-actions">
+                <span
+                  data-testid="project-status-tag"
+                  class="project-card__status"
+                  :class="stageTagClass(project.status)"
+                >
+                  {{ statusLabel(project.status) }}
+                </span>
+                <!-- More menu -->
+                <div class="project-card__more-wrapper">
+                  <button
+                    class="project-card__more-btn"
+                    :class="{ 'project-card__more-btn--active': showMenuProjectId === project.id }"
+                    @click.stop="showMenuProjectId = showMenuProjectId === project.id ? null : project.id"
+                  >
+                    <MoreOutlined :style="{ fontSize: '15px' }" />
+                  </button>
+                  <div
+                    v-if="showMenuProjectId === project.id"
+                    class="project-card__menu-backdrop"
+                    @click.stop="showMenuProjectId = null"
+                  />
+                  <div v-if="showMenuProjectId === project.id" class="project-card__menu">
+                    <button
+                      class="project-card__menu-item"
+                      @click.stop="handleDeleteRequest(project.id)"
+                    >
+                      <DeleteOutlined :style="{ fontSize: '13px' }" />
+                      删除项目
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Meta -->
@@ -142,6 +168,47 @@
       </template>
     </main>
 
+    <!-- Delete Confirm Modal -->
+    <a-modal
+      :open="deleteTargetId !== null"
+      :width="420"
+      centered
+      :footer="null"
+      :closable="false"
+      @cancel="deleteTargetId = null"
+    >
+      <div class="delete-confirm">
+        <div class="delete-confirm__body">
+          <div class="delete-confirm__icon">
+            <ExclamationCircleOutlined :style="{ fontSize: '17px', color: '#dc2626' }" />
+          </div>
+          <div>
+            <h3 class="delete-confirm__title">删除项目</h3>
+            <p class="delete-confirm__text">
+              确认要删除《{{ deleteTarget?.title }}》吗？删除后无法恢复，包括所有创作内容。
+            </p>
+          </div>
+        </div>
+        <div class="delete-confirm__actions">
+          <button
+            type="button"
+            class="delete-confirm__btn-cancel"
+            @click="deleteTargetId = null"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="delete-confirm__btn-delete"
+            :disabled="deleting"
+            @click="handleDeleteConfirm"
+          >
+            确认删除
+          </button>
+        </div>
+      </div>
+    </a-modal>
+
     <CreateProjectModal
       v-model:open="showCreateModal"
       @created="handleCreateProject"
@@ -152,6 +219,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
 import { useProjectStore } from '@/stores/useProjectStore';
 import type { Project } from '@/stores/useProjectStore';
 import {
@@ -160,6 +228,9 @@ import {
   FileTextOutlined,
   ClockCircleOutlined,
   RightOutlined,
+  MoreOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons-vue';
 import CreateProjectModal from '@/components/CreateProjectModal.vue';
 
@@ -170,7 +241,14 @@ const showCreateModal = ref(false);
 const loading = ref(false);
 const loaded = ref(false);
 const loadError = ref<string | null>(null);
-const projects = ref<Project[]>(projectStore.projects);
+const { projects } = storeToRefs(projectStore);
+const showMenuProjectId = ref<string | null>(null);
+const deleteTargetId = ref<string | null>(null);
+const deleting = ref(false);
+
+const deleteTarget = computed(() =>
+  deleteTargetId.value ? projects.value.find((p) => p.id === deleteTargetId.value) ?? null : null,
+);
 
 // ── Filter ──────────────────────────────────────────────────────
 type FilterKey = 'all' | 'active' | 'completed' | 'archived';
@@ -296,7 +374,7 @@ const PHASE_ROUTE_MAP: Record<string, string> = {
 };
 
 function openProject(id: string) {
-  const project = projectStore.projects.find((p) => p.id === id);
+  const project = projects.value.find((p) => p.id === id);
   const routeName = PHASE_ROUTE_MAP[project?.status ?? ''] ?? 'workflow.idea';
   router.push({ name: routeName, params: { id } });
 }
@@ -306,7 +384,6 @@ async function loadProjects() {
   loadError.value = null;
   try {
     await projectStore.loadProjects();
-    projects.value = projectStore.projects;
     loaded.value = true;
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : '加载项目列表失败';
@@ -327,8 +404,26 @@ async function handleCreateProject(title: string, genre?: string) {
       // non-critical
     }
   }
-  projects.value = projectStore.projects;
   router.push({ name: 'workflow.idea', params: { id: project.id } });
+}
+
+function handleDeleteRequest(projectId: string) {
+  showMenuProjectId.value = null;
+  deleteTargetId.value = projectId;
+}
+
+async function handleDeleteConfirm() {
+  if (!deleteTargetId.value) return;
+  deleting.value = true;
+  try {
+    await projectStore.deleteProject(deleteTargetId.value);
+    deleteTargetId.value = null;
+  } catch {
+    // Error is handled by the store or shown via notification
+  } finally {
+    deleting.value = false;
+    deleteTargetId.value = null;
+  }
 }
 
 onMounted(() => {
@@ -523,12 +618,83 @@ onMounted(() => {
   font-style: italic;
 }
 
+.project-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .project-card__status {
   flex-shrink: 0;
   font-size: var(--font-size-caption);
   padding: 2px 8px;
   border-radius: 6px;
   border: 1px solid;
+}
+
+/* ── Card More Menu ─────────────────────────────────────────────── */
+.project-card__more-wrapper {
+  position: relative;
+}
+
+.project-card__more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.project-card__more-btn:hover,
+.project-card__more-btn--active {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.project-card__menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.project-card__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  width: 144px;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.project-card__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--font-size-body);
+  color: #dc2626;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.project-card__menu-item:hover {
+  background: #fef2f2;
 }
 
 /* ── Stage Tag Colors ─────────────────────────────────────────── */
@@ -652,5 +818,84 @@ onMounted(() => {
   color: #9ca3af;
   cursor: not-allowed;
   border-color: #e5e7eb;
+}
+
+/* ── Delete Confirm Modal ───────────────────────────────────────── */
+.delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.delete-confirm__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.delete-confirm__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.delete-confirm__title {
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.delete-confirm__text {
+  font-size: var(--font-size-body);
+  color: #6b7280;
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.delete-confirm__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.delete-confirm__btn-cancel {
+  font-size: var(--font-size-body);
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.delete-confirm__btn-cancel:hover {
+  background: #f9fafb;
+}
+
+.delete-confirm__btn-delete {
+  font-size: var(--font-size-body);
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.delete-confirm__btn-delete:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.delete-confirm__btn-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

@@ -43,7 +43,8 @@ export async function request<T>(
         const err = await res.json().catch(() => ({ message: '请求失败' }));
         throw new Error(err.message || '请求失败');
       }
-      return res.json() as Promise<T>;
+      const text = await res.text();
+      return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
     } finally {
       inFlight.delete(cacheKey);
       // 非 GET 请求完成后，清除相关 GET 缓存，避免后续 GET 返回过期数据
@@ -76,7 +77,8 @@ export async function getOrNull<T>(url: string): Promise<T | null> {
         const err = await res.json().catch(() => ({ message: '请求失败' }));
         throw new Error(err.message || '请求失败');
       }
-      return res.json() as Promise<T>;
+      const text = await res.text();
+      return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
     } finally {
       inFlight.delete(cacheKey);
     }

@@ -71,11 +71,12 @@ export class ProjectController {
 
   @Delete(':id')
   @HttpCode(200)
-  async delete(@Param('id') id: string): Promise<void> {
+  async delete(@Param('id') id: string): Promise<{ ok: boolean }> {
     const deleted = await this.projectService.delete(id);
     if (!deleted) {
       throw new NotFoundException('Project not found');
     }
+    return { ok: true };
   }
 
   @Post(':id/archive')
