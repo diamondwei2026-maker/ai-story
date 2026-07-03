@@ -32,5 +32,8 @@ coverage/
 .claude/settings.local.json
 .claude/settings.json
 
+# CodeGraph (runtime data)
+.codegraph/
+
 # Temp files
 *.tmp
