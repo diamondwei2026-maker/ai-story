@@ -6,7 +6,6 @@ const mockSellPoint = {
   title: '星际医妃风华录',
   coreSellPoint: '现代女医生重生星际时代',
   marketScore: 8.5,
-  hitReferences: ['《星际超级医生》', '《重生之医妃倾城》'],
   differentiation: '将专业医学知识融入异能战斗',
 };
 
@@ -40,14 +39,6 @@ describe('MarketAnalysisCard', () => {
     const wrapper = await mountComponent();
     const progress = wrapper.find('.ant-progress');
     expect(progress.exists()).toBe(true);
-  });
-
-  it('displays similar hit references', async () => {
-    const wrapper = await mountComponent();
-    const refs = wrapper.find('[data-testid="hit-references"]');
-    expect(refs.exists()).toBe(true);
-    expect(refs.text()).toContain('《星际超级医生》');
-    expect(refs.text()).toContain('《重生之医妃倾城》');
   });
 
   it('displays differentiation analysis', async () => {

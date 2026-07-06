@@ -142,16 +142,6 @@
                 <span class="sell-point-card__label">核心卖点</span>
                 <p class="sell-point-card__text">{{ point.coreSellPoint }}</p>
               </div>
-              <!-- <div class="sell-point-card__field">
-                <span class="sell-point-card__label">爆款参考作品</span>
-                <div class="sell-point-card__tags">
-                  <span
-                    v-for="ref in point.hitReferences"
-                    :key="ref"
-                    class="sell-point-card__tag"
-                  >{{ ref }}</span>
-                </div>
-              </div> -->
               <div class="sell-point-card__field">
                 <span class="sell-point-card__label">差异化分析</span>
                 <p class="sell-point-card__text sell-point-card__text--small">

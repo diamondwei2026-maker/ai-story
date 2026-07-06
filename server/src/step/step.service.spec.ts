@@ -37,19 +37,19 @@ const mockChatModel = {
     } else if (input.includes('卖点方案') || input.includes('sellPoint')) {
       yield {
         content:
-          '## 卖点方案 1: 星际医妃风华录\n- 核心卖点: 现代女医生重生星际时代，将现代医学与异能修炼融合，开创"医能"新体系\n- 市场匹配度: 8.5/10\n- 爆款参考: 《星际超级医生》、《重生之医妃倾城》\n- 差异化分析: 将专业医学知识融入异能战斗，形成独特的知识壁垒和爽点\n\n',
+          '## 卖点方案 1: 星际医妃风华录\n- 核心卖点: 现代女医生重生星际时代，将现代医学与异能修炼融合，开创"医能"新体系\n- 市场匹配度: 8.5/10\n- 类型标签: 星际+医术流+女强\n- 差异化分析: 将专业医学知识融入异能战斗，形成独特的知识壁垒和爽点\n\n',
       };
       yield {
         content:
-          '## 卖点方案 2: 毒妃逆袭：星际制药女王\n- 核心卖点: 毒理学博士穿越成废材王妃，以制药能力逆袭星际商界和修炼界\n- 市场匹配度: 7.8/10\n- 爆款参考: 《制药女王》、《狂妃逆袭：毒步天下》\n- 差异化分析: 商战+修炼双线并行，毒药流在星际背景下有新意\n\n',
+          '## 卖点方案 2: 毒妃逆袭：星际制药女王\n- 核心卖点: 毒理学博士穿越成废材王妃，以制药能力逆袭星际商界和修炼界\n- 市场匹配度: 7.8/10\n- 类型标签: 穿越+商战+毒药流\n- 差异化分析: 商战+修炼双线并行，毒药流在星际背景下有新意\n\n',
       };
       yield {
         content:
-          '## 卖点方案 3: 星海巡诊：医妃的宇宙诊所\n- 核心卖点: 主角绑定"宇宙诊所"系统，穿越不同星球行医，收集异能和伙伴\n- 市场匹配度: 9.2/10\n- 爆款参考: 《无限诊所系统》、《星际游医》\n- 差异化分析: 单元剧结构+长线主线，兼具系统流的爽感和单元故事的丰富性\n\n',
+          '## 卖点方案 3: 星海巡诊：医妃的宇宙诊所\n- 核心卖点: 主角绑定"宇宙诊所"系统，穿越不同星球行医，收集异能和伙伴\n- 市场匹配度: 9.2/10\n- 类型标签: 系统流+单元剧+星际冒险\n- 差异化分析: 单元剧结构+长线主线，兼具系统流的爽感和单元故事的丰富性\n\n',
       };
       yield {
         content:
-          '## 卖点方案 4: 庸医惑星：反套路治愈系\n- 核心卖点: 半吊子实习生意外治愈了重伤的星际元帅，被误认为神医，在星际引发一系列笑料\n- 市场匹配度: 8.0/10\n- 爆款参考: 《神医凰后》、《废柴逆天：神医不好惹》\n- 差异化分析: 反套路搞笑人设+治愈系温情，差异化明显\n',
+          '## 卖点方案 4: 庸医惑星：反套路治愈系\n- 核心卖点: 半吊子实习生意外治愈了重伤的星际元帅，被误认为神医，在星际引发一系列笑料\n- 市场匹配度: 8.0/10\n- 类型标签: 反套路+轻松向+治愈系\n- 差异化分析: 反套路搞笑人设+治愈系温情，差异化明显\n',
       };
     } else if (input.includes('summary') || input.includes('简介')) {
       yield {
@@ -2528,17 +2528,17 @@ describe('StepService', () => {
       }
     });
 
-    it('should include similar hit references in each sell point', async () => {
-      const project = projectService.create({ title: '爆款参考测试' });
+    it('should include genre tags in each sell point', async () => {
+      const project = projectService.create({ title: '类型标签测试' });
 
       const step = await service.generateIdea(project.id, {
         idea: '测试创意',
       });
 
       const output = step.output!;
-      expect(output).toContain('爆款参考');
-      const refCount = (output.match(/爆款参考:/g) || []).length;
-      expect(refCount).toBeGreaterThanOrEqual(3);
+      expect(output).toContain('类型标签');
+      const tagCount = (output.match(/类型标签:/g) || []).length;
+      expect(tagCount).toBeGreaterThanOrEqual(3);
     });
 
     it('should include review annotations in the StepData', async () => {

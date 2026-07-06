@@ -1,5 +1,12 @@
 import { computed, type Ref } from 'vue';
-import type { SellPoint } from '@/components/MarketAnalysisCard.vue';
+
+export interface SellPoint {
+  index: number;
+  title: string;
+  coreSellPoint: string;
+  marketScore: number;
+  differentiation: string;
+}
 
 /**
  * 剥离 Markdown bold 标记，处理 AI 输出如 **核心卖点：** / **市场匹配度：** 等格式。
@@ -37,29 +44,20 @@ function parseByBlocks(text: string): SellPoint[] {
       cleanBody.match(/核心卖点[：:]\s*(.+)/) ??
       cleanBody.match(/【核心卖点】[：:]?\s*(.+)/);
     const scoreMatch = cleanBody.match(/市场匹配度[：:]\s*([\d.]+)(?:\s*\/\s*10)?/);
-    const refsMatch = cleanBody.match(/爆款参考[：:]\s*(.+)/);
     const diffMatch =
       cleanBody.match(/差异化分析[：:]\s*(.+)/) ??
       cleanBody.match(/差异化[：:]\s*(.+)/);
-
-    const hitReferences = refsMatch
-      ? refsMatch[1].split(/[，,、《》]/).filter(Boolean).map((r) => {
-          const cleaned = r.replace(/[《》]/g, '').trim();
-          return cleaned ? `《${cleaned}》` : '';
-        }).filter(Boolean)
-      : [];
 
     // 尝试从块标题中提取编号
     const numFromHeader = block.match(/卖点方案\s*(\d+)/);
     const displayIndex = numFromHeader ? parseInt(numFromHeader[1], 10) - 1 : autoIndex;
 
-    if (sellPointMatch || scoreMatch || refsMatch) {
+    if (sellPointMatch || scoreMatch) {
       result.push({
         index: displayIndex,
         title: titleMatch ? titleMatch[1].trim() : `卖点方案 ${displayIndex + 1}`,
         coreSellPoint: sellPointMatch ? sellPointMatch[1].trim() : '',
         marketScore: scoreMatch ? parseFloat(scoreMatch[1]) : 0,
-        hitReferences,
         differentiation: diffMatch ? diffMatch[1].trim() : '',
       });
       autoIndex++;
@@ -113,29 +111,15 @@ export function useIdeaParser(
       // 市场匹配度支持 "8.5"、"8.5 / 10"
       const scoreMatch =
         cleanBody.match(/市场匹配度[：:]\s*([\d.]+)(?:\s*\/\s*10)?/);
-      const refsMatch =
-        cleanBody.match(/爆款参考[：:]\s*(.+)/);
       const diffMatch =
         cleanBody.match(/差异化分析[：:]\s*(.+)/) ??
         cleanBody.match(/差异化[：:]\s*(.+)/);
-
-      const hitReferences = refsMatch
-        ? refsMatch[1]
-            .split(/[，,、《》]/)
-            .filter(Boolean)
-            .map((r) => {
-              const cleaned = r.replace(/[《》]/g, '').trim();
-              return cleaned ? `《${cleaned}》` : '';
-            })
-            .filter(Boolean)
-        : [];
 
       result.push({
         index,
         title: titleMatch ? titleMatch[1].trim() : `卖点方案 ${index + 1}`,
         coreSellPoint: sellPointMatch ? sellPointMatch[1].trim() : '',
         marketScore: scoreMatch ? parseFloat(scoreMatch[1]) : 0,
-        hitReferences,
         differentiation: diffMatch ? diffMatch[1].trim() : '',
       });
     }

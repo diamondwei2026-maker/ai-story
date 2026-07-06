@@ -7,7 +7,6 @@ const mockSellPoints = [
     title: '星际医妃风华录',
     coreSellPoint: '现代女医生重生星际时代',
     marketScore: 8.5,
-    hitReferences: ['《星际超级医生》', '《重生之医妃倾城》'],
     differentiation: '将专业医学知识融入异能战斗',
   },
   {
@@ -15,7 +14,6 @@ const mockSellPoints = [
     title: '毒妃逆袭：星际制药女王',
     coreSellPoint: '毒理学博士穿越成废材王妃',
     marketScore: 7.8,
-    hitReferences: ['《制药女王》', '《狂妃逆袭：毒步天下》'],
     differentiation: '商战+修炼双线并行',
   },
   {
@@ -23,7 +21,6 @@ const mockSellPoints = [
     title: '星海巡诊：医妃的宇宙诊所',
     coreSellPoint: '绑定宇宙诊所系统穿越不同星球行医',
     marketScore: 9.2,
-    hitReferences: ['《无限诊所系统》', '《星际游医》'],
     differentiation: '单元剧+长线主线',
   },
 ];

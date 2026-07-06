@@ -21,13 +21,6 @@
         />
       </div>
 
-      <div data-testid="hit-references" class="market-card__references">
-        <span class="market-card__ref-label caption">爆款参考:</span>
-        <a-tag v-for="(ref, i) in sellPoint.hitReferences" :key="i" class="market-card__ref-tag">
-          {{ ref }}
-        </a-tag>
-      </div>
-
       <p data-testid="differentiation" class="market-card__diff caption">
         {{ sellPoint.differentiation }}
       </p>
@@ -41,7 +34,6 @@ export interface SellPoint {
   title: string;
   coreSellPoint: string;
   marketScore: number;
-  hitReferences: string[];
   differentiation: string;
 }
 
@@ -68,22 +60,6 @@ defineEmits<{
 .market-card__score-label {
   display: block;
   margin-bottom: 4px;
-}
-
-.market-card__references {
-  margin-bottom: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.market-card__ref-label {
-  color: var(--color-text-secondary);
-}
-
-.market-card__ref-tag {
-  font-size: var(--font-size-caption);
 }
 
 .market-card__diff {
