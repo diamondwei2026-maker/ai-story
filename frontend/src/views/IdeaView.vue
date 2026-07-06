@@ -4,7 +4,9 @@
     <div class="idea-view__header">
       <div>
         <h2 data-testid="idea-title" class="idea-view__title">灵感提取</h2>
-        <p class="idea-view__desc">输入一个故事创意，AI 将分析市场可行性并生成差异化卖点方案</p>
+        <p class="idea-view__desc">
+          输入一个故事创意，AI 将分析市场可行性并生成差异化卖点方案
+        </p>
       </div>
       <span
         v-if="isConfirmed"
@@ -27,14 +29,21 @@
       class="idea-view__error"
     >
       <template #action>
-        <a-button data-testid="idea-retry-btn" size="small" @click="handleGenerate">重试</a-button>
+        <a-button
+          data-testid="idea-retry-btn"
+          size="small"
+          @click="handleGenerate"
+          >重试</a-button
+        >
       </template>
     </a-alert>
 
     <!-- Step 1: Idea Input -->
     <div v-if="!data && !loading" class="idea-view__card">
       <h3 class="idea-view__card-title">一句话故事创意</h3>
-      <p class="idea-view__card-desc">用一句话描述你的故事核心，或从下方示例中获取灵感</p>
+      <p class="idea-view__card-desc">
+        用一句话描述你的故事核心，或从下方示例中获取灵感
+      </p>
 
       <div class="idea-view__examples">
         <button
@@ -66,7 +75,11 @@
     </div>
 
     <!-- Generating -->
-    <div v-if="!isConfirmed && loading && !data" data-testid="idea-loading" class="idea-view__loading">
+    <div
+      v-if="!isConfirmed && loading && !data"
+      data-testid="idea-loading"
+      class="idea-view__loading"
+    >
       <LoadingOutlined class="idea-view__loading-icon" spin />
       <span>AI 正在分析市场并生成差异化卖点方案...</span>
     </div>
@@ -100,17 +113,26 @@
             :key="point.index"
             data-testid="sell-point-card"
             class="sell-point-card"
-            :class="{ 'sell-point-card--selected': selectedSellPointIndex === point.index }"
+            :class="{
+              'sell-point-card--selected':
+                selectedSellPointIndex === point.index,
+            }"
             @click="onSelectSellPoint(point.index)"
           >
             <!-- Check mark -->
-            <div v-if="selectedSellPointIndex === point.index" class="sell-point-card__check">
+            <div
+              v-if="selectedSellPointIndex === point.index"
+              class="sell-point-card__check"
+            >
               <CheckOutlined />
             </div>
 
             <div class="sell-point-card__header">
               <h4 class="sell-point-card__title">{{ point.title }}</h4>
-              <span class="sell-point-card__score" :class="scoreClass(point.marketScore)">
+              <span
+                class="sell-point-card__score"
+                :class="scoreClass(point.marketScore)"
+              >
                 市场 {{ point.marketScore }}
               </span>
             </div>
@@ -120,7 +142,7 @@
                 <span class="sell-point-card__label">核心卖点</span>
                 <p class="sell-point-card__text">{{ point.coreSellPoint }}</p>
               </div>
-              <div class="sell-point-card__field">
+              <!-- <div class="sell-point-card__field">
                 <span class="sell-point-card__label">爆款参考作品</span>
                 <div class="sell-point-card__tags">
                   <span
@@ -129,10 +151,12 @@
                     class="sell-point-card__tag"
                   >{{ ref }}</span>
                 </div>
-              </div>
+              </div> -->
               <div class="sell-point-card__field">
                 <span class="sell-point-card__label">差异化分析</span>
-                <p class="sell-point-card__text sell-point-card__text--small">{{ point.differentiation }}</p>
+                <p class="sell-point-card__text sell-point-card__text--small">
+                  {{ point.differentiation }}
+                </p>
               </div>
             </div>
           </div>
@@ -160,7 +184,10 @@
       </div>
 
       <!-- Summary Display -->
-      <div v-if="summaryGenerated" class="idea-view__card idea-view__card--summary">
+      <div
+        v-if="summaryGenerated"
+        class="idea-view__card idea-view__card--summary"
+      >
         <h3 class="idea-view__card-title">生成的故事简介</h3>
 
         <!-- Selected Point Badge -->
@@ -198,79 +225,72 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch } from "vue";
 import {
   CheckOutlined,
   ThunderboltOutlined,
   LoadingOutlined,
   ReloadOutlined,
   RightOutlined,
-} from '@ant-design/icons-vue';
-import { usePhaseWorkflow } from '@/composables/usePhaseWorkflow';
+} from "@ant-design/icons-vue";
+import { usePhaseWorkflow } from "@/composables/usePhaseWorkflow";
 import {
   generateIdea,
   generateIdeaSummary,
   confirmIdea,
   rejectIdea,
   getIdea,
-} from '@/api/idea';
-import type { StepDataResponse } from '@/api/common';
-import { useIdeaParser } from '@/composables/useIdeaParser';
+} from "@/api/idea";
+import type { StepDataResponse } from "@/api/common";
+import { useIdeaParser } from "@/composables/useIdeaParser";
 
 const props = defineProps<{
   projectId: string;
 }>();
 
-const ideaText = ref('');
-const feedbackText = ref('');
+const ideaText = ref("");
+const feedbackText = ref("");
 const selectedSellPointIndex = ref(-1);
-const customBrief = ref('');
+const customBrief = ref("");
 const summaryLoading = ref(false);
 
 const suggestedPrompts = [
-  '一位失忆的古代将领穿越到现代，发现自己竟然是某个神秘组织的预言中人',
-  '末日病毒爆发后，一名外科医生发现少数人对病毒有天然免疫，而她的女儿就是其中之一',
-  '科技巨头秘密研发了可以储存人类记忆的芯片，主角意外获取了一段不该存在的记忆',
+  "一位失忆的古代将领穿越到现代，发现自己竟然是某个神秘组织的预言中人",
+  "末日病毒爆发后，一名外科医生发现少数人对病毒有天然免疫，而她的女儿就是其中之一",
+  "科技巨头秘密研发了可以储存人类记忆的芯片，主角意外获取了一段不该存在的记忆",
 ];
 
-const {
-  data,
-  loading,
-  error,
-  isConfirmed,
-  handleGenerate,
-  handleConfirm,
-} = usePhaseWorkflow<StepDataResponse>({
-  projectId: props.projectId,
-  phase: 'IDEA',
-  nextPhase: 'SETTING',
-  getFn: getIdea,
-  generateFn: generateIdea,
-  confirmFn: (projectId) =>
-    confirmIdea(projectId, {
-      selectedSellPoint: selectedSellPointIndex.value,
-      customBrief: customBrief.value || undefined,
-    }),
-  rejectFn: rejectIdea,
-  generateArgs: () => ({ idea: ideaText.value }),
-});
+const { data, loading, error, isConfirmed, handleGenerate, handleConfirm } =
+  usePhaseWorkflow<StepDataResponse>({
+    projectId: props.projectId,
+    phase: "IDEA",
+    nextPhase: "SETTING",
+    getFn: getIdea,
+    generateFn: generateIdea,
+    confirmFn: (projectId) =>
+      confirmIdea(projectId, {
+        selectedSellPoint: selectedSellPointIndex.value,
+        customBrief: customBrief.value || undefined,
+      }),
+    rejectFn: rejectIdea,
+    generateArgs: () => ({ idea: ideaText.value }),
+  });
 
 // Restore selectedSellPointIndex from backend
 watch(data, (newData) => {
   if (newData) {
     const review = newData.review as Record<string, unknown> | null;
-    if (review && typeof review.selectedSellPoint === 'number') {
+    if (review && typeof review.selectedSellPoint === "number") {
       selectedSellPointIndex.value = review.selectedSellPoint as number;
     }
 
     // 从后端 input 字段恢复 ideaText（页面刷新 / 已有数据加载场景）
     if (newData.input && !ideaText.value) {
       const raw = newData.input;
-      if (raw.startsWith('idea: ')) {
-        const fbIdx = raw.indexOf('\nfeedback:');
-        ideaText.value = fbIdx > -1
-          ? raw.slice(6, fbIdx).trim()
-          : raw.slice(6).trim();
+      if (raw.startsWith("idea: ")) {
+        const fbIdx = raw.indexOf("\nfeedback:");
+        ideaText.value =
+          fbIdx > -1 ? raw.slice(6, fbIdx).trim() : raw.slice(6).trim();
       } else {
         ideaText.value = raw.trim();
       }
@@ -290,14 +310,16 @@ const {
 
 const selectedSellPoint = computed(() =>
   selectedSellPointIndex.value >= 0
-    ? parsedSellPoints.value.find((p) => p.index === selectedSellPointIndex.value)
+    ? parsedSellPoints.value.find(
+        (p) => p.index === selectedSellPointIndex.value,
+      )
     : null,
 );
 
 function scoreClass(score: number): string {
-  if (score >= 9) return 'score--emerald';
-  if (score >= 7) return 'score--blue';
-  return 'score--amber';
+  if (score >= 9) return "score--emerald";
+  if (score >= 7) return "score--blue";
+  return "score--amber";
 }
 
 function onSelectSellPoint(index: number) {
@@ -315,7 +337,7 @@ async function handleRegenerateWithFeedback(feedback: string) {
     data.value = result;
     selectedSellPointIndex.value = -1;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '重新生成失败';
+    error.value = e instanceof Error ? e.message : "重新生成失败";
   } finally {
     loading.value = false;
   }
@@ -330,7 +352,7 @@ async function handleGenerateSummary(sellPointIndex: number) {
     });
     data.value = result;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '简介生成失败';
+    error.value = e instanceof Error ? e.message : "简介生成失败";
   } finally {
     summaryLoading.value = false;
   }
