@@ -1,10 +1,20 @@
 import { request } from './common';
 import type { Project } from '@/stores/useProjectStore';
 
-export async function createProject(title: string): Promise<Project> {
+export async function createProject(input: {
+  title: string;
+  genre?: string;
+  skipIdea?: boolean;
+  description?: string;
+}): Promise<Project> {
   return request('/projects', {
     method: 'POST',
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({
+      title: input.title,
+      config: input.genre ? { genre: input.genre } : undefined,
+      skipIdea: input.skipIdea,
+      description: input.description,
+    }),
   });
 }
 

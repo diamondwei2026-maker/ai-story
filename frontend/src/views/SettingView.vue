@@ -56,7 +56,12 @@
         </div>
 
         <div class="setting-view__panel">
-          <WorldBuilder v-if="activeTab === 'world'" :content="settingData.output" :readonly="isConfirmed" />
+          <WorldBuilder
+            v-if="activeTab === 'world'"
+            :content="settingData.output"
+            :readonly="isConfirmed"
+            :dimensions="settingDimensions"
+          />
           <CharacterCard v-if="activeTab === 'characters'" :content="settingData.output" :readonly="isConfirmed" />
           <RelationGraph v-if="activeTab === 'relationships'" :content="settingData.output" :readonly="isConfirmed" />
         </div>
@@ -94,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import {
   CheckCircleOutlined,
   LoadingOutlined,
@@ -121,6 +126,17 @@ const tabs = [
   { key: 'relationships', label: '关系' },
 ];
 const activeTab = ref('world');
+
+/** 从 setting review 中提取体裁维度配置，传递给 WorldBuilder */
+const settingDimensions = computed(() => {
+  const review = settingData.value?.review as Record<string, unknown> | null;
+  const dims = review?.settingDimensions;
+  if (Array.isArray(dims) && dims.length === 4) {
+    return dims as Array<{ key: string; label: string; sectionHeader: string }>;
+  }
+  // 兼容旧数据（review 中没有 settingDimensions），返回 undefined 让 WorldBuilder 用默认值
+  return undefined;
+});
 
 /** 从 IDEA 阶段提取的已确认创意摘要，供设定生成使用 */
 const ideaBasis = ref('');

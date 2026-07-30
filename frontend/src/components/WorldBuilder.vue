@@ -76,7 +76,10 @@ interface Dimension {
   value: string;
 }
 
-const DIMENSIONS: Omit<Dimension, 'value'>[] = [
+/**
+ * 默认维度配置（保持向后兼容：当父组件未传入 dimensions 时使用）
+ */
+const DEFAULT_DIMENSIONS: Omit<Dimension, 'value'>[] = [
   { key: 'era', label: '时代背景', sectionHeader: '时代背景' },
   { key: 'geography', label: '地理环境', sectionHeader: '地理环境' },
   { key: 'society', label: '社会结构', sectionHeader: '社会结构' },
@@ -86,6 +89,8 @@ const DIMENSIONS: Omit<Dimension, 'value'>[] = [
 const props = defineProps<{
   content?: string;
   readonly?: boolean;
+  /** 动态维度配置：第4维度根据体裁动态变化，如 阶级体系 / 情感羁绊体系 / 科技体系 */
+  dimensions?: Array<{ key: string; label: string; sectionHeader: string }>;
 }>();
 
 /** Which dimension key is currently being edited (null = view mode) */
@@ -98,12 +103,13 @@ watch(() => props.content, () => {
 
 const parsed = computed(() => parseSections(props.content ?? ''));
 
-const dimensions = computed<Dimension[]>(() =>
-  DIMENSIONS.map((d) => ({
+const dimensions = computed<Dimension[]>(() => {
+  const base = props.dimensions ?? DEFAULT_DIMENSIONS;
+  return base.map((d) => ({
     ...d,
     value: savedEdits.value[d.key] || parsed.value[d.sectionHeader] || '',
-  })),
-);
+  }));
+});
 
 const hasContent = computed(() =>
   dimensions.value.some((d) => d.value),

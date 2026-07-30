@@ -43,8 +43,13 @@ export const useProjectStore = defineStore('projectStore', () => {
     storePersist.save({ projects: projects.value, currentProject: currentProject.value });
   }
 
-  async function createProject(title: string): Promise<Project> {
-    const project = await projectApi.createProject(title);
+  async function createProject(input: {
+    title: string;
+    genre?: string;
+    skipIdea?: boolean;
+    description?: string;
+  }): Promise<Project> {
+    const project = await projectApi.createProject(input);
     projects.value.push(project);
     storePersist.save({ projects: projects.value, currentProject: currentProject.value });
     return project;

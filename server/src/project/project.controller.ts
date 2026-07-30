@@ -24,8 +24,10 @@ export class ProjectController {
   ) {}
 
   @Post()
-  async create(@Body() body: { title?: string; config?: Project['config'] }): Promise<Project> {
-    const { title, config } = body;
+  async create(
+    @Body() body: { title?: string; config?: Project['config']; skipIdea?: boolean; description?: string },
+  ): Promise<Project> {
+    const { title, config, skipIdea, description } = body;
 
     if (title === undefined || title === null) {
       throw new BadRequestException('title is required');
@@ -35,7 +37,7 @@ export class ProjectController {
       throw new BadRequestException('title must be a non-empty string');
     }
 
-    return this.projectService.create({ title, config });
+    return this.projectService.create({ title, config, skipIdea, description });
   }
 
   @Get()

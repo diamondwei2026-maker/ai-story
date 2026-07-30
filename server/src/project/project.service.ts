@@ -6,22 +6,42 @@ import { Project, ProjectStatus, PendingFactUpdate, StatusHistoryEntry } from '.
 export class ProjectService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: { title: string; config?: Project['config'] }): Promise<Project> {
+  async create(data: {
+    title: string;
+    config?: Project['config'];
+    skipIdea?: boolean;
+    description?: string;
+  }): Promise<Project> {
     const now = new Date();
+    const skipIdea = data.skipIdea === true;
+    const description = data.description?.trim() || undefined;
+
+    // Merge description into config for card display
+    const config = {
+      ...(data.config ?? {}),
+      ...(description ? { description } : {}),
+    };
+
+    const initialStatus: ProjectStatus = skipIdea ? 'SETTING' : 'IDEA';
+    const initialPhase = skipIdea ? 'SETTING' : 'IDEA';
+
+    const statusHistory = skipIdea
+      ? [
+          { status: 'IDEA' as ProjectStatus, changedAt: now.toISOString(), reason: 'User skipped — provided own description' },
+          { status: 'SETTING' as ProjectStatus, changedAt: now.toISOString(), reason: 'Project created with skip-IDEA option' },
+        ]
+      : [
+          { status: 'IDEA' as ProjectStatus, changedAt: now.toISOString(), reason: 'Project created' },
+        ];
+
     const doc = await this.prisma.project.create({
       data: {
         title: data.title.trim(),
-        status: 'IDEA',
-        currentPhase: 'IDEA',
-        config: (data.config ?? {}) as any,
+        status: initialStatus,
+        currentPhase: initialPhase,
+        config: config as any,
         pendingFactUpdates: [],
-        statusHistory: [
-          {
-            status: 'IDEA',
-            changedAt: now.toISOString(),
-            reason: 'Project created',
-          },
-        ],
+        statusHistory: statusHistory as any,
       },
     });
     return this.toProject(doc);

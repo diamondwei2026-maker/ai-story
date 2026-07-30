@@ -74,6 +74,7 @@ const MODEL_MAP: Record<TaskType, string> = {
 };
 
 const TASK_MAX_TOKENS: Partial<Record<TaskType, number>> = {
+  [TaskType.SETTING]: 16384,
   [TaskType.BEATS]: 32768,
 };
 

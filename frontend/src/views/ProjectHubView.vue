@@ -317,7 +317,12 @@ function stageTagClass(status: string): string {
 }
 
 function genreLabel(project: Project): string {
-  return project.config?.genre ?? '未分类';
+  const raw = project.config?.genre;
+  if (!raw) return '未分类';
+  const tags = raw.split(',').map((t) => t.trim()).filter(Boolean);
+  if (tags.length === 0) return '未分类';
+  if (tags.length <= 2) return tags.join(' · ');
+  return `${tags.slice(0, 2).join(' · ')} +${tags.length - 2}`;
 }
 
 function projectDescription(project: Project): string | null {
@@ -393,18 +398,21 @@ async function loadProjects() {
   }
 }
 
-async function handleCreateProject(title: string, genre?: string) {
-  const project = await projectStore.createProject(title);
-  if (genre) {
-    try {
-      await import('@/api/project').then((m) =>
-        m.updateProject(project.id, { config: { genre } }),
-      );
-    } catch {
-      // non-critical
-    }
-  }
-  router.push({ name: 'workflow.idea', params: { id: project.id } });
+async function handleCreateProject(input: {
+  title: string;
+  genre?: string;
+  skipIdea: boolean;
+  description?: string;
+}) {
+  const project = await projectStore.createProject({
+    title: input.title,
+    genre: input.genre,
+    skipIdea: input.skipIdea,
+    description: input.description,
+  });
+  // When skipping IDEA, navigate directly to SETTING stage
+  const routeName = input.skipIdea ? 'workflow.setting' : 'workflow.idea';
+  router.push({ name: routeName, params: { id: project.id } });
 }
 
 function handleDeleteRequest(projectId: string) {

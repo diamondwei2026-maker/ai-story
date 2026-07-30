@@ -20,6 +20,13 @@ import { ContextBudgetService } from '../ai-gateway/context-budget.service';
 import { FactsheetCompensationService } from './factsheet-compensation.service';
 import { FactsheetService } from './factsheet.service';
 import { ReviewService } from './review.service';
+import {
+  matchGenre,
+  matchGenreWithPrimary,
+  renderDimensionSection,
+  getFrontendDimensions,
+  type GenreDimension,
+} from './genre-dimensions.config';
 
 const POWER_SYSTEM_REDLINES: { label: string; keywords: string[] }[] = [
   { label: '禁止宣扬暴力至上', keywords: ['暴力至上', '以暴制暴', '暴力崇拜'] },
@@ -155,12 +162,48 @@ export class StepService {
     const existing = await this.getSettingByProjectId(projectId);
     const step = existing ?? (await this.createPendingStep(projectId, 'SETTING'));
 
-    const idea = opts.idea ?? '';
+    // ── 创意来源：优先 opts.idea，其次 project.config.description（skipIdea 模式）───
+    const ideaFromOpts = opts.idea ?? '';
+    const configDescription =
+      typeof (project.config as any)?.description === 'string'
+        ? (project.config as any).description
+        : '';
+    const idea = ideaFromOpts || configDescription || '';
     const currentContent = opts.currentContent ?? '';
-    const prompt = this.promptLoader.renderTemplate('creation', 'setting-generation', { idea, currentContent });
+
+    // ── 体裁分析：从 IDEA 阶段提取类型标签，确定动态设定维度 + 文化锚定 ──
+    const { dimension, category, typeTags, culturalOrientation } =
+      await this.analyzeGenre(projectId, idea, project.config as Record<string, unknown> | undefined);
+    const dynamicDimensionSection = renderDimensionSection(dimension);
+    const frontendDimensions = getFrontendDimensions(dimension);
+
+    // 类型标签前置到创意中，让 AI 知道自己该写什么体裁
+    const ideaWithTags = typeTags
+      ? `【类型标签：${typeTags}】\n\n${idea}`
+      : idea;
+
+    // ── Step 1: Generate world-building (4 dimensions) ──
+    const worldPrompt = this.promptLoader.renderTemplate('creation', 'setting-generation', {
+      idea: ideaWithTags,
+      currentContent,
+      dynamicDimensionSection,
+      culturalOrientation,
+    });
 
     step.status = 'AI_GENERATING';
-    const { content: output, aiMeta } = await this.collectAiOutput(TaskType.SETTING, prompt);
+    const { content: worldOutput, aiMeta } = await this.collectAiOutput(TaskType.SETTING, worldPrompt);
+
+    // ── Step 2: Generate characters & relationships based on world setting ──
+    const charsPrompt = this.promptLoader.renderTemplate('creation', 'setting-characters-generation', {
+      idea: ideaWithTags,
+      worldSetting: worldOutput,
+      culturalOrientation,
+    });
+
+    const { content: charsOutput } = await this.collectAiOutput(TaskType.SETTING, charsPrompt);
+
+    // ── Merge outputs ──
+    const output = worldOutput + '\n\n' + charsOutput;
 
     const updated = await this.prisma.stepData.update({
       where: { id: step.id },
@@ -171,11 +214,97 @@ export class StepService {
         review: {
           powerSystemCheck: this.runPowerSystemCheck(output),
           annotations: '',
+          genreCategory: category,
+          settingDimensions: frontendDimensions,
         } as any,
         version: { increment: 1 },
       },
     });
     return this.toStepData(updated);
+  }
+
+  /**
+   * 体裁分析：从 IDEA 阶段已确认的卖点方案中提取类型标签，
+   * 匹配体裁配置，返回动态设定维度 + 文化锚定 + 类型标签。
+   * 若 IDEA 数据不可用（如 skipIdea 模式），使用 project.config.genre 和创意文本做匹配。
+   */
+  private async analyzeGenre(
+    projectId: string,
+    ideaText: string,
+    projectConfig?: Record<string, unknown>,
+  ): Promise<{ dimension: GenreDimension; category: string; typeTags: string; culturalOrientation: string }> {
+    try {
+      // 从 project.config.genre 提取用户选择的题材（逗号分隔的多选，如"历史,蒸汽朋克,群像"）
+      const configGenre = typeof projectConfig?.genre === 'string'
+        ? projectConfig.genre
+        : '';
+      // 拆分逗号分隔的标签，第一项为主标签
+      const genreTags = configGenre
+        ? configGenre.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+      const primaryGenre = genreTags[0] || '';
+
+      const ideaStep = await this.getIdeaByProjectId(projectId);
+      if (!ideaStep || !ideaStep.output) {
+        // 无 IDEA 数据（如 skipIdea）：用主标签优先匹配
+        const allTags = configGenre
+          ? `${configGenre} ${ideaText}`
+          : ideaText;
+        const result = primaryGenre
+          ? matchGenreWithPrimary(allTags, primaryGenre, ideaText)
+          : matchGenre(configGenre, ideaText);
+        return { ...result, typeTags: configGenre || '' };
+      }
+
+      // 从 IDEA output 中提取已确认卖点的类型标签
+      const review = ideaStep.review as Record<string, unknown> | null;
+      const selectedSellPoint = typeof review?.selectedSellPoint === 'number'
+        ? review.selectedSellPoint
+        : -1;
+
+      const sellPointBlocks = (ideaStep.output).match(
+        /## 卖点方案 \d+:[\s\S]*?(?=\n## 卖点方案 \d+:|\n#+ (?:一句话简介|500字简介)|$)/g,
+      ) ?? [];
+
+      // 提取选中卖点的类型标签
+      let typeTags = '';
+      if (selectedSellPoint >= 0 && sellPointBlocks[selectedSellPoint]) {
+        const tagMatch = sellPointBlocks[selectedSellPoint].match(
+          /类型标签[：:]\s*(.+)/,
+        );
+        if (tagMatch) {
+          typeTags = tagMatch[1].trim();
+        }
+      }
+
+      // 如果没找到指定的，从所有卖点中提取
+      if (!typeTags) {
+        for (const block of sellPointBlocks) {
+          const tagMatch = block.match(/类型标签[：:]\s*(.+)/);
+          if (tagMatch) {
+            typeTags = tagMatch[1].trim();
+            break;
+          }
+        }
+      }
+
+      // 合并 IDEA 类型标签 + 用户选择的 genre 标签
+      const combinedTags = [typeTags, configGenre].filter(Boolean).join(' ');
+      const searchText = `${combinedTags} ${ideaText}`;
+
+      // IDEA 类型标签的主标签（取第一个 + 分隔符前的标签）
+      const ideaPrimary = typeTags ? typeTags.split(/[+,，\s]+/)[0].trim() : '';
+      const effectivePrimary = ideaPrimary || primaryGenre;
+
+      const result = effectivePrimary
+        ? matchGenreWithPrimary(searchText, effectivePrimary, ideaText)
+        : matchGenre(combinedTags, ideaText);
+      return { ...result, typeTags: [typeTags, configGenre].filter(Boolean).join(',') || '' };
+    } catch {
+      // 任何异常都 fallback 到默认维度
+      const result = matchGenre('', ideaText);
+      return { ...result, typeTags: '' };
+    }
   }
 
   async confirmSetting(projectId: string): Promise<StepData> {
