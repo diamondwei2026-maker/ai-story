@@ -1,73 +1,55 @@
-import { useState } from "react";
-import {
-  ChevronRight,
-  Plus,
-  BookOpen,
-  Clock,
-  FileText,
-  X,
-  MoreHorizontal,
-  Trash2,
-  AlertTriangle,
-} from "lucide-react";
-import type { Project, ProjectStatus } from "../data/mockData";
-import { STAGE_LABELS, STAGE_COLORS, STAGE_ORDER } from "../data/mockData";
+import { useState } from "react"
+import { ChevronRight, Plus, BookOpen, Clock, FileText, X, MoreHorizontal, Trash2, AlertTriangle } from "lucide-react"
+import type { Project, ProjectStatus } from "../data/mockData"
+import { STAGE_LABELS, STAGE_COLORS, STAGE_ORDER } from "../data/mockData"
 
-type FilterTab = "全部" | "创作中" | "已完本" | "已归档";
+type FilterTab = "全部" | "创作中" | "已完本" | "已归档"
 
 interface ProjectCenterProps {
-  projects: Project[];
-  onOpenProject: (id: string) => void;
-  onCreateProject: (title: string, genre: string) => void;
-  onDeleteProject: (id: string) => void;
+  projects: Project[]
+  onOpenProject: (id: string) => void
+  onCreateProject: (input: { title: string; genre: string; skipIdea: boolean; description?: string }) => void
+  onDeleteProject: (id: string) => void
 }
 
-export function ProjectCenter({
-  projects,
-  onOpenProject,
-  onCreateProject,
-  onDeleteProject,
-}: ProjectCenterProps) {
-  const [activeFilter, setActiveFilter] = useState<FilterTab>("全部");
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+export function ProjectCenter({ projects, onOpenProject, onCreateProject, onDeleteProject }: ProjectCenterProps) {
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("全部")
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const filteredProjects = projects.filter((p) => {
-    if (activeFilter === "全部") return true;
-    if (activeFilter === "创作中")
-      return !["已完本", "已归档"].includes(p.status);
-    return p.status === activeFilter;
-  });
+    if (activeFilter === "全部") return true
+    if (activeFilter === "创作中") return !["已完本", "已归档"].includes(p.status)
+    return p.status === activeFilter
+  })
 
   const tabCount = (tab: FilterTab) => {
-    if (tab === "全部") return projects.length;
-    if (tab === "创作中")
-      return projects.filter((p) => !["已完本", "已归档"].includes(p.status))
-        .length;
-    return projects.filter((p) => p.status === tab).length;
-  };
+    if (tab === "全部") return projects.length
+    if (tab === "创作中") return projects.filter((p) => !["已完本", "已归档"].includes(p.status)).length
+    return projects.filter((p) => p.status === tab).length
+  }
 
   const formatWordCount = (count: number) => {
-    if (count === 0) return "尚未写作";
-    if (count >= 10000) return `${(count / 10000).toFixed(1)} 万字`;
-    return `${count} 字`;
-  };
+    if (count === 0) return "尚未写作"
+    if (count >= 10000) return `${(count / 10000).toFixed(1)} 万字`
+    return `${count} 字`
+  }
 
   const getActionLabel = (status: ProjectStatus) => {
-    if (status === "已完本") return "浏览作品";
-    if (status === "已归档") return "查看详情";
-    return "继续创作";
-  };
+    if (status === "已完本") return "浏览作品"
+    if (status === "已归档") return "查看详情"
+    return "继续创作"
+  }
 
-  const deleteTarget = projects.find((p) => p.id === deleteTargetId) ?? null;
+  const deleteTarget = projects.find((p) => p.id === deleteTargetId) ?? null
 
   return (
     <div className="min-h-screen bg-gray-50">
       {showNewModal && (
         <NewProjectModal
-          onConfirm={(title, genre) => {
-            setShowNewModal(false);
-            onCreateProject(title, genre);
+          onConfirm={(input) => {
+            setShowNewModal(false)
+            onCreateProject(input)
           }}
           onCancel={() => setShowNewModal(false)}
         />
@@ -77,8 +59,8 @@ export function ProjectCenter({
         <DeleteConfirmModal
           projectTitle={deleteTarget.title}
           onConfirm={() => {
-            onDeleteProject(deleteTargetId);
-            setDeleteTargetId(null);
+            onDeleteProject(deleteTargetId)
+            setDeleteTargetId(null)
           }}
           onCancel={() => setDeleteTargetId(null)}
         />
@@ -88,9 +70,7 @@ export function ProjectCenter({
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-gray-900">AI 小说创作平台</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              全流程 AI 辅助创作，从灵感到完本
-            </p>
+            <p className="text-gray-500 text-sm mt-0.5">全流程 AI 辅助创作，从灵感到完本</p>
           </div>
           <button
             onClick={() => setShowNewModal(true)}
@@ -104,24 +84,20 @@ export function ProjectCenter({
 
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center gap-0 mb-6 border-b border-gray-200">
-          {(["全部", "创作中", "已完本", "已归档"] as FilterTab[]).map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveFilter(tab)}
-                className={`px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px ${
-                  activeFilter === tab
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {tab}
-                <span className="ml-1.5 text-xs text-gray-400">
-                  {tabCount(tab)}
-                </span>
-              </button>
-            ),
-          )}
+          {(["全部", "创作中", "已完本", "已归档"] as FilterTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveFilter(tab)}
+              className={`px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px ${
+                activeFilter === tab
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab}
+              <span className="ml-1.5 text-xs text-gray-400">{tabCount(tab)}</span>
+            </button>
+          ))}
         </div>
 
         {filteredProjects.length === 0 ? (
@@ -145,7 +121,7 @@ export function ProjectCenter({
         )}
       </main>
     </div>
-  );
+  )
 }
 
 function ProjectCard({
@@ -155,14 +131,14 @@ function ProjectCard({
   onClick,
   onDeleteRequest,
 }: {
-  project: Project;
-  actionLabel: string;
-  formatWordCount: (n: number) => string;
-  onClick: () => void;
-  onDeleteRequest: () => void;
+  project: Project
+  actionLabel: string
+  formatWordCount: (n: number) => string
+  onClick: () => void
+  onDeleteRequest: () => void
 }) {
-  const [showMenu, setShowMenu] = useState(false);
-  const isArchived = project.status === "已归档";
+  const [showMenu, setShowMenu] = useState(false)
+  const isArchived = project.status === "已归档"
 
   return (
     <div
@@ -173,18 +149,14 @@ function ProjectCard({
         <div className="flex-1 min-w-0">
           <h3 className="text-gray-900 truncate">{project.title}</h3>
           {project.description ? (
-            <p className="text-gray-500 text-sm mt-1 line-clamp-2 leading-relaxed">
-              {project.description}
-            </p>
+            <p className="text-gray-500 text-sm mt-1 line-clamp-2 leading-relaxed">{project.description}</p>
           ) : (
             <p className="text-gray-400 text-sm mt-1 italic">暂无简介</p>
           )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className={`text-xs px-2 py-1 rounded-md border ${STAGE_COLORS[project.status]}`}
-          >
+          <span className={`text-xs px-2 py-1 rounded-md border ${STAGE_COLORS[project.status]}`}>
             {STAGE_LABELS[project.status]}
           </span>
 
@@ -193,17 +165,11 @@ function ProjectCard({
             {showMenu && (
               <div
                 className="fixed inset-0 z-10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(false);
-                }}
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false) }}
               />
             )}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
               className={`p-1 rounded-md transition-colors ${showMenu ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
             >
               <MoreHorizontal size={15} />
@@ -212,9 +178,9 @@ function ProjectCard({
               <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 py-1 overflow-hidden">
                 <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMenu(false);
-                    onDeleteRequest();
+                    e.stopPropagation()
+                    setShowMenu(false)
+                    onDeleteRequest()
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
@@ -246,23 +212,18 @@ function ProjectCard({
         <div className="space-y-1.5">
           <div className="flex items-center gap-1">
             {STAGE_ORDER.map((stage) => {
-              const isCompleted = project.completedStages.includes(stage);
-              const isCurrent =
-                project.currentStage === stage && project.status !== "已完本";
-              const isDone = project.status === "已完本";
+              const isCompleted = project.completedStages.includes(stage)
+              const isCurrent = project.currentStage === stage && project.status !== "已完本"
+              const isDone = project.status === "已完本"
               return (
                 <div key={stage} className="flex items-center flex-1 gap-1">
                   <div
                     className={`h-1 flex-1 rounded-full transition-colors ${
-                      isCompleted || isDone
-                        ? "bg-gray-800"
-                        : isCurrent
-                          ? "bg-gray-400"
-                          : "bg-gray-200"
+                      isCompleted || isDone ? "bg-gray-800" : isCurrent ? "bg-gray-400" : "bg-gray-200"
                     }`}
                   />
                 </div>
-              );
+              )
             })}
           </div>
           <div className="flex justify-between text-xs text-gray-400">
@@ -282,15 +243,15 @@ function ProjectCard({
             : "border-gray-200 text-gray-700 hover:bg-gray-50"
         }`}
         onClick={(e) => {
-          e.stopPropagation();
-          if (!isArchived) onClick();
+          e.stopPropagation()
+          if (!isArchived) onClick()
         }}
       >
         {actionLabel}
         <ChevronRight size={14} />
       </button>
     </div>
-  );
+  )
 }
 
 function DeleteConfirmModal({
@@ -298,15 +259,12 @@ function DeleteConfirmModal({
   onConfirm,
   onCancel,
 }: {
-  projectTitle: string;
-  onConfirm: () => void;
-  onCancel: () => void;
+  projectTitle: string
+  onConfirm: () => void
+  onCancel: () => void
 }) {
   return (
-    <div
-      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
-      onClick={onCancel}
-    >
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onCancel}>
       <div
         className="bg-white rounded-xl border border-gray-200 shadow-lg p-6 w-full max-w-sm mx-4 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -339,41 +297,29 @@ function DeleteConfirmModal({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function NewProjectModal({
   onConfirm,
   onCancel,
 }: {
-  onConfirm: (title: string, genre: string) => void;
-  onCancel: () => void;
+  onConfirm: (input: { title: string; genre: string; skipIdea: boolean; description?: string }) => void
+  onCancel: () => void
 }) {
-  const [title, setTitle] = useState("");
-  const [genre, setGenre] = useState("");
+  const [title, setTitle] = useState("")
+  const [genre, setGenre] = useState("")
+  const [skipIdea, setSkipIdea] = useState(false)
+  const [description, setDescription] = useState("")
 
-  const GENRE_OPTIONS = [
-    "科幻",
-    "玄幻",
-    "仙侠",
-    "都市",
-    "古风",
-    "悬疑",
-    "末日",
-    "历史",
-    "军事",
-    "其他",
-  ];
+  const GENRE_OPTIONS = ["科幻", "玄幻", "仙侠", "都市", "古风", "悬疑", "末日", "历史", "军事", "其他"]
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl border border-gray-200 shadow-lg p-6 w-full max-w-md mx-4 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="text-gray-900">新建项目</h3>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
             <X size={18} />
           </button>
         </div>
@@ -393,15 +339,11 @@ function NewProjectModal({
               autoFocus
               maxLength={30}
             />
-            <div className="text-right text-xs text-gray-400 mt-1">
-              {title.length}/30
-            </div>
+            <div className="text-right text-xs text-gray-400 mt-1">{title.length}/30</div>
           </div>
 
           <div>
-            <label className="text-sm text-gray-700 block mb-1.5">
-              题材类型（选填）
-            </label>
+            <label className="text-sm text-gray-700 block mb-1.5">题材类型（选填）</label>
             <div className="flex flex-wrap gap-2 mb-2">
               {GENRE_OPTIONS.map((g) => (
                 <button
@@ -425,6 +367,39 @@ function NewProjectModal({
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 bg-gray-50"
             />
           </div>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3.5">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={skipIdea}
+                onChange={(e) => setSkipIdea(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+              />
+              <span>
+                <span className="block text-sm text-gray-800">我已有灵感与简介，跳过灵感提取阶段</span>
+                <span className="mt-1 block text-xs leading-relaxed text-gray-500">创建后将直接进入设定集，灵感提取会标记为已完成。</span>
+              </span>
+            </label>
+
+            {skipIdea && (
+              <div className="mt-4 border-t border-gray-200 pt-4">
+                <label className="mb-1.5 block text-sm text-gray-700">
+                  故事简介
+                  <span className="ml-0.5 text-red-500">*</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="粘贴你已有的故事简介，AI 将基于它继续设定集创作..."
+                  className="min-h-[104px] w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
+                  rows={4}
+                  maxLength={1000}
+                />
+                <div className="mt-1 text-right text-xs text-gray-400">{description.length}/1000</div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 justify-end pt-1">
@@ -435,14 +410,21 @@ function NewProjectModal({
             取消
           </button>
           <button
-            onClick={() => onConfirm(title.trim(), genre.trim())}
-            disabled={!title.trim()}
+            onClick={() =>
+              onConfirm({
+                title: title.trim(),
+                genre: genre.trim(),
+                skipIdea,
+                description: skipIdea ? description.trim() : undefined,
+              })
+            }
+            disabled={!title.trim() || (skipIdea && !description.trim())}
             className="text-sm bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            创建并开始
+            {skipIdea ? "创建并进入设定集" : "创建并开始"}
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }
