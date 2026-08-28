@@ -151,6 +151,14 @@ else
 fi
 npm run build   # server: prisma generate + nest build; frontend: vue-tsc + vite build
 
+# 把前端产物复制到标准 Web 目录, 避免 nginx 读不了 /root 下的文件 (权限坑)
+# nginx 以 nginx 用户运行, /root 权限 700 无法穿透, 放 /var/www 下彻底解决
+WEB_ROOT="/var/www/novelcraft"
+mkdir -p "$WEB_ROOT"
+cp -r "$APP_DIR/frontend/dist/." "$WEB_ROOT/"
+chmod -R o+rX "$WEB_ROOT"
+echo "   前端已部署到 $WEB_ROOT"
+
 # ---------- 8. 初始化数据库 (MongoDB Atlas 建集合) ----------
 echo "==> [8/10] 初始化数据库 (prisma db push)"
 ( cd "$APP_DIR/server" && npx prisma db push --skip-generate )
@@ -171,7 +179,7 @@ server {
     server_name _;                 # 有域名时改为你的域名
     client_max_body_size 50m;
 
-    root /APP_DIR_PLACEHOLDER/frontend/dist;
+    root /var/www/novelcraft;
     index index.html;
 
     # 后端反代: NestJS 全局前缀 /api, 原样透传
@@ -193,7 +201,6 @@ server {
     }
 }
 NGINX
-sed -i "s|/APP_DIR_PLACEHOLDER|$APP_DIR|" /etc/nginx/conf.d/novelcraft.conf
 if [ -n "${DOMAIN:-}" ]; then
   sed -i "s|server_name _;|server_name $DOMAIN;|" /etc/nginx/conf.d/novelcraft.conf
 fi
