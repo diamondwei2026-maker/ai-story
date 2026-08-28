@@ -1273,7 +1273,32 @@ export class StepService {
     // contaminate the field, causing the ReviewPanel to render prematurely.
 
     // Step 3: FactSheet update (serial — involves CAS write)
-    const sheetUpdateResult = await this.collectAiOutput(TaskType.FACTSHEET_UPDATE, `Update FactSheet with: ${chapterContent}`);
+    const sheetUpdateResult = await this.collectAiOutput(
+      TaskType.FACTSHEET_UPDATE,
+      [
+        '你是一位小说事实表维护助手。请从以下章节内容中提取信息，更新事实表。',
+        '',
+        '## 输出格式（严格 JSON，不要包含 markdown 代码块标记）',
+        '{',
+        '  "新出场角色": [{"name": "角色名", "identity": "身份简述", "firstChapter": ' + chapter.chapterNumber + ', "type": "常驻配角|阶段性角色|路人"}],',
+        '  "角色退场": [{"name": "角色名", "chapter": ' + chapter.chapterNumber + ', "reason": "死亡|离开|隐匿|完成使命|其他", "isPermanent": true}],',
+        '  "角色状态变化": [{"name": "角色名", "field": "变化字段（如修为/身份/与主角关系/持有物品）", "oldValue": "旧值（未知则填-）", "newValue": "新值"}],',
+        '  "角色关系变化": [{"name1": "角色A", "name2": "角色B", "oldRelation": "旧关系（未知则填-）", "newRelation": "新关系", "reason": "变化原因"}],',
+        '  "伏笔进度": [{"id": "伏笔标识", "status": "埋设|推进|回收", "detail": "本章具体内容"}],',
+        '  "已用路人命名": ["本章使用的路人姓名列表，用于后续章节去重"]',
+        '}',
+        '',
+        '## 要求',
+        '- 只提取本章明确出现的信息，不要推测或编造',
+        '- 如果某类信息本章没有，对应数组留空 []',
+        '- 角色姓名必须与原文完全一致，不要自行修改',
+        '- "已用路人命名"帮助后续章节避免重复使用同一个路人名字',
+        '- 确保输出是合法 JSON（双引号、无尾逗号），不要包裹在 ```json 代码块中',
+        '',
+        '## 章节内容',
+        chapterContent,
+      ].join('\n'),
+    );
     let updateEntries: Record<string, unknown>;
     try {
       updateEntries = JSON.parse(sheetUpdateResult.content);
