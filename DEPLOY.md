@@ -350,6 +350,7 @@ bash deploy.sh            # 重新构建 + 重启，全程自动
 | 提示 `command not found`（如 git/unzip/pm2） | 新系统没装该软件：git/unzip 用 `dnf install -y`；**pm2 特殊**：它装好了但不在 PATH（tarball 版 Node 的坑），修复见下行 |
 | 部署第 9 步报 `pm2: command not found` | Node 是 tarball 安装的，全局目录不在 PATH，但 pm2 其实已装好 → 补软链：`ln -sf "$(npm prefix -g)/bin/pm2" /usr/local/bin/pm2`，然后重跑 `bash deploy.sh`（新版本脚本会自动处理） |
 | 首页 500，nginx 日志报 `Permission denied`（stat() .../frontend/dist/index.html failed 13） | nginx 用户读不了 `/root` 下的文件（`/root` 权限 700）→ 立即修：`chmod o+x /root && chmod -R o+rX /root/ai-story/frontend/dist`；**新版 deploy.sh 已改为自动部署到 `/var/www/novelcraft` 根治此问题**（重跑 `bash deploy.sh` 即可） |
+| 页面能开，但报 CORS 错误 / 请求发到 `your-app.onrender.com` | 前端构建时用了 `.env.production` 里旧的 Render 占位地址 → 立即修：`cd /root/ai-story && VITE_API_BASE_URL=/api npm run build -w frontend && cp -r frontend/dist/. /var/www/novelcraft/`，浏览器 Ctrl+F5 刷新；新版仓库已把该占位地址清空（默认同源 `/api`） |
 | 克隆后找不到 `deploy.sh` / `package.json` | 分支不对：`git clone` 默认下载 `main` 分支（旧代码），部署文件在 `develop` 上 → **删掉重新 `git clone -b develop`**（见 §4 第 4 步），不要用 clone+checkout 的方式容易切不干净 |
 | 运行 `bash deploy.sh` 第 5 步报"找不到 package.json"/提示设置 GIT_REPO | 代码目录不完整（多半是 main/develop 分支混乱）→ `cd /root && rm -rf ai-story && git clone -b develop ...` 重新克隆 |
 | 忘记 PM2 命令 | 记三个：`pm2 status` / `pm2 logs` / `pm2 restart` |
