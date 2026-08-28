@@ -212,12 +212,42 @@ git push origin HEAD
 ```
 > 首次推送：用户名填 GitHub 用户名，**密码框填的不是账号密码**，而是 Personal Access Token（GitHub 设置 → Developer settings → Personal access tokens → Generate new token，勾选 `repo` 权限）。
 
-**服务器上**（登录后执行，见第 5 步）：
-```bash
-cd /root
-git clone https://github.com/diamondwei2026-maker/ai-story.git
-cd ai-story
-```
+**服务器上（怎么打开终端、在哪输入，完整步骤）：**
+
+这三条命令是**在服务器上输入**的，不是在你自己电脑的 PowerShell 里。具体操作：
+
+1. **打开服务器的"终端窗口"**（二选一）：
+   - 方式一（网页终端，推荐）：阿里云控制台 → 你的服务器 → 「**远程连接**」（走阿里云内部通道，无需 22 端口）→ 进入网页版黑窗口
+   - 方式二（本机终端）：自己的电脑打开 PowerShell，输入 `ssh root@你的服务器IP` 回车（1.7 配好密钥后免密直接进）
+2. **确认登录成功**：窗口里出现 `[root@xxx ~]#` 这样的提示符（`#` = 你是 root 管理员），就说明已登录服务器，可以输入命令了
+3. **先安装 git**（新装系统默认不带 git，不装会报 `-bash: git: command not found`）：
+   ```bash
+   dnf install -y git
+   ```
+   `dnf` = 系统包管理器（类似应用商店），`install -y` = 安装并自动确认。
+4. **逐条输入下面 3 条命令**（每条输完按回车，等它执行完再输下一条）：
+   ```bash
+   cd /root
+   git clone -b develop https://github.com/diamondwei2026-maker/ai-story.git
+   cd ai-story
+   ```
+5. **为什么要用 `git clone -b develop`（重点！不加会出各种怪问题）**：
+   - 这个仓库的**默认分支是 `main`**（旧代码），而部署相关的 `deploy.sh`、`package.json` 等文件都在 **`develop`** 分支上
+   - `git clone`（不带 `-b`）默认只下载 `main` 分支，克隆完目录里**没有 deploy.sh**——直接 `bash deploy.sh` 会报 `No such file or directory`
+   - `-b develop` = **克隆时直接指定分支**，克隆完自动就在 develop 上，不用再 `git checkout`
+   - ⚠️ 之前踩过的坑：先克隆 main 再 `git checkout develop`，容易切不干净，导致目录里 deploy.sh 有、package.json 却没有，运行 `bash deploy.sh` 会在第 5 步报"找不到 package.json"（提示设置 GIT_REPO）。**重新用 `-b develop` 克隆一次最省事**
+6. **看执行结果**：
+   - `dnf install -y git` → 末尾出现 `Complete!` 说明装好了
+   - `cd /root` → 没输出是正常的（只是"进入目录"）
+   - `git clone -b develop ...` → 应显示 `Cloning into 'ai-story'...` 然后 `done.`，说明代码下载成功
+   - `cd ai-story` → 同样无输出，正常
+7. **验证**：输入 `ls` 回车，**必须能看到 `package.json`、`deploy.sh`、`server`、`frontend`** 这些文件，才说明代码到位。少任何一个都是分支不对，重新用第 4 步的 `-b develop` 克隆
+
+> 💡 如果之前克隆/切换出了问题导致代码目录混乱，直接删了重来最快：
+> ```bash
+> cd /root && rm -rf ai-story && git clone -b develop https://github.com/diamondwei2026-maker/ai-story.git && cd ai-story
+> ```
+> 登录后默认就在 `/root`（root 用户的家目录），所以第一条 `cd /root` 其实经常可以省略，写上是为了保证在任何位置都能执行成功。
 > 国内服务器访问 GitHub 慢属正常；可先把仓库镜像到 Gitee 再克隆。
 
 ### 方案 B：scp 直接上传（不想用 git 时）
@@ -300,9 +330,10 @@ systemctl reload nginx                      # 重载 nginx 配置
 ### 更新代码（以后改功能要上线）
 ```bash
 cd /root/ai-story
-git pull            # 拉到最新（方案 B 则重新上传覆盖）
-bash deploy.sh      # 重新构建 + 重启，全程自动
+git pull origin develop   # 拉到 develop 分支最新代码（方案 B 则重新上传覆盖）
+bash deploy.sh            # 重新构建 + 重启，全程自动
 ```
+> 记住服务器始终在 `develop` 分支，所以更新代码用 `git pull origin develop`，不要用不带分支的 `git pull`（它默认拉 main 分支，会把部署文件拉丢）。
 
 ---
 
@@ -316,6 +347,10 @@ bash deploy.sh      # 重新构建 + 重启，全程自动
 | 连不上数据库 | 检查连接串：密码有无特殊字符、`/novelcraft` 库名加没加、Atlas Network Access 是否开了 `0.0.0.0/0` |
 | 服务器卡死/内存满 | `free -h` 看内存；构建依赖脚本自动建的 2G swap，构建时别开太多程序 |
 | SSH 连不上 | ① 安全组 22 是否放行 → ② 是否关密码前密钥没验证好（用 Workbench 兜底进） |
+| 提示 `command not found`（如 git/unzip/pm2） | 新系统没装该软件：git/unzip 用 `dnf install -y`；**pm2 特殊**：它装好了但不在 PATH（tarball 版 Node 的坑），修复见下行 |
+| 部署第 9 步报 `pm2: command not found` | Node 是 tarball 安装的，全局目录不在 PATH，但 pm2 其实已装好 → 补软链：`ln -sf "$(npm prefix -g)/bin/pm2" /usr/local/bin/pm2`，然后重跑 `bash deploy.sh`（新版本脚本会自动处理） |
+| 克隆后找不到 `deploy.sh` / `package.json` | 分支不对：`git clone` 默认下载 `main` 分支（旧代码），部署文件在 `develop` 上 → **删掉重新 `git clone -b develop`**（见 §4 第 4 步），不要用 clone+checkout 的方式容易切不干净 |
+| 运行 `bash deploy.sh` 第 5 步报"找不到 package.json"/提示设置 GIT_REPO | 代码目录不完整（多半是 main/develop 分支混乱）→ `cd /root && rm -rf ai-story && git clone -b develop ...` 重新克隆 |
 | 忘记 PM2 命令 | 记三个：`pm2 status` / `pm2 logs` / `pm2 restart` |
 
 ---

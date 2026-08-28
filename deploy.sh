@@ -92,6 +92,14 @@ export PRISMA_ENGINES_MIRROR="${PRISMA_ENGINES_MIRROR:-https://registry.npmmirro
 # ---------- 3. PM2 ----------
 echo "==> [3/10] 安装 PM2"
 command -v pm2 >/dev/null || npm i -g pm2 --no-audit --no-fund
+# 修复: tarball 安装的 Node 全局目录(如 /usr/local/node-v20.x-linux-x64/bin)不在 PATH,
+# 全局装的 pm2 命令行找不到, 这里自动补个软链到 /usr/local/bin
+PM2_BIN="$(npm prefix -g)/bin/pm2"
+if [ -f "$PM2_BIN" ] && ! command -v pm2 >/dev/null 2>&1; then
+  ln -sf "$PM2_BIN" /usr/local/bin/pm2
+  echo "   已为 pm2 创建软链: /usr/local/bin/pm2"
+fi
+command -v pm2 >/dev/null 2>&1 || { echo "❌ pm2 安装失败"; exit 1; }
 
 # ---------- 4. nginx ----------
 echo "==> [4/10] 安装 nginx"
