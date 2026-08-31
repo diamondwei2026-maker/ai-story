@@ -385,14 +385,49 @@ bash deploy.sh            # 重新构建 + 重启，全程自动
 
 ## 9. 进阶（可选）
 
-### 9.1 域名 + HTTPS
-1. 买域名（阿里云万网）→ 云解析 DNS 加 A 记录：`@` → 服务器公网 IP
-2. `DOMAIN=你的域名 bash deploy.sh`（自动写入 server_name）
-3. 免费证书：
-   ```bash
-   dnf install -y certbot python3-certbot-nginx
-   certbot --nginx -d 你的域名
-   ```
+### 9.1 域名 + HTTPS（完整流程，含踩坑记录）
+
+**① 加 A 记录（阿里云 DNS）**
+阿里云控制台 → 「云解析 DNS」→ 点你的域名 → 「解析设置」→ 「添加记录」：
+- 记录类型：**A**；主机记录：子域名前缀（如 `story`，访问 `story.你的域名.com`；填 `@` 则解析到主域名）；记录值：**服务器公网 IP**；TTL 默认
+- ⚠️ 已有记录**不要动**，只新增；若 `story` 已是 CNAME 需改成 A（CNAME 不能指向 IP）
+
+**② 确认安全组放行 443**（HTTPS 必须，漏了浏览器提示"无法访问此网站"）
+安全组/防火墙 → 检查 443 是否已放行（方法同 §1.5，常被漏掉）。
+
+**③ 验证 DNS 生效**（服务器上执行，nslookup 可能没装，用这个）：
+```bash
+getent hosts story.你的域名.com     # 应显示 47.96.160.201 这类公网 IP
+```
+- 返回**公网 IP** → 继续；返回空/别的 IP → DNS 未生效或 A 记录值不对，**等几分钟再查**
+
+**④ 部署时带上 DOMAIN（关键！否则 certbot 会失败）**
+```bash
+cd /root/ai-story
+DOMAIN=story.你的域名.com bash deploy.sh
+```
+- deploy.sh 会把 nginx 的 `server_name _` 自动改成你的域名
+- ⚠️ **不带 DOMAIN 跑 deploy.sh = nginx 没有域名** → certbot 会报 `Could not automatically find a matching server block`（本次真实踩坑）。补救：`sed -i 's/server_name _;/server_name 你的域名;/' /etc/nginx/conf.d/novelcraft.conf && nginx -t && systemctl reload nginx`
+
+**⑤ 签发并安装免费证书**
+```bash
+dnf install -y epel-release    # certbot 在 EPEL 源里，先启用（找不到包时执行这步）
+dnf install -y certbot python3-certbot-nginx
+certbot --nginx -d story.你的域名.com
+```
+流程：填邮箱 → `A` 同意条款 → `N` 不分享邮箱 → 看到 `Successfully received certificate` = 成功。
+
+**⑥ 可能遇到的 certbot 提示**
+- `Certificate not yet due for renewal` + 选项 1/2 → 证书**其实已签发**，只是没装进 nginx → 选 **1**（重新安装现有证书，不重复申请）
+- `Could not install certificate / matching server block` → 回到 ④ 的补救命令改 server_name，再 `certbot install --cert-name 你的域名`
+- certbot 不存在 → `dnf install -y certbot python3-certbot-nginx`（先确认装过）
+
+**⑦ 验证**
+```bash
+ss -tlnp | grep :443                       # 看到 LISTEN 0.0.0.0:443
+curl -sk -o /dev/null -w "%{http_code}\n" https://127.0.0.1/   # 返回 200
+```
+浏览器访问 `https://story.你的域名.com`，地址栏有小锁 = 完成；http 会自动跳 https。
 
 ### 9.2 fail2ban（不锁自己 IP 的保险）
 自动封禁"反复登录失败"的 IP，**只封攻击者、从不封你**（正常登录不会失败，换 IP 无感）：
